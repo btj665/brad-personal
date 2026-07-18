@@ -7,6 +7,7 @@
     section: 'world',
     viewMode: localStorage.getItem('viewMode') || 'bubbles', // 'bubbles' | 'list'
     location: safeParse(localStorage.getItem('location')),
+    excluded: new Set(safeParse(localStorage.getItem('excludedSources')) || []),
     sections: {},          // section -> {clusters, errors, fetchedAt}
     navStack: [],          // view descriptors for back navigation
     currentView: { kind: 'section' },
@@ -25,6 +26,27 @@
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
     ));
   }
+  // Outlet favicon via source URL or article link (skips aggregator domains).
+  function faviconFor(item) {
+    try {
+      const host = new URL(item.sourceUrl || item.link).hostname;
+      if (!host || host.endsWith('news.google.com')) return '';
+      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
+    } catch { return ''; }
+  }
+  function clusterFavicons(cluster, max = 3) {
+    const seen = new Set();
+    const icons = [];
+    for (const it of cluster.items) {
+      const url = faviconFor(it);
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      icons.push(url);
+      if (icons.length >= max) break;
+    }
+    return icons;
+  }
+
   function timeAgo(ts) {
     if (!ts) return '';
     const m = Math.round((Date.now() - ts) / 60000);
@@ -43,6 +65,7 @@
     setStatus(`Loading ${sectionLabel(section)} news…`);
     const params = new URLSearchParams({ section });
     if (fresh) params.set('fresh', '1');
+    if (state.excluded.size) params.set('exclude', [...state.excluded].join('|'));
     const loc = state.location;
     if (loc) {
       if (loc.city) params.set('city', loc.city);
@@ -177,10 +200,14 @@
       el.style.cssText = `padding:${Math.round(d * 0.15)}px;` +
         `font-size:${Math.max(11.5, d / 12.5)}px;` +
         (c.image ? `--img:url("${encodeURI(c.image)}");` : '');
+      const icons = clusterFavicons(c);
       el.innerHTML = `
         ${i === 0 ? '<span class="b-kicker">Top story</span>' : ''}
         <span class="b-title" style="-webkit-line-clamp:${d > 175 ? 5 : 4}">${esc(c.title)}</span>
-        <span class="b-meta">${c.sourceCount} source${c.sourceCount === 1 ? '' : 's'} · ${timeAgo(c.latest)}</span>`;
+        <span class="b-meta">${c.sourceCount} source${c.sourceCount === 1 ? '' : 's'} · ${timeAgo(c.latest)}</span>
+        ${icons.length ? `<span class="b-sources">${icons.map((u) =>
+          `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">`).join('')}${
+          c.sourceCount > icons.length ? `<i>+${c.sourceCount - icons.length}</i>` : ''}</span>` : ''}`;
       el.title = c.title;
       el.addEventListener('click', () => showStory(c));
       wrap.appendChild(el);
@@ -222,7 +249,7 @@
             ${a.image ? `<img src="${esc(a.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
             <div class="card-body">
               <p class="card-title">${esc(a.title)}</p>
-              <div class="card-meta">${esc(a.sourceName || '')} ${a.timestamp ? `· ${timeAgo(a.timestamp)}` : ''}</div>
+              <div class="card-meta">${(() => { const f = faviconFor(a); return f ? `<img class="src-ico" src="${esc(f)}" alt="" onerror="this.remove()">` : ''; })()}${esc(a.sourceName || '')} ${a.timestamp ? `· ${timeAgo(a.timestamp)}` : ''}</div>
               ${a.description ? `<p class="card-desc">${esc(a.description)}</p>` : ''}
             </div>
           </div>`).join('')}
@@ -532,6 +559,58 @@
     }
   }
 
+  // ---------- sources ----------
+  const sourcesDialog = $('#sources-dialog');
+
+  async function openSourcesDialog() {
+    let data = state.sections[state.section];
+    if (!data?.sources) {
+      try { data = await loadSection(state.section); } catch { data = null; }
+    }
+    $('#sources-section-name').textContent = sectionLabel(state.section);
+    const list = $('#sources-list');
+    const sources = data?.sources || [];
+    if (!sources.length) {
+      list.innerHTML = '<p class="muted">No sources loaded yet — open a section with stories first.</p>';
+    } else {
+      list.innerHTML = sources.map((s, i) => `
+        <label class="source-row">
+          <input type="checkbox" data-name="${esc(s.name)}" ${state.excluded.has(s.name) ? '' : 'checked'}>
+          <span class="source-name">${esc(s.name)}</span>
+          <span class="source-count">${s.count}</span>
+        </label>`).join('');
+    }
+    sourcesDialog.showModal();
+  }
+
+  $('#sources-btn').addEventListener('click', openSourcesDialog);
+  $('#sources-all').addEventListener('click', () => {
+    sourcesDialog.querySelectorAll('input[type=checkbox]').forEach((c) => { c.checked = true; });
+  });
+  $('#sources-none').addEventListener('click', () => {
+    sourcesDialog.querySelectorAll('input[type=checkbox]').forEach((c) => { c.checked = false; });
+  });
+  $('#sources-cancel').addEventListener('click', () => sourcesDialog.close());
+  $('#sources-apply').addEventListener('click', () => {
+    sourcesDialog.querySelectorAll('input[type=checkbox]').forEach((c) => {
+      const name = c.dataset.name;
+      if (c.checked) state.excluded.delete(name);
+      else state.excluded.add(name);
+    });
+    localStorage.setItem('excludedSources', JSON.stringify([...state.excluded]));
+    state.sections = {}; // re-cluster every section with the new source set
+    sourcesDialog.close();
+    updateSourcesChip();
+    state.navStack = [];
+    showSection(state.section);
+  });
+
+  function updateSourcesChip() {
+    $('#sources-btn').textContent = state.excluded.size
+      ? `📡 Sources (${state.excluded.size} off)`
+      : '📡 Sources';
+  }
+
   // ---------- settings ----------
   const settingsDialog = $('#settings-dialog');
   $('#settings-btn').addEventListener('click', () => {
@@ -569,6 +648,7 @@
 
   // ---------- init ----------
   if (state.location?.label) $('#location-chip').textContent = `📍 ${state.location.label}`;
+  updateSourcesChip();
   updateAiContext();
   showSection('world');
 })();

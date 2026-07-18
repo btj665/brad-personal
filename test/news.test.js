@@ -66,6 +66,7 @@ test('parseFeed handles RSS 2.0 with CDATA, media, and Google-News-style source 
   // " - Example Wire" suffix stripped because it matches <source>
   assert.equal(fire2.title, 'California wildfire spreads, evacuations ordered');
   assert.equal(fire2.sourceName, 'Example Wire');
+  assert.equal(fire2.sourceUrl, 'https://wire.example.com');
 
   assert.equal(markets.image, 'https://example.com/img/markets.png');
 });

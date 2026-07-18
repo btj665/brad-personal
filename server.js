@@ -98,7 +98,8 @@ const server = http.createServer(async (req, res) => {
             zip: q.get('zip') || '',
           }
         : null;
-      const data = await getSection(section, location, { fresh: q.get('fresh') === '1' });
+      const exclude = new Set((q.get('exclude') || '').split('|').filter(Boolean));
+      const data = await getSection(section, location, { fresh: q.get('fresh') === '1', exclude });
       return sendJson(res, 200, data);
     }
 
