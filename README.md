@@ -41,6 +41,26 @@ Then open **http://localhost:8360** in your browser.
 - News reading works without any API key; only the AI panel needs one.
 - Optional: `PORT=3000 npm start` to change the port.
 
+### Alternative: use your GitHub / Copilot account instead
+
+The AI panel can also run on **GitHub Models**, which works with a regular GitHub
+account (free tier included; higher rate limits if you have a GitHub Copilot plan):
+
+1. Create a fine-grained personal access token at
+   https://github.com/settings/personal-access-tokens with the **Models: read**
+   account permission.
+2. In the app, open **Settings (⚙)**, switch the provider to **GitHub Models**, and
+   paste the token (or start the server with `GITHUB_TOKEN` set).
+3. Optional: set `GITHUB_MODEL` to pick a model (default `openai/gpt-4o`).
+
+Trade-off: GitHub Models has no live web search, so broad questions like "what's
+going on with X right now" are answered only from the headlines/article on screen.
+The Anthropic provider searches the web for current reporting.
+
+> Note: Microsoft 365 Copilot / Copilot Pro subscriptions don't expose an API that
+> third-party apps can use, so they can't be plugged in directly — GitHub Models is
+> the supported way to use a Microsoft/GitHub account here.
+
 ## How it works
 
 - `server.js` — small zero-framework Node server: static UI + JSON API.

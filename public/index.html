@@ -71,11 +71,16 @@
   <!-- Settings dialog -->
   <dialog id="settings-dialog">
     <h3>Settings</h3>
-    <label for="api-key-input">Anthropic API key (for the AI panel)</label>
+    <label for="provider-select">AI provider</label>
+    <select id="provider-select">
+      <option value="anthropic">Anthropic Claude (best answers + live web search)</option>
+      <option value="github">GitHub Models (uses your GitHub / Copilot account, free tier)</option>
+    </select>
+    <label for="api-key-input" id="api-key-label">Anthropic API key</label>
     <input id="api-key-input" type="password" placeholder="sk-ant-…" autocomplete="off" />
-    <p class="muted">Stored only in this browser (localStorage) and sent only to your own
-    news-reader server, which forwards it to the Anthropic API. Not needed if the server
-    was started with <code>ANTHROPIC_API_KEY</code> set.</p>
+    <p class="muted" id="provider-help"></p>
+    <p class="muted">Keys are stored only in this browser (localStorage) and sent only to your
+    own news-reader server, which forwards them to the provider.</p>
     <div class="dialog-actions">
       <button id="settings-save" class="btn primary">Save</button>
       <button id="settings-cancel" class="btn ghost">Cancel</button>

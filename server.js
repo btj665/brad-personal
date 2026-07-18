@@ -114,7 +114,9 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && pathname === '/api/ask') {
       const body = await readBody(req);
-      const apiKey = req.headers['x-user-api-key'] || process.env.ANTHROPIC_API_KEY || '';
+      const provider = req.headers['x-ai-provider'] === 'github' ? 'github' : 'anthropic';
+      const envKey = provider === 'github' ? process.env.GITHUB_TOKEN : process.env.ANTHROPIC_API_KEY;
+      const auth = { provider, apiKey: req.headers['x-user-api-key'] || envKey || '' };
       res.writeHead(200, {
         'content-type': 'text/event-stream; charset=utf-8',
         'cache-control': 'no-cache',
@@ -123,7 +125,7 @@ const server = http.createServer(async (req, res) => {
       const sse = (data) => {
         if (!res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
       };
-      await handleAsk(body, apiKey, sse);
+      await handleAsk(body, auth, sse);
       res.end();
       return;
     }

@@ -299,6 +299,18 @@ dialog {
 }
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 dialog h3 { margin: 0 0 8px; }
+dialog select {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font: inherit;
+  margin: 6px 0 12px;
+}
+dialog select:focus { outline: none; border-color: var(--accent); }
+dialog label { font-size: 0.88rem; color: var(--text-dim); }
 dialog input {
   width: 100%;
   background: var(--bg);
