@@ -3,6 +3,7 @@
 
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,6 +24,7 @@ const MIME = {
   '.png': 'image/png',
   '.ico': 'image/x-icon',
   '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json',
 };
 
 function sendJson(res, status, data) {
@@ -139,7 +141,15 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`News reader running at http://localhost:${PORT}`);
+  console.log('News reader running:');
+  console.log(`  This computer:   http://localhost:${PORT}`);
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const a of addrs || []) {
+      if (a.family === 'IPv4' && !a.internal) {
+        console.log(`  On your network: http://${a.address}:${PORT}   (phones/tablets on the same Wi-Fi)`);
+      }
+    }
+  }
   if (!process.env.ANTHROPIC_API_KEY) {
     console.log('Note: ANTHROPIC_API_KEY is not set — the AI panel will prompt for a key in Settings.');
   }

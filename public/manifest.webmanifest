@@ -1,0 +1,12 @@
+{
+  "name": "Newsflow",
+  "short_name": "Newsflow",
+  "description": "Personal news reader — clustered hard-news headlines with an AI panel",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1117",
+  "theme_color": "#161b24",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

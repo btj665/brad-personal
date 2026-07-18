@@ -41,6 +41,33 @@ Then open **http://localhost:8360** in your browser.
 - News reading works without any API key; only the AI panel needs one.
 - Optional: `PORT=3000 npm start` to change the port.
 
+## Use it from your phone / tablet / other devices
+
+The server listens on your whole local network, not just this computer. When it starts
+it prints the address to use, e.g.:
+
+```
+News reader running:
+  This computer:   http://localhost:8360
+  On your network: http://192.168.1.42:8360   (phones/tablets on the same Wi-Fi)
+```
+
+1. **Allow it through the Windows firewall** — the first time you run `npm start`,
+   Windows shows a "Windows Defender Firewall has blocked some features" prompt for
+   Node.js. Check **Private networks** and click **Allow access**. (If you missed the
+   prompt, run this once in an *administrator* PowerShell:
+   `New-NetFirewallRule -DisplayName "Newsflow" -Direction Inbound -Protocol TCP -LocalPort 8360 -Action Allow`)
+2. On your phone/tablet (same Wi-Fi), open the `http://192.168.x.x:8360` address the
+   server printed.
+3. Optional: use your browser's **Add to Home Screen** to install it like an app.
+
+Notes:
+- The PC running the server must stay on. `PORT=...` changes the port.
+- Start the server with `ANTHROPIC_API_KEY` set so every device gets the AI panel
+  without pasting the key on each one (keys entered in Settings are per-device).
+- Browsers only allow the "Use my current location" button on `localhost` or HTTPS,
+  so on other devices set your location by ZIP code instead (one time — it's saved).
+
 ## How it works
 
 - `server.js` — small zero-framework Node server: static UI + JSON API.
