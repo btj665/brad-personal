@@ -26,6 +26,12 @@
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
     ));
   }
+  // Google News feed links are redirect pages the reader can't extract —
+  // those open at the original source in a new tab instead.
+  function isGoogleRedirect(link) {
+    try { return new URL(link).hostname.endsWith('news.google.com'); } catch { return false; }
+  }
+
   // Outlet favicon via source URL or article link (skips aggregator domains).
   function faviconFor(item) {
     try {
@@ -245,10 +251,10 @@
         <p class="muted">${cluster.items.length} article${cluster.items.length === 1 ? '' : 's'} from
           ${esc(cluster.sources.join(', ') || 'various sources')}</p>
         ${cluster.items.map((a, i) => `
-          <div class="article-row" data-i="${i}">
+          <div class="article-row" data-i="${i}" title="${isGoogleRedirect(a.link) ? 'Opens at the original source in a new tab' : ''}">
             ${a.image ? `<img src="${esc(a.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
             <div class="card-body">
-              <p class="card-title">${esc(a.title)}</p>
+              <p class="card-title">${esc(a.title)}${isGoogleRedirect(a.link) ? ' <span class="ext-mark">↗</span>' : ''}</p>
               <div class="card-meta">${(() => { const f = faviconFor(a); return f ? `<img class="src-ico" src="${esc(f)}" alt="" onerror="this.remove()">` : ''; })()}${esc(a.sourceName || '')} ${a.timestamp ? `· ${timeAgo(a.timestamp)}` : ''}</div>
               ${a.description ? `<p class="card-desc">${esc(a.description)}</p>` : ''}
             </div>
@@ -256,7 +262,11 @@
       </div>`;
     $('#back-btn').addEventListener('click', goBack);
     viewEl.querySelectorAll('.article-row').forEach((el) =>
-      el.addEventListener('click', () => showArticle(cluster.items[Number(el.dataset.i)])));
+      el.addEventListener('click', () => {
+        const item = cluster.items[Number(el.dataset.i)];
+        if (isGoogleRedirect(item.link)) window.open(item.link, '_blank', 'noopener');
+        else showArticle(item);
+      }));
     updateAiContext();
     viewEl.parentElement.scrollTop = 0;
   }

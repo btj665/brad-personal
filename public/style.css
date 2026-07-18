@@ -486,3 +486,6 @@ dialog input:focus { outline: none; border-color: var(--accent); }
     box-shadow: -12px 0 40px rgba(0,0,0,0.5);
   }
 }
+
+/* external-link marker on Google News rows */
+.ext-mark { color: var(--accent); font-size: 0.85em; }
