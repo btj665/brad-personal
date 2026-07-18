@@ -5,6 +5,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { getSection } from './lib/news.js';
@@ -12,9 +13,21 @@ import { lookupZip, reverseGeocode } from './lib/geo.js';
 import { extractArticle } from './lib/extract.js';
 import { handleAsk } from './lib/ai.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = path.join(__dirname, 'public');
-const PORT = Number(process.env.PORT) || 8360;
+// When packaged as a standalone executable (pkg), files live next to the exe.
+const IS_PKG = typeof process.pkg !== 'undefined';
+const BASE_DIR = IS_PKG
+  ? path.dirname(process.execPath)
+  : path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = path.join(BASE_DIR, 'public');
+
+// Optional config file next to the app (used by the shareable distribution).
+let fileConfig = {};
+try {
+  fileConfig = JSON.parse(fs.readFileSync(path.join(BASE_DIR, 'newsflow.config.json'), 'utf8'));
+} catch { /* no config file — fine */ }
+
+const PORT = Number(process.env.PORT) || Number(fileConfig.port) || 8360;
+const SERVER_API_KEY = process.env.ANTHROPIC_API_KEY || fileConfig.anthropicApiKey || '';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -79,7 +92,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (req.method === 'GET' && pathname === '/api/health') {
-      return sendJson(res, 200, { ok: true, hasServerKey: Boolean(process.env.ANTHROPIC_API_KEY) });
+      return sendJson(res, 200, { ok: true, hasServerKey: Boolean(SERVER_API_KEY) });
     }
 
     if (req.method === 'GET' && pathname === '/api/geo') {
@@ -117,7 +130,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && pathname === '/api/ask') {
       const body = await readBody(req);
-      const apiKey = req.headers['x-user-api-key'] || process.env.ANTHROPIC_API_KEY || '';
+      const apiKey = req.headers['x-user-api-key'] || SERVER_API_KEY;
       res.writeHead(200, {
         'content-type': 'text/event-stream; charset=utf-8',
         'cache-control': 'no-cache',
@@ -150,7 +163,16 @@ server.listen(PORT, () => {
       }
     }
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.log('Note: ANTHROPIC_API_KEY is not set — the AI panel will prompt for a key in Settings.');
+  if (!SERVER_API_KEY) {
+    console.log('Note: no Anthropic API key configured — the AI panel will prompt for a key in Settings.');
+  }
+  // Double-click launches (packaged exe / Start script) open the browser automatically.
+  if (IS_PKG || process.env.NEWSFLOW_OPEN === '1') {
+    const url = `http://localhost:${PORT}`;
+    const [cmd, args] =
+      process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
+      : process.platform === 'darwin' ? ['open', [url]]
+      : ['xdg-open', [url]];
+    try { spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref(); } catch { /* best effort */ }
   }
 });

@@ -68,6 +68,25 @@ Notes:
 - Browsers only allow the "Use my current location" button on `localhost` or HTTPS,
   so on other devices set your location by ZIP code instead (one time — it's saved).
 
+## Share it with someone (build a distributable zip)
+
+Two options, both produce `dist/Newsflow.zip`:
+
+```bash
+npm run dist       # portable app — recipient double-clicks "Start Newsflow.bat";
+                   # if they don't have Node.js the script installs it via winget
+npm run dist:exe   # standalone Newsflow.exe — no Node.js needed at all
+                   # (build this on your own machine; it downloads a Node base
+                   # binary the first time)
+```
+
+What recipients do: unzip anywhere, double-click **Start Newsflow.bat** (or
+**Newsflow.exe**), and the browser opens automatically. A `README-FIRST.txt` in the
+zip walks them through the firewall prompt, phone access, and the optional AI key —
+they can paste a key in Settings (⚙) or drop it in `newsflow.config.json` next to the
+app. Heads-up for the exe: Windows SmartScreen warns on unsigned downloads the first
+run ("More info" → "Run anyway").
+
 ## How it works
 
 - `server.js` — small zero-framework Node server: static UI + JSON API.
