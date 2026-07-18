@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Newsflow — your news reader</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗞️</text></svg>" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">🗞️ <span>Newsflow</span></div>
+
+    <nav id="tabs">
+      <button class="tab active" data-section="world">World</button>
+      <button class="tab" data-section="us">U.S.</button>
+      <button class="tab" data-section="regional">Regional</button>
+      <button class="tab" data-section="local">Local</button>
+    </nav>
+
+    <div class="topbar-right">
+      <button id="location-chip" class="chip" title="Set your location">📍 Set location</button>
+      <button id="view-toggle" class="icon-btn" title="Toggle bubbles / list view">☰</button>
+      <button id="refresh-btn" class="icon-btn" title="Refresh">⟳</button>
+      <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+      <button id="ai-toggle" class="icon-btn" title="Toggle AI panel">✦</button>
+    </div>
+  </header>
+
+  <div id="layout">
+    <main id="content">
+      <div id="status-bar" class="hidden"></div>
+      <div id="view"></div>
+    </main>
+
+    <aside id="ai-panel">
+      <div class="ai-header">
+        <div class="ai-title">✦ Ask the news</div>
+        <button id="ai-clear" class="icon-btn small" title="Clear conversation">🗑</button>
+      </div>
+      <div id="ai-context" class="ai-context"></div>
+      <div id="ai-messages" class="ai-messages">
+        <div class="ai-hint">
+          Ask about the article you're reading, the current headlines, or the news in
+          general — e.g. <em>"summarize this article"</em>, <em>"what's going on with the
+          US and Iran?"</em>, or <em>"what happened in Oklahoma City today?"</em>
+        </div>
+      </div>
+      <div id="ai-status" class="ai-status hidden"></div>
+      <form id="ai-form" class="ai-form">
+        <textarea id="ai-input" rows="2" placeholder="Ask a question about the news…"></textarea>
+        <button type="submit" id="ai-send" title="Send">➤</button>
+      </form>
+    </aside>
+  </div>
+
+  <!-- Location dialog -->
+  <dialog id="location-dialog">
+    <h3>Where are you?</h3>
+    <p class="muted">Used to gather regional and local news for your area. Nothing is stored outside your browser.</p>
+    <button id="use-geolocation" class="btn primary">Use my current location</button>
+    <div class="or-divider"><span>or enter a ZIP code</span></div>
+    <form id="zip-form">
+      <input id="zip-input" inputmode="numeric" pattern="\d{5}" maxlength="5" placeholder="e.g. 73102" />
+      <button type="submit" class="btn">Set</button>
+    </form>
+    <p id="location-error" class="error hidden"></p>
+    <button id="location-cancel" class="btn ghost">Cancel</button>
+  </dialog>
+
+  <!-- Settings dialog -->
+  <dialog id="settings-dialog">
+    <h3>Settings</h3>
+    <label for="api-key-input">Anthropic API key (for the AI panel)</label>
+    <input id="api-key-input" type="password" placeholder="sk-ant-…" autocomplete="off" />
+    <p class="muted">Stored only in this browser (localStorage) and sent only to your own
+    news-reader server, which forwards it to the Anthropic API. Not needed if the server
+    was started with <code>ANTHROPIC_API_KEY</code> set.</p>
+    <div class="dialog-actions">
+      <button id="settings-save" class="btn primary">Save</button>
+      <button id="settings-cancel" class="btn ghost">Cancel</button>
+    </div>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>
