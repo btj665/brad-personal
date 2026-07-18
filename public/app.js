@@ -160,19 +160,31 @@
       placed.push({ x, y, r });
       fieldH = Math.max(fieldH, y + r + 40);
 
-      const hue = 205 + ((i * 37) % 110); // blues → violets
+      // curated hue palette: indigo / periwinkle / teal / plum / slate blue
+      const HUES = [222, 258, 195, 286, 240, 205, 270, 182];
+      const hue = HUES[i % HUES.length];
+      const coverage = Math.min(c.sourceCount / 6, 1);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'bubble-wrap';
+      wrap.style.cssText = `left:${x - r}px; top:${y - r}px; width:${d}px; height:${d}px;` +
+        `--h:${hue}; --cov:${coverage.toFixed(3)};` +
+        `--pop-delay:${Math.min(i * 55, 900)}ms;` +
+        `--drift-dur:${10 + (i % 5) * 1.7}s; --drift-delay:${(i % 7) * -1.4}s;`;
+
       const el = document.createElement('div');
-      el.className = 'bubble';
-      el.style.cssText = `left:${x - r}px; top:${y - r}px; width:${d}px; height:${d}px;` +
-        `padding:${Math.round(d * 0.14)}px;` +
-        `--b1: hsl(${hue}, 42%, 26%); --b2: hsl(${hue + 20}, 45%, 14%);` +
-        `animation-delay:${(i % 7) * -1.1}s; font-size:${Math.max(11, d / 13)}px;`;
+      el.className = `bubble${c.image ? ' has-img' : ''}`;
+      el.style.cssText = `padding:${Math.round(d * 0.15)}px;` +
+        `font-size:${Math.max(11.5, d / 12.5)}px;` +
+        (c.image ? `--img:url("${encodeURI(c.image)}");` : '');
       el.innerHTML = `
-        <span class="b-title" style="-webkit-line-clamp:${d > 170 ? 5 : 4}">${esc(c.title)}</span>
+        ${i === 0 ? '<span class="b-kicker">Top story</span>' : ''}
+        <span class="b-title" style="-webkit-line-clamp:${d > 175 ? 5 : 4}">${esc(c.title)}</span>
         <span class="b-meta">${c.sourceCount} source${c.sourceCount === 1 ? '' : 's'} · ${timeAgo(c.latest)}</span>`;
       el.title = c.title;
       el.addEventListener('click', () => showStory(c));
-      field.appendChild(el);
+      wrap.appendChild(el);
+      field.appendChild(wrap);
     });
     field.style.minHeight = `${fieldH}px`;
   }
