@@ -413,13 +413,46 @@
   const aiInput = $('#ai-input');
   const aiStatus = $('#ai-status');
 
-  function openAiPanel() {
-    $('#ai-panel').classList.remove('collapsed');
-    $('#ai-toggle').classList.add('active');
+  const aiPanel = $('#ai-panel');
+  const aiBackdrop = $('#ai-backdrop');
+  const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
+
+  function setAiPanel(open) {
+    aiPanel.classList.toggle('collapsed', !open);
+    $('#ai-toggle').classList.toggle('active', open);
+    aiBackdrop.classList.toggle('show', open && isNarrow());
   }
-  $('#ai-toggle').addEventListener('click', () => {
-    $('#ai-panel').classList.toggle('collapsed');
-    $('#ai-toggle').classList.toggle('active');
+  function openAiPanel() { setAiPanel(true); }
+
+  $('#ai-toggle').addEventListener('click', () =>
+    setAiPanel(aiPanel.classList.contains('collapsed')));
+  $('#ai-close').addEventListener('click', () => setAiPanel(false));
+  aiBackdrop.addEventListener('click', () => setAiPanel(false));
+
+  // Swipe right to dismiss on touch screens.
+  let touch = null;
+  aiPanel.addEventListener('touchstart', (e) => {
+    if (!isNarrow() || e.touches.length !== 1) return;
+    touch = { x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, active: false };
+  }, { passive: true });
+  aiPanel.addEventListener('touchmove', (e) => {
+    if (!touch) return;
+    const dx = e.touches[0].clientX - touch.x;
+    const dy = e.touches[0].clientY - touch.y;
+    if (!touch.active) {
+      if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy) * 1.4) return; // let scrolls through
+      touch.active = true;
+      aiPanel.classList.add('dragging');
+    }
+    touch.dx = Math.max(0, dx);
+    aiPanel.style.transform = `translateX(${touch.dx}px)`;
+  }, { passive: true });
+  aiPanel.addEventListener('touchend', () => {
+    if (!touch) return;
+    aiPanel.classList.remove('dragging');
+    aiPanel.style.transform = '';
+    if (touch.active && touch.dx > 70) setAiPanel(false);
+    touch = null;
   });
   $('#ai-clear').addEventListener('click', () => {
     state.aiHistory = [];
@@ -659,6 +692,7 @@
   // ---------- init ----------
   if (state.location?.label) $('#location-chip').textContent = `📍 ${state.location.label}`;
   updateSourcesChip();
+  if (isNarrow()) setAiPanel(false); // phones start with the panel closed
   updateAiContext();
   showSection('world');
 })();

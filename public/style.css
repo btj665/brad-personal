@@ -358,6 +358,9 @@ code { background: var(--bg-hover); padding: 1px 5px; border-radius: 4px; font-s
   padding: 12px 14px 8px;
 }
 .ai-title { font-weight: 700; }
+.ai-header-btns { display: flex; gap: 6px; }
+.ai-close-btn { display: none; }
+#ai-backdrop { display: none; }
 .ai-context {
   margin: 0 14px 8px;
   padding: 6px 10px;
@@ -484,6 +487,24 @@ dialog input:focus { outline: none; border-color: var(--accent); }
     z-index: 20;
     width: min(420px, 100vw);
     box-shadow: -12px 0 40px rgba(0,0,0,0.5);
+    transition: transform 0.28s ease, visibility 0s;
+  }
+  /* On phones the panel slides instead of display:none so it can animate */
+  #ai-panel.collapsed {
+    display: flex;
+    transform: translateX(105%);
+    visibility: hidden;
+    transition: transform 0.28s ease, visibility 0s 0.28s;
+  }
+  #ai-panel.dragging { transition: none; }
+  .ai-close-btn { display: grid; }
+  #ai-backdrop.show {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    background: rgba(4, 6, 10, 0.5);
+    backdrop-filter: blur(2px);
   }
 }
 
