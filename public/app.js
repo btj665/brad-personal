@@ -464,9 +464,8 @@
     const answerEl = addMessage('assistant', '');
     let answer = '';
 
-    const provider = localStorage.getItem('aiProvider') || 'anthropic';
-    const headers = { 'content-type': 'application/json', 'x-ai-provider': provider };
-    const userKey = localStorage.getItem(`apiKey.${provider}`) || localStorage.getItem('apiKey');
+    const headers = { 'content-type': 'application/json' };
+    const userKey = localStorage.getItem('apiKey');
     if (userKey) headers['x-user-api-key'] = userKey;
 
     try {
@@ -523,44 +522,14 @@
 
   // ---------- settings ----------
   const settingsDialog = $('#settings-dialog');
-  const providerSelect = $('#provider-select');
-
-  const PROVIDER_UI = {
-    anthropic: {
-      label: 'Anthropic API key',
-      placeholder: 'sk-ant-…',
-      help: 'Get a key at platform.claude.com → API Keys. Enables live web search for questions about breaking news.',
-    },
-    github: {
-      label: 'GitHub personal access token',
-      placeholder: 'github_pat_…',
-      help: 'Create a fine-grained token at github.com/settings/personal-access-tokens with the "Models" read permission. Free tier included with your GitHub account; higher limits with a Copilot plan. No live web search — answers come from the articles and headlines on screen.',
-    },
-  };
-
-  function syncProviderUi() {
-    const p = providerSelect.value;
-    const ui = PROVIDER_UI[p];
-    $('#api-key-label').textContent = ui.label;
-    $('#api-key-input').placeholder = ui.placeholder;
-    $('#provider-help').textContent = ui.help;
-    $('#api-key-input').value =
-      localStorage.getItem(`apiKey.${p}`) ||
-      (p === 'anthropic' ? localStorage.getItem('apiKey') || '' : '');
-  }
-  providerSelect.addEventListener('change', syncProviderUi);
-
   $('#settings-btn').addEventListener('click', () => {
-    providerSelect.value = localStorage.getItem('aiProvider') || 'anthropic';
-    syncProviderUi();
+    $('#api-key-input').value = localStorage.getItem('apiKey') || '';
     settingsDialog.showModal();
   });
   $('#settings-save').addEventListener('click', () => {
-    const p = providerSelect.value;
-    localStorage.setItem('aiProvider', p);
     const key = $('#api-key-input').value.trim();
-    if (key) localStorage.setItem(`apiKey.${p}`, key);
-    else localStorage.removeItem(`apiKey.${p}`);
+    if (key) localStorage.setItem('apiKey', key);
+    else localStorage.removeItem('apiKey');
     settingsDialog.close();
   });
   $('#settings-cancel').addEventListener('click', () => settingsDialog.close());
