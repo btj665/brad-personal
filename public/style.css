@@ -510,3 +510,35 @@ dialog input:focus { outline: none; border-color: var(--accent); }
 
 /* external-link marker on Google News rows */
 .ext-mark { color: var(--accent); font-size: 0.85em; }
+
+/* ---------- weather ---------- */
+#weather-dialog { width: min(430px, 92vw); }
+.wx-now {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0 16px;
+}
+.wx-emoji { font-size: 2.6rem; }
+.wx-temp {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 2.4rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.wx-cond { font-size: 0.9rem; line-height: 1.45; }
+.wx-forecast {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 6px;
+  margin-bottom: 12px;
+}
+.wx-day { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 0.8rem; }
+.wx-day-name { color: var(--text-dim); font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.wx-day-emoji { font-size: 1.25rem; }
+.wx-day-temps { font-weight: 600; }
+.wx-day-precip { font-size: 0.68rem; color: #6fc3e8; min-height: 1em; }

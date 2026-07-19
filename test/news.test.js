@@ -128,3 +128,10 @@ test('entity decoding and html stripping', () => {
   assert.equal(decodeEntities('a &amp; b &#39;quoted&#x27; &mdash; ok'), "a & b 'quoted' — ok");
   assert.equal(stripHtml('<p>Hello <b>world</b></p> <script>x()</script>'), 'Hello world');
 });
+
+test('WMO weather codes map to labels', async () => {
+  const { describeWmo } = await import('../lib/weather.js');
+  assert.deepEqual(describeWmo(0), ['Clear', '☀️']);
+  assert.deepEqual(describeWmo(95), ['Thunderstorm', '⛈️']);
+  assert.equal(describeWmo(9999)[0], 'Unknown');
+});

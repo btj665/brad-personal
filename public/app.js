@@ -361,6 +361,7 @@
     delete state.sections.regional;
     delete state.sections.local;
     locDialog.close();
+    loadWeather();
     if (state.section === 'regional' || state.section === 'local') showSection(state.section);
   }
   function locError(msg) {
@@ -602,6 +603,65 @@
     }
   }
 
+  // ---------- weather ----------
+  const weatherChip = $('#weather-chip');
+  const weatherDialog = $('#weather-dialog');
+  let weather = null;
+
+  async function loadWeather() {
+    const loc = state.location;
+    if (!loc) { weatherChip.classList.add('hidden'); return; }
+    const params = new URLSearchParams();
+    if (loc.lat && loc.lon) { params.set('lat', loc.lat); params.set('lon', loc.lon); }
+    else if (loc.city) { params.set('city', loc.city); params.set('state', loc.state || ''); }
+    else { weatherChip.classList.add('hidden'); return; }
+    try {
+      const res = await fetch(`/api/weather?${params}`);
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+      weather = data;
+      // Backfill coordinates onto older saved locations so next load skips geocoding.
+      if (!loc.lat && data.lat) {
+        loc.lat = data.lat; loc.lon = data.lon;
+        localStorage.setItem('location', JSON.stringify(loc));
+      }
+      weatherChip.textContent = `${data.current.emoji} ${data.current.temp}°`;
+      weatherChip.classList.remove('hidden');
+    } catch {
+      weatherChip.classList.add('hidden');
+    }
+  }
+
+  function dayName(dateStr, i) {
+    if (i === 0) return 'Today';
+    return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' });
+  }
+
+  weatherChip.addEventListener('click', () => {
+    if (!weather) return;
+    const c = weather.current;
+    $('#weather-title').textContent = `Weather — ${state.location?.label || 'your area'}`;
+    $('#weather-body').innerHTML = `
+      <div class="wx-now">
+        <span class="wx-emoji">${c.emoji}</span>
+        <span class="wx-temp">${c.temp}°F</span>
+        <span class="wx-cond">${esc(c.label)}<br>
+          <span class="muted">Feels like ${c.feelsLike}° · Wind ${c.wind} mph${c.gusts > c.wind + 5 ? ` (gusts ${c.gusts})` : ''} · Humidity ${c.humidity ?? '–'}%</span>
+        </span>
+      </div>
+      <div class="wx-forecast">
+        ${weather.daily.slice(0, 6).map((d, i) => `
+          <div class="wx-day" title="${esc(d.label)}">
+            <span class="wx-day-name">${dayName(d.date, i)}</span>
+            <span class="wx-day-emoji">${d.emoji}</span>
+            <span class="wx-day-temps">${d.high}° <span class="muted">${d.low}°</span></span>
+            ${d.precip != null && d.precip > 15 ? `<span class="wx-day-precip">💧${d.precip}%</span>` : '<span class="wx-day-precip"></span>'}
+          </div>`).join('')}
+      </div>`;
+    weatherDialog.showModal();
+  });
+  $('#weather-close').addEventListener('click', () => weatherDialog.close());
+
   // ---------- sources ----------
   const sourcesDialog = $('#sources-dialog');
 
@@ -679,6 +739,7 @@
     const btn = $('#refresh-btn');
     btn.classList.add('spinning');
     state.navStack = [];
+    loadWeather();
     try { await showSection(state.section, { fresh: true }); }
     finally { btn.classList.remove('spinning'); }
   });
@@ -692,6 +753,7 @@
   // ---------- init ----------
   if (state.location?.label) $('#location-chip').textContent = `📍 ${state.location.label}`;
   updateSourcesChip();
+  loadWeather();
   if (isNarrow()) setAiPanel(false); // phones start with the panel closed
   updateAiContext();
   showSection('world');

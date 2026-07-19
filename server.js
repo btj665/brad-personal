@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import { getSection } from './lib/news.js';
 import { lookupZip, reverseGeocode } from './lib/geo.js';
+import { getWeather, geocodeCity } from './lib/weather.js';
 import { extractArticle } from './lib/extract.js';
 import { handleAsk } from './lib/ai.js';
 
@@ -101,6 +102,17 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, await reverseGeocode(q.get('lat'), q.get('lon')));
       }
       return sendJson(res, 400, { error: 'Provide ?zip= or ?lat=&lon=' });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/weather') {
+      let lat = q.get('lat');
+      let lon = q.get('lon');
+      if ((!lat || !lon) && q.get('city')) {
+        // Older saved locations have no coordinates — resolve them once.
+        ({ lat, lon } = await geocodeCity(q.get('city'), q.get('state') || ''));
+      }
+      if (!lat || !lon) return sendJson(res, 400, { error: 'Provide ?lat=&lon= or ?city=&state=' });
+      return sendJson(res, 200, await getWeather(lat, lon));
     }
 
     if (req.method === 'GET' && pathname === '/api/news') {
