@@ -44,7 +44,9 @@ if (EXE) {
     '--define:import.meta.url=__importMetaUrl'
   );
   // 2. Wrap it in a standalone Windows executable.
-  run('npx pkg build/newsflow.cjs --targets node22-win-x64 --output "' +
+  // Full package name matters: bare "npx pkg" can resolve to the abandoned
+  // vercel/pkg (max node18) when local dev deps aren't installed.
+  run('npx @yao-pkg/pkg build/newsflow.cjs --targets node22-win-x64 --output "' +
     path.join(STAGE, 'Newsflow.exe') + '"');
   // 3. Static UI ships next to the exe so it stays editable.
   fs.cpSync(path.join(ROOT, 'public'), path.join(STAGE, 'public'), { recursive: true });
