@@ -1,0 +1,37 @@
+{
+  "name": "casino",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "sim": "tsx scripts/sim.ts",
+    "edge": "tsx scripts/edge.ts",
+    "poker:freq": "tsx scripts/poker-freq.ts",
+    "uth:edge": "tsx scripts/uth-edge.ts",
+    "uth:trips": "tsx scripts/uth-trips.ts",
+    "paigow:edge": "tsx scripts/paigow-edge.ts",
+    "vp:return": "tsx scripts/vp-return.ts",
+    "roulette:edge": "tsx scripts/roulette-edge.ts",
+    "craps:edge": "tsx scripts/craps-edge.ts"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "tsx": "^4.23.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vitest": "^4.1.10"
+  }
+}
