@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { makeRng } from '../engine/rng'
 import type { Card, Rank, Suit } from '../engine/types'
+import { winningHold } from './autohold'
 import { classifyDeuces, classifyStandard } from './classify'
 import { VideoPokerGame } from './engine'
 import { variantById } from './paytables'
@@ -93,6 +94,90 @@ describe('the solver', () => {
     const { best } = solve(hand, job, rng)
     const held = hand.filter((_, i) => best.mask & (1 << i)).map((x) => x.rank)
     expect(held.filter((r) => r === '5')).toHaveLength(2)
+  })
+})
+
+describe('auto-hold of a winning hand', () => {
+  it('holds exactly the paying cards in the standard family', () => {
+    // The one paying pair.
+    expect(winningHold(h('Js Jh 8d 5c 3s'), 'standard')).toEqual([true, true, false, false, false])
+    // Both pairs of two pair.
+    expect(winningHold(h('As Ah Ks Kh 9d'), 'standard')).toEqual([true, true, true, true, false])
+    // The trips, not the kickers.
+    expect(winningHold(h('8s 8h 8d Ks 3c'), 'standard')).toEqual([true, true, true, false, false])
+    // The quads; the kicker redraws free.
+    expect(winningHold(h('9s 9h 9d 9c As'), 'standard')).toEqual([true, true, true, true, false])
+    // Five-card hands keep all five.
+    expect(winningHold(h('As Ks 9s 5s 3s'), 'standard')).toEqual([true, true, true, true, true])
+    expect(winningHold(h('As Kh Qd Jc 10s'), 'standard')).toEqual([true, true, true, true, true])
+    expect(winningHold(h('As Ah Ad Ks Kh'), 'standard')).toEqual([true, true, true, true, true])
+  })
+
+  it('holds nothing on a non-winner — even a low pair or a big draw', () => {
+    expect(winningHold(h('9s 9h Kd 5c 3s'), 'standard')).toEqual(new Array(5).fill(false))
+    expect(winningHold(h('As Ks Qs Js 9d'), 'standard')).toEqual(new Array(5).fill(false))
+  })
+
+  it('holds the deuces and the naturals they pay with', () => {
+    // Four deuces: keep the deuces, redraw the fifth free.
+    expect(winningHold(h('2s 2h 2d 2c As'), 'deuces')).toEqual([true, true, true, true, false])
+    // A wild trips built on a natural pair: deuce + the pair.
+    expect(winningHold(h('9s 9h 2d Kc 5s'), 'deuces')).toEqual([true, true, true, false, false])
+    // Two deuces beside three unmatched naturals: the deuces alone are the
+    // guaranteed trips; no single natural is part of the win.
+    expect(winningHold(h('2s 2h Kd 9c 5s'), 'deuces')).toEqual([true, true, false, false, false])
+    // Wild quads: deuces + the natural pair.
+    expect(winningHold(h('2s 2h 9d 9c 5s'), 'deuces')).toEqual([true, true, true, true, false])
+    // Five-card wild hands keep all five.
+    expect(winningHold(h('9s 9h 9d 2c 2s'), 'deuces')).toEqual([true, true, true, true, true])
+    expect(winningHold(h('7s 8s 9s 10s 2h'), 'deuces')).toEqual([true, true, true, true, true])
+  })
+
+  it('holds nothing in deuces below trips', () => {
+    expect(winningHold(h('9s 9h Kd 5c 3s'), 'deuces')).toEqual(new Array(5).fill(false))
+  })
+
+  it('pre-holds on the deal when the game has autoHold on, and can be overridden', () => {
+    const game = new VideoPokerGame({
+      variantId: 'jacks-9-6',
+      seed: 11,
+      bankroll: 1000,
+      autoHold: 'winners',
+    })
+    for (let i = 0; i < 50; i++) {
+      if (!game.canDeal()) break
+      game.deal()
+      expect(game.hand!.held).toEqual(winningHold(game.hand!.cards, game.variant.family))
+      game.toggleHold(0) // the player can still change any card
+      expect(game.hand!.held[0]).toBe(!winningHold(game.hand!.cards, game.variant.family)[0])
+      game.draw()
+    }
+  })
+
+  it('pre-holds the optimal play when autoHold is optimal', { timeout: 30000 }, () => {
+    const game = new VideoPokerGame({
+      variantId: 'jacks-9-6',
+      seed: 13,
+      bankroll: 10000,
+      autoHold: 'optimal',
+    })
+    // On a dealt paying hand the best hold keeps two-plus cards, whose EV the
+    // solver computes exactly — so re-solving with any rng must agree. (On
+    // garbage hands the best hold is a sampled estimate and near-ties can
+    // legitimately land differently, so those aren't compared.)
+    let compared = 0
+    for (let i = 0; i < 30 && compared < 2; i++) {
+      game.deal()
+      expect(game.hand!.held).toHaveLength(5)
+      if (classifyStandard(game.hand!.cards) !== 'nothing') {
+        const { best } = solve(game.hand!.cards, game.variant, makeRng(99))
+        const expected = game.hand!.cards.map((_, k) => Boolean(best.mask & (1 << k)))
+        expect(game.hand!.held).toEqual(expected)
+        compared++
+      }
+      game.draw()
+    }
+    expect(compared).toBeGreaterThan(0)
   })
 })
 

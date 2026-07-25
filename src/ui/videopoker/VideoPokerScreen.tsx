@@ -1,13 +1,25 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 
 import { randomSeed } from '../../engine/rng'
-import { VideoPokerGame } from '../../videopoker/engine'
+import { VideoPokerGame, type AutoHoldMode } from '../../videopoker/engine'
 import type { PayCategory } from '../../videopoker/classify'
 import { VARIANTS, payFor } from '../../videopoker/paytables'
 import { PlayingCard } from '../Card'
 import { WinToast } from '../WinToast'
 
 const START = 200
+
+/** The auto-hold button cycles off → winners → best. */
+const NEXT_AUTO: Record<AutoHoldMode, AutoHoldMode> = {
+  off: 'winners',
+  winners: 'optimal',
+  optimal: 'off',
+}
+const AUTO_LABEL: Record<AutoHoldMode, string> = {
+  off: 'Auto-hold',
+  winners: 'Auto-hold: winners',
+  optimal: 'Auto-hold: best',
+}
 
 /** The order and labels the pay table is shown in, per family. */
 const STANDARD_ROWS: Array<[PayCategory, string]> = [
@@ -100,7 +112,14 @@ export function VideoPokerScreen() {
 
   const changeVariant = useCallback((id: string) => game.setVariant(id), [game])
   const rebuy = useCallback(() => {
-    setGame(new VideoPokerGame({ seed: randomSeed(), variantId: game.variant.id, bankroll: START }))
+    setGame(
+      new VideoPokerGame({
+        seed: randomSeed(),
+        variantId: game.variant.id,
+        bankroll: START,
+        autoHold: game.autoHold,
+      }),
+    )
   }, [game])
 
   const broke = game.bankroll < game.coins && game.phase !== 'dealt'
@@ -128,6 +147,13 @@ export function VideoPokerScreen() {
             <span className="bankroll-label">Credits</span>
             <b>{game.bankroll.toLocaleString()}</b>
           </span>
+          <button
+            className={`btn btn-ghost${game.autoHold !== 'off' ? ' btn-on' : ''}`}
+            onClick={() => game.setAutoHold(NEXT_AUTO[game.autoHold])}
+            title="Pre-hold cards on the deal: winners keeps a dealt paying hand, best plays the optimal hold. Tap cards to override."
+          >
+            {AUTO_LABEL[game.autoHold]}
+          </button>
           <button
             className={`btn btn-ghost${coach ? ' btn-on' : ''}`}
             onClick={() => setCoach((c) => !c)}
@@ -181,7 +207,11 @@ export function VideoPokerScreen() {
                     {won > 0 ? ` — win ${won}` : ''}
                   </span>
                 ) : game.phase === 'dealt' ? (
-                  <span className="vp-prompt">Tap cards to hold, then Draw.</span>
+                  <span className="vp-prompt">
+                    {game.autoHold !== 'off' && game.hand?.held.some(Boolean)
+                      ? 'Auto-held — tap cards to change, then Draw.'
+                      : 'Tap cards to hold, then Draw.'}
+                  </span>
                 ) : (
                   <span className="vp-prompt">Bet 1–5 credits and deal.</span>
                 )}

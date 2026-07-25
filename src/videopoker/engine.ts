@@ -5,11 +5,17 @@
 import { buildShoeCards } from '../engine/cards'
 import { makeRng, randomSeed, type Rng } from '../engine/rng'
 import type { Card } from '../engine/types'
+import { winningHold } from './autohold'
 import { classify, type PayCategory } from './classify'
 import { payFor, variantById, type Variant } from './paytables'
 import { optimalHold } from './solver'
 
 export type Phase = 'bet' | 'dealt' | 'complete'
+
+/** 'winners' pre-holds the cards of a dealt paying hand; 'optimal' pre-holds
+ *  the solver's best play. Either way the player can still change the holds
+ *  before drawing. */
+export type AutoHoldMode = 'off' | 'winners' | 'optimal'
 
 export interface VpHand {
   cards: Card[]
@@ -29,6 +35,8 @@ export class VideoPokerGame {
   bankroll: number
   /** Coins per bet. Five is a full bet, which unlocks the royal-flush bonus. */
   coins = 5
+  /** Pre-hold cards on the deal. Applies from the next deal. */
+  autoHold: AutoHoldMode = 'off'
   hand: VpHand | null = null
   /** The last completed hand, kept on screen while the next is dealt. */
   last: VpHand | null = null
@@ -37,11 +45,14 @@ export class VideoPokerGame {
 
   private listeners = new Set<() => void>()
 
-  constructor(opts: { variantId?: string; seed?: number; bankroll?: number } = {}) {
+  constructor(
+    opts: { variantId?: string; seed?: number; bankroll?: number; autoHold?: AutoHoldMode } = {},
+  ) {
     this.variant = variantById(opts.variantId ?? 'jacks-9-6')
     this.seed = opts.seed ?? randomSeed()
     this.rng = makeRng(this.seed)
     this.bankroll = opts.bankroll ?? 200
+    this.autoHold = opts.autoHold ?? 'off'
   }
 
   subscribe = (fn: () => void): (() => void) => {
@@ -66,6 +77,11 @@ export class VideoPokerGame {
     this.touch()
   }
 
+  setAutoHold(mode: AutoHoldMode): void {
+    this.autoHold = mode
+    this.touch()
+  }
+
   canDeal(): boolean {
     return this.phase !== 'dealt' && this.bankroll >= this.coins
   }
@@ -83,6 +99,11 @@ export class VideoPokerGame {
       category: null,
       bet: this.coins,
       won: 0,
+    }
+    if (this.autoHold === 'winners') {
+      this.hand.held = winningHold(this.hand.cards, this.variant.family)
+    } else if (this.autoHold === 'optimal') {
+      this.hand.held = optimalHold(this.hand.cards, this.variant, this.rng)
     }
     this.last = null
     this.phase = 'dealt'

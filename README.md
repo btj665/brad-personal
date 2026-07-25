@@ -178,7 +178,10 @@ house way** — or tick "set for me" up top to have every hand set automatically
 
 **Video Poker.** Pick a variant from the dropdown (its return is on the label).
 Bet 1–5 coins, deal, tap the cards to hold, draw. **Coach** highlights the cards
-perfect play would keep.
+perfect play would keep. **Auto-hold** pre-selects holds on the deal — *winners*
+keeps exactly the cards of a dealt paying hand (so a winner is never thrown away
+by accident), *best* pre-holds the solver's optimal play; either way, tap any
+card to override before drawing.
 
 **Roulette.** Pick a wheel. Click a chip value, then the layout: a number for a
 straight-up, or one of the dots on the edges and corners for a split, street,
