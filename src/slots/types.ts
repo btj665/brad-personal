@@ -108,6 +108,10 @@ export interface Step {
   paid: number
   /** True when this step is one of the free games. */
   free: boolean
+  /** True when this screen came off a fresh set of reels rather than from the
+   *  screen above it collapsing. The arithmetic doesn't care, but the cabinet
+   *  does: one spins the reels, the other drops symbols into the gaps. */
+  spun: boolean
 }
 
 export interface SpinResult {

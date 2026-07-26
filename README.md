@@ -391,9 +391,14 @@ holds on the deal — *winners* keeps exactly the cards of a dealt paying hand,
 before drawing.
 
 **Slots.** Pick a cabinet from the dropdown (its return is on the label), set
-coins per line, and spin. Winning cells light; on Rockslide they crumble and the
-screen drops again at a rising multiplier until the chain dies. The line under
-the machine states what that cabinet actually returns, computed from its strips —
+coins per line, and spin — or set 10, 25 or 50 on autoplay. The reels start
+together and stop left to right, so the last one carries the suspense; each
+winning line is then held up on its own before the total rolls up on the meter.
+On Rockslide the winners crumble out and fresh stone falls into the gaps at a
+rising multiplier until the chain dies. On The Late Show three marquees buy ten
+free games and the spotlight floods its whole reel. Every symbol is drawn as SVG
+in `ui/slots/Symbols.tsx` — four cabinets, four palettes, no bitmaps. The line
+under the machine states what it actually returns, computed from its own strips;
 there is no reason a slot shouldn't tell you.
 
 **Keno.** Mark one to ten of the eighty numbers, or use quick pick. Twenty are
@@ -430,11 +435,13 @@ comes with it.
   commercial machine's actual reel strips or pay table, so the returns are ours
   and match nothing on a real floor.
 - Slots have no progressive meters, no nudge or hold features, no "ways" games
-  (243-ways and the like — every cabinet here pays on defined lines), and the
-  reels snap rather than spinning with easing. The cascade refills from the
-  reel's own strip rather than from a physical column above it, which is the
-  right model for the arithmetic and is why the enumerated base return stays
-  meaningful.
+  (243-ways and the like — every cabinet here pays on defined lines), and no
+  sound. The cascade refills from the reel's own strip rather than from a
+  physical column above it, which is the right model for the arithmetic and is
+  why the enumerated base return stays meaningful. The reels are also honest
+  about being theatre: the engine resolves a spin completely before the first
+  reel moves, exactly as a real cabinet does, and everything after that is
+  animation over a decided result.
 - Caribbean Stud plays the published A-K-J-8-3 rule, not upcard-aware optimal
   play; that's the ~0.10% between the two published figures. Its progressive
   meter is fixed rather than growing, since that's the only version whose return

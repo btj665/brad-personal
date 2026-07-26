@@ -79,7 +79,7 @@ export function resolveSpin(
       const multiplier = multiplierForChain(machine, chain) * extraMultiplier
       const stepPaid = wins.reduce((sum, w) => sum + w.paid, 0) * multiplier
       paid += stepPaid
-      steps.push({ window, wins, multiplier, paid: stepPaid, free })
+      steps.push({ window, wins, multiplier, paid: stepPaid, free, spun: chain === 0 })
 
       if (machine.feature.kind !== 'cascade' || wins.length === 0) break
       chain++
