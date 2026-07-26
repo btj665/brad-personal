@@ -64,9 +64,11 @@
   }
 
   // ---------- section loading ----------
-  async function loadSection(section, { fresh = false } = {}) {
+  // fresh: bust the server's feed cache too (the ⟳ button).
+  // force: skip the client cache and re-request (tab switches).
+  async function loadSection(section, { fresh = false, force = false } = {}) {
     const cached = state.sections[section];
-    if (cached && !fresh && Date.now() - cached.fetchedAt < 5 * 60 * 1000) return cached;
+    if (cached && !fresh && !force && Date.now() - cached.fetchedAt < 5 * 60 * 1000) return cached;
 
     setStatus(`Loading ${sectionLabel(section)} news…`);
     const params = new URLSearchParams({ section });
@@ -101,7 +103,7 @@
   }
 
   // ---------- rendering: section (bubbles or list) ----------
-  async function showSection(section, { fresh = false, push = false } = {}) {
+  async function showSection(section, { fresh = false, push = false, reload = false } = {}) {
     if (push) pushNav();
     state.section = section;
     state.currentView = { kind: 'section' };
@@ -118,7 +120,7 @@
     viewEl.innerHTML = '<div class="empty-state"><div class="big">🗞️</div>Gathering the news…</div>';
     let data;
     try {
-      data = await loadSection(section, { fresh });
+      data = await loadSection(section, { fresh, force: reload });
     } catch (err) {
       viewEl.innerHTML = `<div class="empty-state"><div class="big">⚠️</div>Couldn't load news: ${esc(err.message)}</div>`;
       return;
@@ -223,7 +225,8 @@
   }
 
   function renderList(data) {
-    viewEl.innerHTML = `<div class="view-pad">${data.clusters.map((c, i) => `
+    const clusters = [...data.clusters].sort((a, b) => (b.latest || 0) - (a.latest || 0));
+    viewEl.innerHTML = `<div class="view-pad">${clusters.map((c, i) => `
       <div class="story-card" data-i="${i}">
         ${c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
         <div class="card-body">
@@ -236,7 +239,7 @@
       </div>`).join('')}
     </div>`;
     viewEl.querySelectorAll('.story-card').forEach((el) =>
-      el.addEventListener('click', () => showStory(data.clusters[Number(el.dataset.i)])));
+      el.addEventListener('click', () => showStory(clusters[Number(el.dataset.i)])));
   }
 
   // ---------- story view ----------
@@ -732,7 +735,7 @@
   document.querySelectorAll('.tab').forEach((t) =>
     t.addEventListener('click', () => {
       state.navStack = [];
-      showSection(t.dataset.section);
+      showSection(t.dataset.section, { reload: true });
     }));
 
   $('#refresh-btn').addEventListener('click', async () => {
