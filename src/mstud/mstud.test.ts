@@ -161,7 +161,11 @@ describe('third street chart', () => {
     expect(third('6s 5d')).toBe('fold')
   })
 
-  it('agrees with the solver on every one of the 169 starting hands', () => {
+  // The expectimax warms its memo on the first call, which is most of the cost
+  // here; 169 hands then run off the cache. It lands just either side of the 5s
+  // default depending on how loaded the machine is, so the budget is explicit
+  // rather than left to chance.
+  it('agrees with the solver on every one of the 169 starting hands', { timeout: 60_000 }, () => {
     const RANKS: Rank[] = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2']
     for (let i = 0; i < RANKS.length; i++) {
       for (let j = i; j < RANKS.length; j++) {
