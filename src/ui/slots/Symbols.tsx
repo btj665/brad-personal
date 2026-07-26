@@ -297,6 +297,49 @@ const BARS: Record<string, (u: string) => JSX.Element> = {
       </Fit>
     </>
   ),
+  // The bonus trigger. A wheel, because a wheel is what it opens, and the only
+  // thing printed on this cream strip with light behind it — which is what puts it
+  // on a par with the wild rather than below it. The segments are a dashed stroke
+  // on one circle: twelve alternating wedges, exactly even, in one declaration.
+  BON: (u) => {
+    const rMid = 22
+    const dash = ((2 * Math.PI * rMid) / 24).toFixed(3)
+    return (
+      <>
+        <Strip u={u} />
+        <Fit>
+          <>
+            <Rad id={`${u}-lit`} s={[[0, '#ffd76a', 0.9], [0.55, '#ffb43c', 0.4], [1, '#ffb43c', 0]]} />
+            <Lin id={`${u}-seg`} s={BAR_RED} />
+            <circle cx="50" cy="53" r="47" fill={`url(#${u}-lit)`} />
+            <Rays n={12} r0={35} r1={49} w={3.4} color="#ffcf5c" o={0.8} cy={53} phase={15} />
+            {/* The wheel: cream face, twelve red segments, a bevelled chrome rim. */}
+            <circle cx="50" cy="53" r="33" fill={CREAM} />
+            <circle
+              cx="50"
+              cy="53"
+              r={rMid}
+              fill="none"
+              stroke={`url(#${u}-seg)`}
+              strokeWidth="22"
+              strokeDasharray={`${dash} ${dash}`}
+            />
+            <circle cx="50" cy="53" r="33" fill="none" stroke={STEEL} strokeWidth="7" />
+            <circle cx="50" cy="53" r="33" fill="none" stroke="#eef3f6" strokeWidth="3.6" />
+            <circle cx="50" cy="53" r="12.5" fill="#eef3f6" stroke={STEEL} strokeWidth="2" />
+            <polygon
+              points="50,41.5 52.82,49.12 60.94,49.45 54.56,54.48 56.76,62.3 50,57.8 43.24,62.3 45.44,54.48 39.06,49.45 47.18,49.12"
+              fill="#ffbf2e"
+              stroke="#8a5b0c"
+              strokeWidth="1.2"
+            />
+            {/* The pointer. Without it this is a pie chart. */}
+            <polygon points="50,24 44,10 56,10" fill="#eef3f6" stroke={STEEL} strokeWidth="2" strokeLinejoin="round" />
+          </>
+        </Fit>
+      </>
+    )
+  },
   // A stepper's blank is not a hole in the reel — it is the printed strip with
   // nothing on it. Drawing it as bare plate keeps the reel reading as one
   // continuous band, which matters here because blanks are 15 of the 32 stops.
@@ -426,6 +469,32 @@ const ROCK: Record<string, (u: string) => JSX.Element> = {
         <path d="M50 36 V94" />
       </g>
       <circle cx="66" cy="20" r="3.6" fill="#ffffff" fillOpacity="0.85" />
+    </>
+  ),
+  // The bonus trigger. Everything else on this cabinet is something the canyon
+  // gives up; this is the thing that makes it. Lit amber rather than gem-blue so
+  // it can't be mistaken for the wild at speed, and no slab behind it — a stick of
+  // dynamite is not embedded in anything, it is about to remove what is.
+  BON: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffab3d" r={50} o={0.58} cy={54} />
+      <Rays n={8} r0={34} r1={50} w={3} color="#ffd27a" o={0.5} cy={54} phase={22} />
+      <Lin id={`${u}-dy`} s={[[0, '#f4756a'], [0.42, '#c8302a'], [1, '#63100e']]} x2={1} y2={0} />
+      <Lin id={`${u}-st`} s={[[0, '#5f4b38'], [0.4, '#3a2d21'], [1, '#1d160f']]} x2={1} y2={0} />
+      <Rad id={`${u}-sp`} s={[[0, '#ffffff'], [0.4, '#ffd76a'], [1, '#ff8a1e', 0]]} />
+      <g stroke="#390b09" strokeWidth="1.8">
+        <rect x="20" y="40" width="17" height="50" rx="7" fill={`url(#${u}-dy)`} transform="rotate(-9 28 65)" />
+        <rect x="63" y="40" width="17" height="50" rx="7" fill={`url(#${u}-dy)`} transform="rotate(9 72 65)" />
+        <rect x="41" y="33" width="18" height="57" rx="7.5" fill={`url(#${u}-dy)`} />
+      </g>
+      {/* The strap. It is what makes three sticks read as a charge. */}
+      <rect x="13" y="59" width="74" height="14" fill={`url(#${u}-st)`} stroke="#140e09" strokeWidth="1.6" />
+      <rect x="13" y="61" width="74" height="2.6" fill="#ffffff" fillOpacity="0.16" />
+      <path d="M50 33 C50 21 61 19 66 13" fill="none" stroke="#d9c48f" strokeWidth="3.6" strokeLinecap="round" />
+      <path d="M50 33 C50 21 61 19 66 13" fill="none" stroke="#8a7448" strokeWidth="1.2" strokeLinecap="round" />
+      <Rays n={6} r0={5} r1={19} w={2.2} color="#ffe9a8" o={0.85} cx={67} cy={12} phase={12} />
+      <circle cx="67" cy="12" r="11" fill={`url(#${u}-sp)`} />
+      <circle cx="67" cy="12" r="4.4" fill="#fffdf2" />
     </>
   ),
   D: (u) => (
@@ -569,6 +638,44 @@ const LATE: Record<string, (u: string) => JSX.Element> = {
       </>
     )
   },
+  // The bonus trigger: the star on the dressing-room door. Every other symbol on
+  // this cabinet is a thing in the room — this is the way further in, so it is a
+  // door, closed, with light coming out from under it. Bright enough to sit beside
+  // the marquee scatter; a gold star where that one has a silver one, and squared
+  // off where that one is arched, so the two never read as each other.
+  BON: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffcf72" r={49} o={0.5} cy={48} />
+      <Lin id={`${u}-fr`} s={LOUNGE_BRASS} />
+      <Lin id={`${u}-dr`} s={[[0, '#5a1a4c'], [0.45, '#330d2c'], [1, '#190617']]} x2={1} y2={0.3} />
+      <Rad id={`${u}-leak`} s={[[0, '#fff3c8', 0.95], [0.5, '#ffcf72', 0.4], [1, '#ffcf72', 0]]} />
+      {/* Architrave, then the leaf. */}
+      <rect x="15" y="5" width="70" height="88" rx="3" fill={`url(#${u}-fr)`} stroke="#5d3f0c" strokeWidth="1.6" />
+      <rect x="22" y="11" width="56" height="79" rx="2" fill={`url(#${u}-dr)`} stroke="#1a0616" strokeWidth="1.6" />
+      {/* Two recessed panels. A door with no joinery on it is a wall. */}
+      <g fill="none" stroke="#8a4a72" strokeOpacity="0.75" strokeWidth="1.8">
+        <rect x="28" y="16" width="44" height="43" rx="1.5" />
+        <rect x="28" y="65" width="44" height="20" rx="1.5" />
+      </g>
+      {/* Hinge stile: the vertical the leaf swings on. */}
+      <rect x="22" y="11" width="3.4" height="79" fill="#000000" fillOpacity="0.4" />
+      <Rays n={10} r0={17} r1={36} w={2.8} color="#ffe9a8" o={0.65} cy={38} phase={18} />
+      <polygon
+        points="50,19 54.64,31.61 68.07,32.13 57.51,40.44 61.17,53.37 50,45.9 38.83,53.37 42.49,40.44 31.93,32.13 45.36,31.61"
+        fill="#ffd35e"
+        stroke="#8a6216"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <polygon points="50,19 54.64,31.61 45.36,31.61" fill="#fff6d8" fillOpacity="0.8" />
+      {/* Lever handle, and the light coming out under the door — the one cue that
+          reads at 50px even when the joinery has gone to mush. */}
+      <circle cx="68" cy="75" r="4" fill="#ffe9ae" stroke="#5d3f0c" strokeWidth="1.2" />
+      <rect x="60" y="73.6" width="9" height="3" rx="1.5" fill="#ffe9ae" stroke="#5d3f0c" strokeWidth="1" />
+      <ellipse cx="50" cy="93" rx="38" ry="11" fill={`url(#${u}-leak)`} />
+      <rect x="22" y="86" width="56" height="4.4" fill="#fff6d8" />
+    </>
+  ),
   mic: (u) => (
     <>
       <Lin id={`${u}-c`} s={[[0, '#f7fafc'], [0.35, '#b9c4cb'], [0.6, '#eef3f6'], [1, '#79848c']]} />
@@ -669,8 +776,8 @@ const CABINETS: Record<string, Cabinet> = {
   bars: {
     art: BARS,
     names: {
-      W: 'wild, doubles the win', '7': 'lucky seven', BBB: 'triple bar', BB: 'double bar',
-      B: 'single bar', C: 'cherries', '-': 'blank',
+      W: 'wild, doubles the win', BON: 'bonus wheel, opens the feature', '7': 'lucky seven',
+      BBB: 'triple bar', BB: 'double bar', B: 'single bar', C: 'cherries', '-': 'blank',
     },
   },
   bell: {
@@ -683,15 +790,16 @@ const CABINETS: Record<string, Cabinet> = {
   rockslide: {
     art: ROCK,
     names: {
-      W: 'wild crystal', D: 'diamond', G: 'gold nugget', R: 'ruby', E: 'emerald',
-      Q: 'pebble', '-': 'blank',
+      W: 'wild crystal', BON: 'dynamite, opens the feature', D: 'diamond', G: 'gold nugget',
+      R: 'ruby', E: 'emerald', Q: 'pebble', '-': 'blank',
     },
   },
   lateshow: {
     art: LATE,
     names: {
-      spot: 'wild spotlight', mrq: 'marquee scatter', mic: 'microphone', mar: 'martini glass',
-      sax: 'saxophone', crt: 'stage curtain', ...RANK_NAMES, '-': 'blank',
+      spot: 'wild spotlight', mrq: 'marquee scatter', BON: 'stage door, opens the feature',
+      mic: 'microphone', mar: 'martini glass', sax: 'saxophone', crt: 'stage curtain',
+      ...RANK_NAMES, '-': 'blank',
     },
   },
 }

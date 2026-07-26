@@ -90,11 +90,19 @@ for (const machine of MACHINES) {
       `${(Number.isNaN(hit) ? '  —' : pct(hit)).padStart(11)}${missed ? '  <-- off target' : ''}`,
   )
 
+  // What `base` does and doesn't cover. This has to name every source of return
+  // that sits outside the enumeration, or the line reads as a claim that the
+  // exact figure is the whole machine — which it isn't the moment a cabinet has
+  // a feature or a bonus, and a wheel worth 13% of the return is easy to hide.
+  const outside: string[] = []
+  if (machine.feature.kind !== 'none') outside.push(machine.feature.kind)
+  if (machine.bonus) outside.push(`${machine.bonus.kind} bonus`)
+
   const lineShare = exactLineReturn(machine) / base
   const detail =
-    machine.feature.kind === 'none'
+    outside.length === 0
       ? `all of it enumerated: ${pct(lineShare)} of the base is line pays, the rest scatters`
-      : `base is the first screen only; the ${machine.feature.kind} adds ${pct((pooled - base) / pooled)} of the return`
+      : `base is the reels alone; ${outside.join(' + ')} adds the other ${pct((pooled - base) / pooled)}`
   console.log(`  ${' '.repeat(16)}${detail}. Per-spin SD ${sd.toFixed(2)}×.`)
 }
 

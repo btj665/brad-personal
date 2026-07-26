@@ -140,8 +140,17 @@ function winFaults(m: Machine, spins: number, coins = 1): string[] {
       }
     }
 
-    const total = result.steps.reduce((a, st) => a + st.paid, 0)
-    if (total !== result.paid) faults.push(`spin ${s}: steps total ${total}, spin says ${result.paid}`)
+    // The reels and the bonus are the only two things that can pay, so together
+    // they have to account for the spin exactly. A bonus award lives outside the
+    // steps, which is precisely why it is easy to lose track of.
+    const fromReels = result.steps.reduce((a, st) => a + st.paid, 0)
+    const fromBonus = result.bonus?.paid ?? 0
+    if (fromReels + fromBonus !== result.paid) {
+      faults.push(
+        `spin ${s}: reels ${fromReels} + bonus ${fromBonus} = ${fromReels + fromBonus}, spin says ${result.paid}`,
+      )
+    }
+    if (result.bonus && result.bonus.paid < 0) faults.push(`spin ${s}: bonus paid ${result.bonus.paid}`)
     if (result.staked !== stake) faults.push(`spin ${s}: staked ${result.staked}, expected ${stake}`)
   }
 

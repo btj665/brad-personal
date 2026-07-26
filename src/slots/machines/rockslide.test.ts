@@ -1,24 +1,41 @@
 import { describe, expect, it } from 'vitest'
 
 import { makeRng } from '../../engine/rng'
+import { pickValue } from '../bonus'
 import { resolveSpin } from '../machine'
-import { exactBaseReturn } from '../rtp'
-import type { Machine, SpinResult, Step } from '../types'
+import { exactBaseReturn, screenCountDistribution } from '../rtp'
+import type { Bonus, Machine, SpinResult, Step } from '../types'
 import { ROCKSLIDE } from './rockslide'
 
 /** The first drop and nothing else: what Rockslide would return if a winning
- *  screen never crumbled. `exactBaseReturn` enumerates this one exactly, and it
- *  is the figure that says the strips and the pay table are cut right. */
-const FIRST_DROP = 0.4922
+ *  screen never crumbled and no boulder ever landed. `exactBaseReturn` enumerates
+ *  this one exactly, and it is the figure that says the strips and the pay table
+ *  are cut right. */
+const FIRST_DROP = 0.447022
 
-/** The whole machine, cascades and free games included: 0.94845 ± 0.00086 over
- *  12,000,000 spins, corroborated by two independent streams (0.95182 ± 0.00210
- *  over 2M and 0.94649 ± 0.00149 over 4M, pooling to 0.9484 ± 0.0007 over 18M).
+/** How much the tumble multiplies the first drop by: 1.926157 ± 0.002158 over
+ *  24,000,000 spins in eight streams, measured with the first drop taken out of
+ *  the sample because that part is enumerated and only adds noise.
  *
  *  A cascade feeds its own next screen, so there is no finite state space to walk
  *  and nothing here to enumerate. This number is measured or it is nothing, which
  *  is why it is quoted with an error bar and `FIRST_DROP` is not. */
-const MEASURED_RTP = 0.9484
+const TUMBLE_LEVERAGE = 1.926157
+
+/** The pick round, which unlike the tumble is exact: nine prizes totalling 78
+ *  against three enders, so each prize is collected one time in four and the pool
+ *  is worth 19.5 × the total stake. Bought once in 221 drops. */
+const PICK_VALUE = 19.5
+const PICK_RETURN = 0.088243
+
+/** The whole machine: the first drop times the tumble, plus the pick. */
+const MEASURED_RTP = FIRST_DROP * TUMBLE_LEVERAGE + PICK_RETURN
+
+function pick(): Extract<Bonus, { kind: 'pick' }> {
+  const bonus = ROCKSLIDE.bonus
+  if (bonus?.kind !== 'pick') throw new Error('Rockslide is a pick machine')
+  return bonus
+}
 
 /** Rockslide's own feature, wired to a screen small enough to write down.
  *
@@ -27,7 +44,9 @@ const MEASURED_RTP = 0.9484
  *  A and blank, which is the single coin-flip that decides whether the chain
  *  carries on — enough randomness for a chain to die, little enough that every
  *  screen in it can be asserted literally. The spread keeps ROCKSLIDE's `feature`
- *  and `rows`, so the ladder and the trigger under test are the real ones. */
+ *  and `rows`, so the ladder and the trigger under test are the real ones. It also
+ *  keeps ROCKSLIDE's `bonus`, which cannot fire here because no strip in the rig
+ *  carries a boulder — so these tests see the cascade on its own. */
 const TUMBLE: Machine = {
   ...ROCKSLIDE,
   id: 'rockslide-tumble-rig',
@@ -88,11 +107,16 @@ describe('the cabinet', () => {
     })
   })
 
-  it('keeps a blank frequent on every reel, which is what lets a chain die', () => {
+  it('keeps dead space frequent on every reel, which is what lets a chain die', () => {
     for (const strip of ROCKSLIDE.strips) {
       expect(strip).toHaveLength(50)
-      const blanks = strip.filter((id) => id === '-').length
-      expect(blanks / strip.length).toBeGreaterThan(0.2)
+      // Blanks and boulders together. The boulder has no line pay, so as far as a
+      // cascade is concerned it is a blank — which is exactly why trading one
+      // blank a reel for one boulder left the tumble's arithmetic alone.
+      const dead = strip.filter((id) => id === '-' || id === 'BON').length
+      expect(dead).toBe(11)
+      expect(dead / strip.length).toBeGreaterThan(0.2)
+      expect(strip.filter((id) => id === 'BON')).toHaveLength(1)
     }
   })
 
@@ -294,13 +318,82 @@ describe('chains end', () => {
   }, 20_000)
 })
 
+describe('the boulders', () => {
+  it('carries one a reel and buys the round with three on the first drop', () => {
+    expect(pick().trigger).toBe('BON')
+    expect(pick().triggerCount).toBe(3)
+    // Not a scatter, not a wild, and not in the pay table: the evaluator has to
+    // read it as a blocker or the whole "it cost nothing at the pay table"
+    // argument in the file header collapses.
+    expect(ROCKSLIDE.symbols.find((s) => s.id === 'BON')?.scatter).toBeUndefined()
+    expect(ROCKSLIDE.linePays.BON).toBeUndefined()
+    expect(ROCKSLIDE.scatterPays).toBeUndefined()
+  })
+
+  it('is bought once in 221 drops, exactly', () => {
+    // One boulder on a fifty-stop reel shows in a four-row window 4 stops in 50,
+    // so the screen count is a sum of five independent 0.08s and the trigger is a
+    // closed form — no sampling anywhere in the price of this feature.
+    const dist = screenCountDistribution(ROCKSLIDE, 'BON')
+    const p = dist.slice(pick().triggerCount).reduce((a, b) => a + b, 0)
+    expect(p).toBeCloseTo(0.00452526, 8)
+    expect(1 / p).toBeGreaterThan(215)
+    expect(1 / p).toBeLessThan(228)
+    expect(p * PICK_VALUE).toBeCloseTo(PICK_RETURN, 6)
+  })
+
+  it('is worth a quarter of its pool, because three of the twelve are rock', () => {
+    expect(pick().prizes.reduce((a, b) => a + b, 0)).toBe(78)
+    expect(pick().enders).toBe(3)
+    expect(pickValue(pick())).toBe(PICK_VALUE)
+    // The board is a gamble rather than an annuity: (12 + 1)/(3 + 1) = 3.25
+    // boulders opened on average, so two prizes collected out of nine.
+    const board = pick().prizes.length + pick().enders
+    expect((board + 1) / (pick().enders + 1)).toBeCloseTo(3.25, 10)
+  })
+
+  it('is awarded once a spin, off the first drop, however far the chain runs', () => {
+    const rng = makeRng(0xb0d1e)
+    let triggers = 0
+    let deepChains = 0
+
+    for (let spin = 0; spin < 60_000; spin++) {
+      const result = resolveSpin(ROCKSLIDE, 1, rng)
+      const onFirstDrop = result.steps[0].window.flat().filter((id) => id === 'BON').length
+      expect(Boolean(result.bonus)).toBe(onFirstDrop >= pick().triggerCount)
+      if (result.bonus) {
+        triggers++
+        expect(result.bonus.kind).toBe('pick')
+        if (chainLength(result) > 0) deepChains++
+      }
+      const steps = result.steps.reduce((a, s) => a + s.paid, 0)
+      expect(result.paid).toBeCloseTo(steps + (result.bonus?.paid ?? 0), 8)
+    }
+
+    expect(60_000 / triggers).toBeGreaterThan(180)
+    expect(60_000 / triggers).toBeLessThan(280)
+    // A boulder is dead rock, so a screen that buys the round can still tumble —
+    // and it does, which is what makes "once a spin" a claim worth checking.
+    expect(deepChains).toBeGreaterThan(50)
+  }, 30_000)
+})
+
 describe('the return', () => {
-  it('is cut to a first drop of 0.4922, well under the target', () => {
-    expect(exactBaseReturn(ROCKSLIDE)).toBeCloseTo(FIRST_DROP, 3)
-    expect(Math.abs(exactBaseReturn(ROCKSLIDE) - FIRST_DROP)).toBeLessThan(0.004)
+  it('is cut to a first drop of 0.4470, well under the target', () => {
+    expect(exactBaseReturn(ROCKSLIDE)).toBeCloseTo(FIRST_DROP, 4)
     expect(ROCKSLIDE.targetRtp).toBe(0.95)
-    // Deliberately half the target: the ladder roughly doubles it back.
-    expect(exactBaseReturn(ROCKSLIDE)).toBeLessThan(0.6)
+    // Deliberately under half the target: the ladder roughly doubles it back and
+    // the pick adds the last nine points.
+    expect(exactBaseReturn(ROCKSLIDE)).toBeLessThan(0.5)
+  })
+
+  it('prices the whole machine as first drop × tumble + pick', () => {
+    expect(MEASURED_RTP).toBeCloseTo(0.9493, 4)
+    expect(Math.abs(MEASURED_RTP - ROCKSLIDE.targetRtp)).toBeLessThan(0.004)
+    // Two thirds of the way from 0.447 to 0.95 is the tumble and the last ninth
+    // is the pick, so neither one alone would get this cabinet to its target.
+    expect(PICK_RETURN / MEASURED_RTP).toBeGreaterThan(0.08)
+    expect(PICK_RETURN / MEASURED_RTP).toBeLessThan(0.10)
   })
 
   it('is worth about twice its first drop once the chain is counted', () => {
@@ -314,12 +407,14 @@ describe('the return', () => {
     const rng = makeRng(20260726)
     let staked = 0
     let paid = 0
+    let bonusPaid = 0
     let sumSq = 0
 
     for (let spin = 0; spin < SPINS; spin++) {
       const result = resolveSpin(ROCKSLIDE, 1, rng)
       staked += result.staked
       paid += result.paid
+      bonusPaid += result.bonus?.paid ?? 0
       const net = (result.paid - result.staked) / result.staked
       sumSq += net * net
     }
@@ -331,8 +426,13 @@ describe('the return', () => {
     expect(rtp).toBeGreaterThan(0.93)
     expect(rtp).toBeLessThan(0.97)
     expect(Math.abs(rtp - MEASURED_RTP)).toBeLessThan(4 * stderr)
+    // The pick's share of what the machine pays, which the closed form says is
+    // 0.0882/0.9493 = 9.3%. Only ~1800 rounds land in 400k spins, so this band is
+    // three standard errors of a very noisy quantity and nothing tighter.
+    expect(bonusPaid / paid).toBeGreaterThan(0.06)
+    expect(bonusPaid / paid).toBeLessThan(0.13)
     // The cascade is most of the machine: the first drop alone would be a
-    // 49% cabinet, which nobody would sit at.
-    expect(rtp / exactBaseReturn(ROCKSLIDE)).toBeGreaterThan(1.7)
+    // 45% cabinet, which nobody would sit at.
+    expect((rtp - bonusPaid / staked) / exactBaseReturn(ROCKSLIDE)).toBeGreaterThan(1.7)
   }, 60_000)
 })

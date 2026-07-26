@@ -5,6 +5,7 @@ import { evaluate, findSymbol, lineWins, scatterWins, windowOf } from './evaluat
 import { resolveSpin, SlotGame } from './machine'
 import { BARS } from './machines/bars'
 import { exactBaseReturn, exactLineReturn, screenCountDistribution, symbolProbabilities } from './rtp'
+import { wheelValue } from './bonus'
 import type { Machine } from './types'
 
 /** A minimal five-reel machine built by hand, so the evaluator can be tested
@@ -132,11 +133,23 @@ describe('the exact return', () => {
 })
 
 describe('Bars & Sevens', () => {
-  it('is cut to the return it claims', () => {
-    expect(exactBaseReturn(BARS)).toBeCloseTo(BARS.targetRtp, 2)
+  it('is cut to the return it claims, reels plus wheel', () => {
+    // This cabinet is the one whose whole price is a closed form. The wheel pays
+    // its own mean because every wedge is equally likely, and the trigger is a
+    // rational number off the strips — so the machine can be priced to the last
+    // digit without a single spin being simulated.
+    const wheel = BARS.bonus
+    if (wheel?.kind !== 'wheel') throw new Error('Bars is meant to carry the wheel')
+
+    const triggerChance = screenCountDistribution(BARS, wheel.trigger)
+      .slice(wheel.triggerCount)
+      .reduce((a, b) => a + b, 0)
+
+    const fromWheel = triggerChance * wheelValue(wheel)
+    expect(exactBaseReturn(BARS) + fromWheel).toBeCloseTo(BARS.targetRtp, 3)
   })
 
-  it('has no scatter, so its whole return is in the lines', () => {
+  it('has no scatter, so its whole reel return is in the lines', () => {
     expect(exactLineReturn(BARS)).toBeCloseTo(exactBaseReturn(BARS), 12)
   })
 
@@ -147,20 +160,28 @@ describe('Bars & Sevens', () => {
 
   it('pays three wilds as eight times the sevens', () => {
     // Each wild doubles, so three of them multiply the top line pay by eight.
-    expect(lineWins(screen('- - -', 'W W W', '- - -'), BARS, 1)[0].paid).toBe(130 * 8)
+    // Read the seven off the machine rather than repeating it — this assertion
+    // rotted once already when the pay table was cut to make room for the wheel.
+    const seven = BARS.linePays['7'][3]
+    expect(lineWins(screen('- - -', 'W W W', '- - -'), BARS, 1)[0].paid).toBe(seven * 8)
   })
 
   it('agrees with a simulation of itself', () => {
-    // A machine with no feature must play exactly as the enumeration says.
     const rng = makeRng(24)
     let staked = 0
     let paid = 0
+    let fromBonus = 0
     for (let i = 0; i < 300_000; i++) {
       const r = resolveSpin(BARS, 1, rng)
       staked += r.staked
       paid += r.paid
+      fromBonus += r.bonus?.paid ?? 0
     }
-    expect(paid / staked).toBeCloseTo(exactBaseReturn(BARS), 1)
+    // The reels are enumerable and the wheel isn't part of that enumeration, so
+    // strip the wheel back out and what's left has to be the exact figure. A
+    // 300k-spin sample of a wheel that lands once in 152 spins is far too noisy
+    // to check on its own; the closed form above is what pins that.
+    expect((paid - fromBonus) / staked).toBeCloseTo(exactBaseReturn(BARS), 1)
   })
 })
 

@@ -1,28 +1,44 @@
 import { describe, expect, it } from 'vitest'
 
 import { makeRng } from '../../engine/rng'
+import { pickValue } from '../bonus'
 import { lineWins, scatterWins } from '../evaluate'
 import { resolveSpin } from '../machine'
 import { exactBaseReturn, exactLineReturn, exactScatterReturn, screenCountDistribution } from '../rtp'
-import type { Machine, SymbolId } from '../types'
+import type { Bonus, Machine, SymbolId } from '../types'
 import { LATESHOW } from './lateshow'
 
-/** The base game, enumerated: lines 0.699854 + marquees 0.009118. The free games
- *  are not in here and cannot be — an expanded reel is no longer distributed
- *  like a spun one — so this is the figure that says the strips and the pay
- *  table are right, and the simulation below is what says the round is. */
-const BASE_RETURN = 0.7090
+/** The base game, enumerated: lines 0.642241 + marquees 0.009118. Neither the
+ *  free games nor the doors are in here — the doors because they are not a screen
+ *  pay at all, the free games because they cannot be enumerated, an expanded reel
+ *  no longer being distributed like a spun one. This is the figure that says the
+ *  strips and the pay table are right. */
+const BASE_RETURN = 0.651358
 
-/** Measured 0.961 ± 0.003 (two standard errors) pooled over sixteen independent
- *  streams of 1,500,000 spins, 0.262 of it out of the free games.
+/** How much the free games multiply the base game by: 1.355553 ± 0.003978 over
+ *  24,000,000 spins in eight streams, measured with the paid screen taken out of
+ *  the sample because that part is enumerated and only adds noise.
  *
- *  Per-spin return on this machine has a standard deviation of 7.3, so one
- *  stream of a few hundred thousand spins resolves the return to about a
- *  percentage point and no better. The run below is therefore a tripwire — it
- *  catches a strip or a pay edited by a symbol — and its band is deliberately
- *  three standard errors wide rather than tight enough to look authoritative. */
-const FULL_RETURN = 0.96
-const FREE_SHARE = 0.262
+ *  Per-spin return on this machine has a standard deviation near 7, so one stream
+ *  of a few hundred thousand spins resolves the return to about a percentage point
+ *  and no better. Anything below quoted from one stream is a tripwire, not a
+ *  price. */
+const FREE_LEVERAGE = 1.355553
+
+/** The backstage round, which unlike the free games is exact: seven prizes
+ *  totalling 41 against a single fire exit, so each prize is collected half the
+ *  time. Bought once in 266 spins. */
+const PICK_VALUE = 20.5
+const PICK_RETURN = 0.077047
+
+const FULL_RETURN = BASE_RETURN * FREE_LEVERAGE + PICK_RETURN
+const FREE_SHARE = (BASE_RETURN * (FREE_LEVERAGE - 1)) / FULL_RETURN
+
+function pick(): Extract<Bonus, { kind: 'pick' }> {
+  const bonus = LATESHOW.bonus
+  if (bonus?.kind !== 'pick') throw new Error('The Late Show is a pick machine')
+  return bonus
+}
 
 /** Build a window from rows written out as strings, top row first. */
 function screen(...rows: string[]): SymbolId[][] {
@@ -111,42 +127,125 @@ describe('The Late Show — the spotlight', () => {
 
 describe('The Late Show — the multiplier', () => {
   it('doubles a free game and pays the spin that bought it straight', () => {
-    // Three aces on all twenty-five lines (20 each) plus the three marquees
-    // (twice the 25-coin stake): 550 for the paid screen, 1100 for each of the
+    // Three aces on all twenty-five lines (18 each) plus the three marquees
+    // (twice the 25-coin stake): 500 for the paid screen, 1000 for each of the
     // ten free ones.
     const r = resolveSpin(rigged(A3, A3, A3, TWO_MRQ, ONE_MRQ), 1, makeRng(2))
 
     const [paidStep, ...free] = r.steps
     expect(paidStep.multiplier).toBe(1)
-    expect(paidStep.paid).toBe(25 * 20 + 2 * 25)
+    expect(paidStep.paid).toBe(25 * 18 + 2 * 25)
 
     for (const step of free) {
       expect(step.multiplier).toBe(2)
       expect(step.paid).toBe(2 * step.wins.reduce((sum, w) => sum + w.paid, 0))
-      expect(step.paid).toBe(2 * (25 * 20 + 2 * 25))
+      expect(step.paid).toBe(2 * (25 * 18 + 2 * 25))
     }
-    expect(r.paid).toBe(550 + 10 * 1100)
+    // No door on any of these strips, so nothing is buying a pick round here.
+    expect(r.bonus).toBeUndefined()
+    expect(r.paid).toBe(500 + 10 * 1000)
+  })
+})
+
+describe('The Late Show — the stage doors', () => {
+  const ONE_BON = ['BON', '-', '-']
+
+  it('buys the round for three doors anywhere, and nothing for two', () => {
+    const three = resolveSpin(rigged(ONE_BON, ONE_BON, ONE_BON, BLANK, BLANK), 1, makeRng(4))
+    expect(three.bonus?.kind).toBe('pick')
+    // No marquee on these strips, so the doors bought the round on their own.
+    expect(three.freeSpinsAwarded).toBe(0)
+
+    const two = resolveSpin(rigged(ONE_BON, ONE_BON, BLANK, BLANK, BLANK), 1, makeRng(4))
+    expect(two.bonus).toBeUndefined()
+    expect(two.paid).toBe(0)
+  })
+
+  it('pays nothing on a line and never stands in for anything', () => {
+    // A door between two aces breaks the run, exactly as a blank would.
+    expect(lineWins(screen('- - - - -', 'A BON A - -', '- - - - -'), LATESHOW, 1)).toHaveLength(0)
+    expect(LATESHOW.linePays.BON).toBeUndefined()
+    expect(LATESHOW.scatterPays?.BON).toBeUndefined()
+    expect(LATESHOW.symbols.find((s) => s.id === 'BON')?.scatter).toBeUndefined()
+    expect(LATESHOW.symbols.find((s) => s.id === 'BON')?.wild).toBeUndefined()
+  })
+
+  it('is worth half its pool, because one door in eight is the fire exit', () => {
+    expect(pick().prizes.reduce((a, b) => a + b, 0)).toBe(41)
+    expect(pick().enders).toBe(1)
+    expect(pickValue(pick())).toBe(PICK_VALUE)
+    // The loosest board in the building: four and a half doors opened on average
+    // out of eight, against Rockslide's 3.25 out of twelve.
+    const board = pick().prizes.length + pick().enders
+    expect((board + 1) / (pick().enders + 1)).toBeCloseTo(4.5, 10)
+  })
+
+  it('is bought once in 266 spins, exactly — the same rate as the marquees', () => {
+    const doors = screenCountDistribution(LATESHOW, 'BON')
+    const p = doors.slice(pick().triggerCount).reduce((a, b) => a + b, 0)
+    expect(p).toBeCloseTo(0.00375838, 8)
+    expect(p * PICK_VALUE).toBeCloseTo(PICK_RETURN, 6)
+
+    // Both symbols sit one to a reel on the same five forty-stop strips, so the
+    // two triggers are the same convolution of the same 3/40 and land on the same
+    // number. That is arithmetic, not a copy-paste.
+    const marquees = screenCountDistribution(LATESHOW, 'mrq')
+    expect(marquees.slice(3).reduce((a, b) => a + b, 0)).toBeCloseTo(p, 12)
   })
 })
 
 describe('The Late Show — reading a screen', () => {
   it('pays a run only when it starts on reel one', () => {
-    expect(lineWins(screen('- - - - -', 'A A A - -', '- - - - -'), LATESHOW, 1)[0].paid).toBe(20)
+    expect(lineWins(screen('- - - - -', 'A A A - -', '- - - - -'), LATESHOW, 1)[0].paid).toBe(18)
     // The same three aces one reel to the right, with nothing on reel one.
     expect(lineWins(screen('- - - - -', '- A A A -', '- - - - -'), LATESHOW, 1)).toHaveLength(0)
   })
 
   it('substitutes the spotlight but never the marquee', () => {
-    expect(lineWins(screen('- - - - -', 'A spot A - -', '- - - - -'), LATESHOW, 1)[0].paid).toBe(20)
+    expect(lineWins(screen('- - - - -', 'A spot A - -', '- - - - -'), LATESHOW, 1)[0].paid).toBe(18)
     expect(lineWins(screen('- - - - -', 'A mrq A - -', '- - - - -'), LATESHOW, 1)).toHaveLength(0)
   })
 })
 
 describe('The Late Show — the return', () => {
   it('has a base game cut to the figure it claims', () => {
-    expect(Math.abs(exactBaseReturn(LATESHOW) - BASE_RETURN)).toBeLessThan(0.004)
-    // Well under the target: the round has to be given room to land in.
-    expect(exactBaseReturn(LATESHOW)).toBeLessThan(LATESHOW.targetRtp - 0.2)
+    expect(exactBaseReturn(LATESHOW)).toBeCloseTo(BASE_RETURN, 5)
+    // Well under the target: two rounds have to be given room to land in.
+    expect(exactBaseReturn(LATESHOW)).toBeLessThan(LATESHOW.targetRtp - 0.25)
+  })
+
+  it('prices the whole machine as base × free games + doors', () => {
+    expect(FULL_RETURN).toBeCloseTo(0.96, 3)
+    expect(Math.abs(FULL_RETURN - LATESHOW.targetRtp)).toBeLessThan(0.004)
+    // The doors are 8% of the machine and the free games 24%: two features, and
+    // the base game is only two thirds of what this cabinet pays.
+    expect(PICK_RETURN / FULL_RETURN).toBeCloseTo(0.080, 2)
+    expect(FREE_SHARE).toBeCloseTo(0.241, 2)
+  })
+
+  it('cost the pay table 8% to add the doors, because the round multiplies them', () => {
+    // The doors are worth 0.0770 of return, but the free games multiply every line
+    // pay by 1.356, so buying them at the pay table only cost 0.0568 of base game.
+    // That is the whole reason the table came down 8% rather than 12%.
+    const oldTable: Machine = {
+      ...LATESHOW,
+      linePays: {
+        mic: [0, 0, 0, 75, 325, 1500],
+        mar: [0, 0, 0, 50, 250, 1000],
+        sax: [0, 0, 0, 35, 160, 600],
+        crt: [0, 0, 0, 30, 125, 500],
+        A: [0, 0, 0, 20, 70, 260],
+        K: [0, 0, 0, 15, 55, 200],
+        Q: [0, 0, 0, 10, 40, 150],
+        J: [0, 0, 0, 9, 35, 125],
+        T: [0, 0, 0, 7, 30, 100],
+      },
+    }
+    const scale = exactLineReturn(LATESHOW) / exactLineReturn(oldTable)
+    expect(scale).toBeGreaterThan(0.91)
+    expect(scale).toBeLessThan(0.93)
+    const cut = (exactBaseReturn(oldTable) - exactBaseReturn(LATESHOW)) * FREE_LEVERAGE
+    expect(cut).toBeCloseTo(PICK_RETURN, 2)
   })
 
   it('splits that base between the lines and the marquees', () => {
@@ -177,32 +276,41 @@ describe('The Late Show — the return', () => {
       let staked = 0
       let paid = 0
       let freePaid = 0
+      let doorPaid = 0
       let triggers = 0
+      let doors = 0
       for (let i = 0; i < spins; i++) {
         const r = resolveSpin(LATESHOW, 1, rng)
         staked += r.staked
         paid += r.paid
+        doorPaid += r.bonus?.paid ?? 0
         if (r.freeSpinsAwarded > 0) triggers++
+        if (r.bonus) doors++
         for (const step of r.steps) if (step.free) freePaid += step.paid
       }
 
       // A fortieth of the spins the reported figure was pooled over. At a
-      // per-spin standard deviation of 7.3 that is a standard error of 0.013, so
+      // per-spin standard deviation near 7 that is a standard error of 0.013, so
       // the band is three of them — wide, and honestly so. Anything that moves
       // the return by the amount an edited strip would still trips it.
       expect(paid / staked).toBeGreaterThan(FULL_RETURN - 0.04)
       expect(paid / staked).toBeLessThan(FULL_RETURN + 0.04)
 
-      // The base game is not sampled — it is enumerated — so the part of the
-      // measurement that is not free games has to land on the exact figure.
-      expect((paid - freePaid) / staked).toBeCloseTo(exactBaseReturn(LATESHOW), 1)
+      // The paid screen is not sampled — it is enumerated — so the part of the
+      // measurement that is neither free games nor doors has to land on it.
+      expect((paid - freePaid - doorPaid) / staked).toBeCloseTo(exactBaseReturn(LATESHOW), 1)
 
-      // Better than a quarter of everything the machine pays comes out of ten
-      // free games it hands out once in every two hundred and seventy spins.
+      // Nearly a quarter of everything the machine pays comes out of ten free
+      // games it hands out once in every two hundred and seventy spins, and
+      // another twelfth out of the doors it hands out just as often.
       expect(freePaid / paid).toBeGreaterThan(FREE_SHARE - 0.03)
       expect(freePaid / paid).toBeLessThan(FREE_SHARE + 0.03)
+      expect(doorPaid / paid).toBeGreaterThan(PICK_RETURN / FULL_RETURN - 0.03)
+      expect(doorPaid / paid).toBeLessThan(PICK_RETURN / FULL_RETURN + 0.03)
       expect(spins / triggers).toBeGreaterThan(220)
       expect(spins / triggers).toBeLessThan(320)
+      expect(spins / doors).toBeGreaterThan(220)
+      expect(spins / doors).toBeLessThan(320)
     },
   )
 })

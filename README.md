@@ -47,16 +47,17 @@ SVG cards.
   Triple / Five / Ten Play.
 - **Slots** — four cabinets, chosen to be four different *mechanics* rather than
   four themes, because the theme is the only part of a slot that doesn't change
-  the arithmetic: a three-reel stepper with doubling wilds, a thirty-line game
-  whose scatter pays on how many landed anywhere, a cascading screen where
-  winners crumble and the chain escalates, and a free-games round with wilds that
-  fill a whole reel.
+  the arithmetic: a three-reel stepper with doubling wilds and a top-box wheel; a
+  thirty-line game whose bells pay from anywhere and then lock and respin; a
+  cascading screen where winners crumble, the chain escalates, and boulders hide
+  prizes; and a lounge with free games, a wild that swallows a whole reel, and
+  eight backstage doors.
 - **Keno** — pick one to ten of eighty, drawn twenty at a time, with the exact
   hypergeometric odds and an honest note about what the ticket costs you.
 
 ```bash
 npm run dev          # play them            → http://localhost:5173
-npm test             # 685 engine tests
+npm test             # 758 engine tests
 npm run build
 
 npm run edges         # every game's validation, one sweep
@@ -139,18 +140,58 @@ with a single flat line, so the computed return and the played game cannot drift
 apart. Each cabinet then asserts that figure against the number it was cut to
 hit.
 
-| Cabinet | Mechanic | Exact base | Measured | Cut for |
-|---|---|---|---|---|
-| Bars & Sevens | 3-reel stepper, doubling wilds | 89.838% | 89.914% | 90% |
-| Bell Ringer | 30 lines, scatter pays on screen count | 94.982% | 95.011% | 95% |
-| Rockslide | cascading reels, 1×→10× ladder | 49.219% *(first drop)* | 94.858% | 95% |
-| The Late Show | expanding wilds, free games at 2× | 70.897% *(base game)* | 95.993% | 96% |
+| Cabinet | Reels | Bonus | Exact base | Measured | Cut for |
+|---|---|---|---|---|---|
+| Bars & Sevens | 3-reel stepper, doubling wilds | top-box wheel | 76.486% | 90.174% | 90% |
+| Bell Ringer | 30 lines, bells pay from anywhere | hold & spin | 85.311% | 94.901% | 95% |
+| Rockslide | cascading reels, 1×→10× ladder | pick a boulder | 44.702% | 94.818% | 95% |
+| The Late Show | expanding wilds, free games at 2× | eight doors | 65.136% | 95.944% | 96% |
 
-The two feature machines **cannot** be enumerated: a cascade feeds its own next
-screen and a free-games round changes the screen's distribution, so the state
-space is unbounded. For those, the exact column is the first screen only — a real
-number, and the cross-check that the strips are right — and the full return is
-measured. `npm run slots:rtp` prints both, and never blurs them together.
+The **base** column is the reels alone. Nothing that feeds a screen back into
+itself can be enumerated — a cascade produces its own next screen, a free-games
+round changes the screen's distribution, a respin re-grants itself — so for those
+the base is a real number and a genuine cross-check that the strips are right,
+and the full return is measured. `npm run slots:rtp` prints both and never blurs
+them together; it also names *which* features sit outside the enumeration, since
+a wheel worth 15% of a machine is otherwise easy to hide inside a reassuring
+"exact" figure.
+
+Two of the three bonus mechanics are priced in **closed form**, so the cabinets
+carrying them were re-cut algebraically rather than by hunting:
+
+- A **wheel** with equally-likely wedges is worth its own mean. Bars & Sevens is
+  the whole machine priced without a single simulated spin: the strip weave lands
+  its two bonus symbols 23 stops apart on a 32-stop reel, so no three-row window
+  can hold both, "three on screen" is exactly "one per reel", and the trigger is
+  `(6/32)³ = 27/4096`. Times a mean wedge of `492/24 = 20.5` that is `0.135132`
+  of the return, exactly, on top of an enumerated `0.764862` — **0.899994**
+  against a target of 0.90.
+- A **pick** round is worth its whole prize pool divided by `duds + 1`. With `d`
+  duds shuffled among the prizes, any given prize is collected exactly when it
+  precedes all of them, and those `d + 1` items are in uniform random order — so
+  it is collected with probability `1/(d+1)`, independent of how many other
+  prizes there are. Verified against simulation on four boards, including a
+  degenerate one-prize-four-duds case, before it was relied on.
+- **Hold and spin** has no closed form, because respins re-grant themselves
+  whenever a coin lands, so it is measured.
+
+Adding the bonus symbol cost nothing, which is the trick that made the retune
+cheap: `BON` replaced **blanks**, not paying symbols. Since the evaluator treats
+it as a blocker exactly like a blank, every window's win set, every cascade and
+every scatter distribution is untouched, and `exactLineReturn` did not move at
+all — asserted by relabelling `BON` back to `-` and checking the base return
+matches to twelve places.
+
+Bell Ringer's rebalance is the one worth reading. Its bells already paid a
+scatter ladder up to 9+; now six bells also buy a hold-and-spin, so **only the
+rungs the round replaces came down** — 3, 4 and 5 are untouched, because they
+never bought a round and have no business funding one. Rungs 6+ fell from
+`0.140563` of the return to `0.043852`, and the round is `0.096808`: the money
+didn't leave the machine, it left the glass. Two side effects: the ladder now
+reads `5 → 9, 6 → 10`, which looks like a typo and is the opposite (the sixth
+bell is worth 40× all in), and dropping a 1200× top award cut the per-spin
+standard deviation from about 12 to 4.7, so that cabinet now resolves four times
+as sharply as it used to.
 
 Measuring a slot is harder than it looks, which cost real time here. A five-reel
 machine's per-spin return has a standard deviation of **3 to 12 times the stake**,
@@ -278,11 +319,16 @@ src/
                   must agree.
   videopoker/     classify → solver → paytables, single line through Ten Play.
   slots/          types.ts is the whole specification of a cabinet: strips, rows,
-                  paylines, pay table, feature. evaluate.ts reads a stopped
+                  paylines, pay table, feature, bonus. evaluate.ts reads a stopped
                   screen; rtp.ts enumerates the return from the strips through
                   that same evaluator; machine.ts resolves a spin — every cascade
-                  in a chain, every free game it bought — into a list of steps
-                  the UI walks on a timer.
+                  in a chain, every free game it bought, and the bonus round —
+                  into a list of steps the UI walks on a timer.
+    bonus.ts      Wheel, pick and hold-and-spin, plus the closed forms that price
+                  the first two. All three are decided the instant they trigger:
+                  a player's clicks set the order of the reveal, not the total,
+                  which is what the cabinets do and the only version whose return
+                  can be stated and then held to.
     machines/     One file per cabinet, and each is data plus a feature tag: the
                   engine does the work, so a new machine is a pay table and a
                   set of strips, not a new state machine.
@@ -396,10 +442,18 @@ together and stop left to right, so the last one carries the suspense; each
 winning line is then held up on its own before the total rolls up on the meter.
 On Rockslide the winners crumble out and fresh stone falls into the gaps at a
 rising multiplier until the chain dies. On The Late Show three marquees buy ten
-free games and the spotlight floods its whole reel. Every symbol is drawn as SVG
-in `ui/slots/Symbols.tsx` — four cabinets, four palettes, no bitmaps. The line
-under the machine states what it actually returns, computed from its own strips;
-there is no reason a slot shouldn't tell you.
+free games and the spotlight floods its whole reel. Land the bonus symbol and the
+cabinet hands over: a wheel to spin, boulders or doors to open, or bells that lock
+and respin. A spin paying eight times the bet or more gets the big-win screen.
+
+**Press Pays.** Every symbol's full ladder in real credits, a diagram of every
+payline numbered to match what the machine calls out when it pays, the feature and
+the bonus round explained in the cabinet's own numbers, and the return — stated as
+what is enumerated and what is measured, with the reason for the difference.
+
+Everything on these machines is drawn: the symbols in `ui/slots/Symbols.tsx`, the
+top boxes, rails, belly glass and coin trays in `ui/slots/Cabinet.tsx`. Four
+cabinets, four palettes, no bitmaps anywhere.
 
 **Keno.** Mark one to ten of the eighty numbers, or use quick pick. Twenty are
 called. The rail shows the pay table for your pick count and the house edge that
