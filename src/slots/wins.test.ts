@@ -194,4 +194,29 @@ describe('a cascade always ends on a screen that paid nothing', () => {
       expect(chains).toBeGreaterThan(50)
     },
   )
+
+  it.each(cascading.map((m) => [m.label, m] as const))(
+    '%s — and every step of a chain is a different screen from the one before it',
+    (_label, machine) => {
+      // Winners are removed and the gaps refilled, so consecutive steps can never
+      // show the same thing. This is worth pinning because the cabinet once
+      // *looked* like it was breaking this rule: the reels held a tape in state and
+      // stopped reading the screen after the first roll, so a tumble repainted the
+      // screen that had already paid. The engine was right and the glass was
+      // stale, and from the outside those are the same bug.
+      const rng = makeRng(8181)
+      let compared = 0
+      for (let s = 0; s < 400; s++) {
+        const result = resolveSpin(machine, 1, rng)
+        for (let i = 1; i < result.steps.length; i++) {
+          if (result.steps[i].spun) continue // a fresh set of reels, not a tumble
+          const before = JSON.stringify(result.steps[i - 1].window)
+          const after = JSON.stringify(result.steps[i].window)
+          expect(after).not.toBe(before)
+          compared++
+        }
+      }
+      expect(compared).toBeGreaterThan(100)
+    },
+  )
 })

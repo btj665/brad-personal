@@ -261,7 +261,10 @@ export function SlotsScreen() {
 
   const baseReturn = useMemo(() => exactBaseReturn(machine), [machine])
   const broke = game.bankroll < game.totalBet()
-  const showing = step?.wins[winIndex]
+  // Only name a win while its screen is actually up. During a crumble or a drop
+  // the next step is already current, so this would announce a line before its
+  // symbols have landed.
+  const showing = phase === 'reveal' ? step?.wins[winIndex] : undefined
   const freeLeft = steps.slice(stepIndex).filter((s) => s.free).length
 
   const paidSteps = steps.filter((s) => s.paid > 0)
@@ -317,7 +320,17 @@ export function SlotsScreen() {
             <div className="sl-body">
               <PayStrip machine={machine} coins={game.coinsPerLine} onSeeAll={() => setPays(true)} />
 
-              <div className="sl-window">
+              {/* The walk's state, on the element, so it can be driven and read
+                  from outside. A stale-screen bug here is invisible to the test
+                  suite — the engine was correct and the glass was one screen
+                  behind — and these four attributes are what made it findable. */}
+              <div
+                className="sl-window"
+                data-phase={phase}
+                data-step={stepIndex}
+                data-steps={steps.length}
+                data-win={winIndex}
+              >
                 {step?.free && (
                   <div className="sl-freebanner">
                     Free game{freeLeft > 1 ? ` · ${freeLeft} left` : ''}

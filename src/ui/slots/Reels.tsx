@@ -73,10 +73,17 @@ export function Reels({ machine, window, lit, crumbling, spinToken, dropped }: R
   const reels = machine.strips.length
   const rows = machine.rows
 
-  // A tape is the landing screen followed by junk. Parking it scrolled deep into
-  // the junk and animating back to zero scrolls the symbols downward, which is
-  // the direction a real reel turns.
-  const [tapes, setTapes] = useState<SymbolId[][]>([])
+  // A tape is the screen followed by junk. Parking it scrolled deep into the junk
+  // and animating back to zero scrolls the symbols downward, which is the
+  // direction a real reel turns.
+  //
+  // Only the *junk* is state, and only a new spin rebuilds it. The visible part is
+  // always read straight off the current `window` prop, which is what lets a
+  // cascade repaint the screen in place: the reels don't roll for a tumble, the
+  // symbols just change. Holding the whole tape in state instead meant the window
+  // prop was ignored after the first roll, so every cascade step redrew the screen
+  // that had already paid.
+  const [junk, setJunk] = useState<SymbolId[][]>([])
   const [rolling, setRolling] = useState(false)
   const [landed, setLanded] = useState<boolean[]>(() => new Array(reels).fill(true))
   const firstRender = useRef(true)
@@ -111,14 +118,13 @@ export function Reels({ machine, window, lit, crumbling, spinToken, dropped }: R
       firstRender.current = false
       return
     }
-    const built = window.map((col, reel) => {
-      const strip = machine.strips[reel]
-      const junk: SymbolId[] = []
+    const built = machine.strips.map((strip, reel) => {
+      const filler: SymbolId[] = []
       const n = FILLER + reel * FILLER_STEP
-      for (let i = 0; i < n; i++) junk.push(strip[Math.floor(Math.random() * strip.length)])
-      return [...col, ...junk]
+      for (let i = 0; i < n; i++) filler.push(strip[Math.floor(Math.random() * strip.length)])
+      return filler
     })
-    setTapes(built)
+    setJunk(built)
     setRolling(true)
     setLanded(new Array(reels).fill(false))
 
@@ -151,15 +157,19 @@ export function Reels({ machine, window, lit, crumbling, spinToken, dropped }: R
       style={{ ['--sl-cell' as string]: `${cell}px`, ['--sl-rows' as string]: rows }}
     >
       {Array.from({ length: reels }, (_, reel) => {
-        const tape = tapes[reel] ?? window[reel]
-        const junk = tape.length - rows
+        const filler = junk[reel] ?? []
+        // The screen first, the junk above it — so parking the tape at
+        // -filler.length shows junk, and animating to 0 brings the screen down.
+        const tape = [...window[reel], ...filler]
         const isLanded = landed[reel]
         return (
           <div className={`sl-reel${isLanded ? ' sl-reel-landed' : ''}`} key={reel}>
             <div
               className={`sl-tape${!isLanded ? ' sl-tape-rolling' : ''}`}
               style={{
-                transform: rolling ? `translateY(calc(var(--sl-cell) * ${-junk}))` : 'translateY(0)',
+                transform: rolling
+                  ? `translateY(calc(var(--sl-cell) * ${-filler.length}))`
+                  : 'translateY(0)',
                 transition: rolling
                   ? 'none'
                   : `transform ${ROLL_MS + reel * ROLL_STEP_MS}ms cubic-bezier(0.16, 0.72, 0.14, 1.04)`,
