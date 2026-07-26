@@ -168,7 +168,12 @@ export function SlotsScreen() {
     }
     if (winIndex === 0) setRunning((r) => r + step.paid)
     if (winIndex < step.wins.length) {
-      const t = setTimeout(() => setWinIndex((i) => i + 1), LINE_MS)
+      // Twenty paylines means a good screen can pay six or eight of them at once.
+      // Holding each for a full beat would take ten seconds, so the walk speeds up
+      // as the win count climbs rather than testing anybody's patience.
+      const many = step.wins.length
+      const dwell = many > 6 ? 230 : many > 3 ? 390 : LINE_MS
+      const t = setTimeout(() => setWinIndex((i) => i + 1), dwell)
       return () => clearTimeout(t)
     }
     const t = setTimeout(() => advance(), 120)
@@ -289,6 +294,15 @@ export function SlotsScreen() {
   const showing = step?.wins[winIndex]
   const freeLeft = steps.slice(stepIndex).filter((s) => s.free).length
 
+  // What the whole spin did, for the summary the machine rests on. A cascade's
+  // last screen is barren by definition, so the total has to be attributed to the
+  // spin rather than to whatever happens to be on the glass at the end.
+  const paidSteps = steps.filter((s) => s.paid > 0)
+  const linesPaid = paidSteps.reduce((n, s) => n + s.wins.length, 0)
+  const chainLength = steps.filter((s) => !s.spun).length + 1
+  const chainAt = Math.min(stepIndex + 1, chainLength)
+  const freeSpinsThisSpin = game.result?.freeSpinsAwarded ?? 0
+
   return (
     <>
       <header className="topbar">
@@ -329,8 +343,16 @@ export function SlotsScreen() {
 
               <div className="sl-window">
                 {step?.free && <div className="sl-freebanner">Free game{freeLeft > 1 ? ` · ${freeLeft} left` : ''}</div>}
-                {step && step.multiplier > 1 && (
+                {/* Only badge a multiplier on a screen it actually multiplied. A
+                    cascade chain always ends on a screen that paid nothing, and a
+                    ×5 hanging over that screen is a claim the machine can't back. */}
+                {step && step.multiplier > 1 && step.paid > 0 && (
                   <div className="sl-multbadge">×{step.multiplier}</div>
+                )}
+                {chainLength > 1 && busy && (
+                  <div className="sl-dropcount">
+                    Drop {chainAt} / {chainLength}
+                  </div>
                 )}
 
                 <Reels
@@ -354,7 +376,16 @@ export function SlotsScreen() {
                     </span>
                   ) : running > 0 ? (
                     <span className="sl-hit">
-                      Win <b>+{running.toLocaleString()}</b>
+                      Total win <b>+{running.toLocaleString()}</b>
+                      <em className="sl-breakdown">
+                        {[
+                          `${linesPaid} line${linesPaid === 1 ? '' : 's'}`,
+                          paidSteps.length > 1 ? `${paidSteps.length} paying drops` : null,
+                          freeSpinsThisSpin > 0 ? `${freeSpinsThisSpin} free games` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </em>
                     </span>
                   ) : game.result ? (
                     <span className="sl-dim">No win</span>
