@@ -18,7 +18,17 @@
     "paigow:edge": "tsx scripts/paigow-edge.ts",
     "vp:return": "tsx scripts/vp-return.ts",
     "roulette:edge": "tsx scripts/roulette-edge.ts",
-    "craps:edge": "tsx scripts/craps-edge.ts"
+    "craps:edge": "tsx scripts/craps-edge.ts",
+    "baccarat:edge": "tsx scripts/baccarat-edge.ts",
+    "tcp:edge": "tsx scripts/threecard-edge.ts",
+    "sicbo:edge": "tsx scripts/sicbo-edge.ts",
+    "lir:edge": "tsx scripts/letitride-edge.ts",
+    "mstud:edge": "tsx scripts/mstud-edge.ts",
+    "cstud:edge": "tsx scripts/caribbean-edge.ts",
+    "war:edge": "tsx scripts/war-edge.ts",
+    "bigsix:edge": "tsx scripts/bigsix-edge.ts",
+    "keno:return": "tsx scripts/keno-return.ts",
+    "edges": "tsx scripts/all-edges.ts"
   },
   "dependencies": {
     "react": "^19.2.7",

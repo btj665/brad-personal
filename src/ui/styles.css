@@ -1264,7 +1264,7 @@ button:disabled {
 
 .gamenav {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 20px;
   padding: 10px 20px;
   border-bottom: 1px solid var(--line);
@@ -1278,12 +1278,45 @@ button:disabled {
   text-transform: uppercase;
   color: var(--brass);
   white-space: nowrap;
+  padding-top: 14px;
+}
+
+/* The floor is grouped — card tables, then dice and wheels, then machines — so
+   fifteen games read as a lobby rather than one long strip of tabs. */
+.gamenav-groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 18px;
+  min-width: 0;
+}
+
+.gamenav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gamenav-group + .gamenav-group {
+  padding-left: 18px;
+  border-left: 1px solid var(--line);
+}
+
+.gamenav-grouplabel {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  padding-left: 4px;
 }
 
 .gamenav-tabs {
   display: flex;
-  gap: 6px;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
 }
 
 .gamenav-tab {
@@ -1291,7 +1324,7 @@ button:disabled {
   flex-direction: column;
   align-items: flex-start;
   gap: 1px;
-  padding: 7px 14px;
+  padding: 6px 11px;
   border-radius: 9px;
   border: 1px solid transparent;
   background: transparent;
@@ -2343,6 +2376,22 @@ main.main {
     display: none;
   }
 
+  /* Narrow: the group columns stack, so their dividers would point the wrong
+     way. Drop them and let the labels do the separating. */
+  .gamenav {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .gamenav-brand {
+    padding-top: 0;
+  }
+
+  .gamenav-group + .gamenav-group {
+    padding-left: 0;
+    border-left: none;
+  }
+
   .rl-bet {
     font-size: 11px;
     min-height: 28px;
@@ -2857,4 +2906,2932 @@ main.main {
   .cr2-dc {
     flex: 1 1 100%;
   }
+}
+
+/* ================================================================ collected: threecard */
+/* ================================================================ Three Card Poker */
+
+.tcp-schedule {
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.tcp-schedule:disabled {
+  opacity: 0.5;
+}
+
+.tcp-tray {
+  align-items: stretch;
+}
+
+/* The table is a short one — two hands and three betting circles, nothing else —
+   so it does not need the full half-round felt the seated games use. */
+.tcp-felt {
+  min-height: 0;
+  padding: 20px 26px 24px;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.tcp-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.tcp-seat-label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.tcp-cards {
+  display: flex;
+  gap: 10px;
+  min-height: 92px;
+  align-items: center;
+}
+
+.tcp-rank {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  white-space: nowrap;
+}
+
+.tcp-rank-dim {
+  color: var(--ink-dim);
+  border-color: rgba(255, 255, 255, 0.07);
+  font-weight: 500;
+}
+
+.tcp-divider {
+  width: min(560px, 100%);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.22) 20%,
+    rgba(255, 255, 255, 0.22) 80%,
+    transparent
+  );
+}
+
+/* --- the betting circles */
+
+.tcp-spots {
+  display: flex;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.tcp-spot {
+  width: 108px;
+  min-height: 84px;
+  padding: 8px 6px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.24);
+  color: var(--ink);
+  font: inherit;
+}
+
+.tcp-spot-live {
+  border-color: rgba(200, 160, 74, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(200, 160, 74, 0.16);
+}
+
+.tcp-spot-ghost {
+  border-style: dashed;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.tcp-spot-click {
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, transform 0.06s;
+}
+
+.tcp-spot-click:hover {
+  border-color: var(--brass);
+  background: rgba(200, 160, 74, 0.1);
+}
+
+.tcp-spot-click:active {
+  transform: translateY(1px);
+}
+
+.tcp-spot-label {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.tcp-spot-chips {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 46px;
+}
+
+.tcp-spot-ghost-amount {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.34);
+  align-self: center;
+}
+
+/* --- the result banner */
+
+.tcp-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--line);
+}
+
+.tcp-result-win {
+  border-color: rgba(88, 201, 138, 0.55);
+  color: var(--win);
+}
+
+.tcp-result-lose {
+  border-color: rgba(224, 101, 94, 0.5);
+  color: var(--lose);
+}
+
+.tcp-result-push {
+  border-color: rgba(217, 180, 92, 0.5);
+  color: var(--push);
+}
+
+.tcp-tag {
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(200, 160, 74, 0.16);
+  border: 1px solid rgba(200, 160, 74, 0.4);
+  color: #e8d4a4;
+}
+
+.tcp-net {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* --- the schedules panel */
+
+.tcp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tcp-paytable {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.tcp-paytable-head {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.tcp-paytable-note {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.tcp-paytable table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.tcp-paytable td {
+  padding: 3px 0;
+  color: var(--ink);
+}
+
+.tcp-paytable td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+}
+
+.tcp-pay-hit td,
+.tcp-pay-hit td:last-child {
+  color: #1a1408;
+  background: var(--brass);
+  font-weight: 650;
+}
+
+.tcp-pay-hit td:first-child {
+  border-radius: 5px 0 0 5px;
+  padding-left: 6px;
+}
+
+.tcp-pay-hit td:last-child {
+  border-radius: 0 5px 5px 0;
+  padding-right: 6px;
+}
+
+.tcp-panel-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
+.tcp-panel-note b {
+  color: var(--ink);
+}
+
+/* --- the controls */
+
+.tcp-controls {
+  width: 100%;
+  max-width: 1180px;
+  align-items: center;
+}
+
+.tcp-chiprow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tcp-chiprow-note {
+  font-size: 11px;
+  color: var(--ink-dim);
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .tcp-tray {
+    grid-template-columns: 1fr;
+  }
+
+  .tcp-spots {
+    gap: 10px;
+  }
+
+  .tcp-spot {
+    width: 92px;
+  }
+}
+
+/* ================================================================ collected: caribbean */
+/* ============================================================== Caribbean Stud
+
+   One player, one dealer, five cards each. The table is a short rectangle of
+   felt rather than the big half-round used by blackjack and Pai Gow, because
+   there is only ever one seat and one decision. The rail on the right carries
+   the two schedules the game advertises: the Raise odds and the progressive. */
+
+.cs {
+  width: 100%;
+  max-width: 1180px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 268px;
+  gap: 14px;
+  align-items: start;
+}
+
+.cs-felt {
+  position: relative;
+  min-width: 0;
+  padding: 18px 24px 22px;
+  border-radius: 22px;
+  background:
+    radial-gradient(75% 60% at 50% 4%, rgba(255, 255, 255, 0.11), transparent 62%),
+    linear-gradient(180deg, var(--felt) 0%, var(--felt-dark) 100%);
+  border: 10px solid var(--rail);
+  box-shadow:
+    inset 0 0 0 2px rgba(200, 160, 74, 0.3),
+    inset 0 16px 50px rgba(0, 0, 0, 0.32),
+    0 22px 60px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+/* --- the two hands */
+
+.cs-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.cs-side-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.cs-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-height: 92px;
+}
+
+.cs-slot {
+  position: relative;
+  display: inline-block;
+  animation: cs-deal 0.26s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes cs-deal {
+  from {
+    transform: translate(30px, -80px) rotate(-12deg);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* The one dealer card that is face up gets a tag, so it reads as information
+   rather than as a mis-dealt hand. */
+.cs-uptag {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1a1408;
+  background: var(--brass);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.cs-hand-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+  min-height: 16px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* --- the verdict line between the hands */
+
+.cs-verdict {
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--felt-line);
+  border-bottom: 1px solid var(--felt-line);
+  align-self: stretch;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.cs-result {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.cs-result-idle {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.cs-result-win {
+  color: #b6f2ce;
+}
+
+.cs-result-lose {
+  color: #ffc4c0;
+}
+
+.cs-result-push,
+.cs-result-fold {
+  color: #f0dca8;
+}
+
+/* --- betting circles */
+
+.cs-circles {
+  display: flex;
+  gap: 22px;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.cs-circle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.cs-circle-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.cs-circle-spot {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 2px solid var(--felt-line);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  position: relative;
+}
+
+/* --- the rail */
+
+.cs-rail {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cs-rail-title {
+  margin: 4px 0 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.cs-paytable {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.cs-paytable td {
+  padding: 2px 6px;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.cs-pay-name {
+  color: #f0d68a;
+  letter-spacing: 0.01em;
+}
+
+.cs-pay-odds {
+  text-align: right;
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cs-pay-hit {
+  background: rgba(200, 160, 74, 0.3);
+}
+
+.cs-pay-hit td {
+  color: #fff;
+}
+
+.cs-rail-note {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.cs-rail-note b {
+  color: var(--ink);
+}
+
+/* The progressive's real return, stated on the felt rather than buried in a
+   comment. It is a bad bet at any meter a casino normally shows. */
+.cs-rail-warn {
+  color: #e6a8a3;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.cs-meter {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-align: center;
+  padding: 4px 0;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(200, 160, 74, 0.3);
+  border-radius: 8px;
+}
+
+/* --- controls */
+
+.cs-bet-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cs-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cs-stepper b {
+  min-width: 46px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+
+.cs-out {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.cs-fold {
+  border-color: rgba(224, 101, 94, 0.4);
+}
+
+.cs-key {
+  font-size: 10px;
+  opacity: 0.55;
+  margin-left: 6px;
+}
+
+.cs-coach {
+  font-size: 12px;
+  padding: 7px 11px;
+  border-radius: 7px;
+  background: rgba(200, 160, 74, 0.1);
+  border: 1px solid rgba(200, 160, 74, 0.28);
+  color: #e8d4a4;
+}
+
+.cs-coach b {
+  color: var(--brass);
+}
+
+@media (max-width: 860px) {
+  .cs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ================================================================ collected: letitride */
+/* ================================================================ let it ride */
+
+.lir {
+  width: 100%;
+  max-width: 940px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+/* Pay table beside the felt, wrapping under it when the room runs out. */
+.lir-layout {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: stretch;
+  justify-content: center;
+}
+
+/* ---------------------------------------------------------------- pay table */
+
+.lir-paytable {
+  flex: 1 1 240px;
+  min-width: 230px;
+  max-width: 300px;
+  padding: 14px 0 12px;
+  border: 1px solid rgba(200, 160, 74, 0.35);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #14202f, #0a1420);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.45);
+  align-self: flex-start;
+}
+
+.lir-paytable-title {
+  margin: 0 14px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.lir-paytable table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.lir-paytable td {
+  padding: 3px 14px;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.lir-pay-name {
+  color: #f0d68a;
+  letter-spacing: 0.02em;
+}
+
+.lir-pay-odds {
+  text-align: right;
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lir-pay-lose {
+  color: var(--ink-dim);
+  font-weight: 400;
+  font-style: italic;
+}
+
+.lir-pay-hit {
+  background: rgba(200, 160, 74, 0.28);
+}
+
+.lir-pay-hit td,
+.lir-pay-hit .lir-pay-name,
+.lir-pay-hit .lir-pay-lose {
+  color: #fff;
+  font-style: normal;
+}
+
+.lir-paytable-foot {
+  margin: 10px 14px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+/* ---------------------------------------------------------------- the felt */
+
+.lir-felt {
+  flex: 1 1 460px;
+  min-width: 320px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px 26px;
+  border-radius: 20px;
+  border: 10px solid var(--rail);
+  background:
+    radial-gradient(75% 60% at 50% 4%, rgba(255, 255, 255, 0.12), transparent 62%),
+    linear-gradient(180deg, var(--felt) 0%, var(--felt-dark) 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(200, 160, 74, 0.3),
+    inset 0 16px 50px rgba(0, 0, 0, 0.32),
+    0 22px 60px rgba(0, 0, 0, 0.55);
+}
+
+.lir-label {
+  display: block;
+  text-align: center;
+  margin-bottom: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.lir-community,
+.lir-hand {
+  width: 100%;
+}
+
+.lir-community-cards,
+.lir-hand-cards {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: flex-end;
+  min-height: 92px;
+}
+
+/* The community pair sits in a marked box, the way the layout prints it. */
+.lir-community-cards {
+  padding: 10px 16px;
+  width: fit-content;
+  margin: 0 auto;
+  border: 1px dashed var(--felt-line);
+  border-radius: 12px;
+}
+
+/* One card turning. The slot is remounted when the card flips, so this runs
+   exactly once per reveal — which is why the two cards turn one at a time
+   rather than together. */
+.lir-flip-up {
+  animation: lir-turn 460ms ease-out both;
+}
+
+@keyframes lir-turn {
+  0% {
+    transform: perspective(600px) rotateY(-180deg) translateY(-4px);
+  }
+  60% {
+    transform: perspective(600px) rotateY(-14deg) translateY(-4px);
+  }
+  100% {
+    transform: perspective(600px) rotateY(0deg) translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------- circles */
+
+.lir-circles {
+  display: flex;
+  gap: 22px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.lir-circle {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--felt-line);
+  background: radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.08), transparent 70%);
+  transition:
+    border-color 180ms,
+    box-shadow 180ms,
+    opacity 240ms;
+}
+
+/* The circle's printed mark — 1, 2, $ — engraved on the baize under the chips. */
+.lir-circle-mark {
+  position: absolute;
+  bottom: -2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.lir-circle-on {
+  border-color: rgba(200, 160, 74, 0.75);
+}
+
+/* A pulled-back bet: the circle is visibly empty for the rest of the hand. */
+.lir-circle-empty {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.18);
+  opacity: 0.6;
+}
+
+.lir-circle-back {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.lir-circle-idle .lir-circle-back {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+/* The bet currently being asked about. */
+.lir-circle-active {
+  border-color: var(--brass);
+  box-shadow:
+    0 0 0 3px rgba(200, 160, 74, 0.18),
+    0 0 22px rgba(200, 160, 74, 0.35);
+}
+
+/* ---------------------------------------------------------------- result */
+
+.lir-result {
+  min-height: 22px;
+  text-align: center;
+  padding: 0 8px;
+}
+
+.lir-verdict {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lir-verdict-win {
+  color: var(--win);
+}
+
+.lir-verdict-lose {
+  color: var(--lose);
+}
+
+/* ---------------------------------------------------------------- coach */
+
+.lir-coach {
+  width: 100%;
+  max-width: 620px;
+  padding: 12px 16px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.lir-coach-title {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.lir-chart {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lir-chart li {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.lir-chart-hit {
+  color: #fff;
+  font-weight: 600;
+  background: rgba(88, 201, 138, 0.22);
+}
+
+.lir-coach-say {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+
+.lir-say-ride {
+  color: var(--win);
+}
+
+.lir-say-pull {
+  color: var(--push);
+}
+
+/* The button the chart points at, when the coach is on. */
+.lir-advise {
+  box-shadow:
+    0 0 0 2px var(--win),
+    0 0 18px rgba(88, 201, 138, 0.4);
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.lir-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.lir-units {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lir-unit {
+  min-width: 40px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.lir-unit:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.lir-unit-on {
+  border-color: var(--brass);
+  color: #1a1408;
+  background: var(--brass);
+}
+
+.lir-unit-label {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+/* ================================================================ collected: sicbo */
+/* ================================================================== sic bo */
+
+.sb {
+  width: 100%;
+  max-width: 780px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+/* ---------------------------------------------------------------- the dice */
+
+.sb-stage {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.sb-cup {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 62px;
+}
+
+.sb-die {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  background: #f4f1ea;
+  flex: none;
+}
+
+.sb-die-lg {
+  width: 54px;
+  height: 54px;
+  border-radius: 10px;
+  padding: 7px;
+  gap: 2px;
+  box-shadow:
+    inset 0 -3px 6px rgba(0, 0, 0, 0.18),
+    0 4px 8px rgba(0, 0, 0, 0.55);
+}
+
+.sb-die-sm {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  padding: 2px;
+  gap: 1px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.sb-pip {
+  border-radius: 50%;
+}
+
+.sb-pip-on {
+  background: #1a1a1c;
+}
+
+/* The shake: the dice tumble in place while the faces are still hidden. */
+.sb-die-roll {
+  animation: sbtumble 0.42s ease-in-out infinite;
+}
+
+@keyframes sbtumble {
+  0% {
+    transform: translateY(0) rotate(0);
+  }
+  30% {
+    transform: translateY(-15px) rotate(115deg);
+  }
+  60% {
+    transform: translateY(2px) rotate(230deg);
+  }
+  100% {
+    transform: translateY(0) rotate(360deg);
+  }
+}
+
+.sb-cup-shaking {
+  filter: blur(0.25px);
+}
+
+.sb-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.sb-total {
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.sb-total-tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+}
+
+.sb-net {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-up {
+  color: var(--win);
+}
+
+.sb-down {
+  color: var(--lose);
+}
+
+.sb-readout-idle {
+  font-size: 13px;
+  color: var(--ink-dim);
+  letter-spacing: 0.04em;
+}
+
+.sb-board {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 240px;
+}
+
+.sb-board-empty {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.sb-hist {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-hist-small {
+  background: #1b4f7a;
+}
+
+.sb-hist-big {
+  background: #8a2f2f;
+}
+
+.sb-hist-trip {
+  background: var(--brass);
+  color: #1a1408;
+}
+
+/* -------------------------------------------------------------- the layout */
+
+.sb-layout {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 3px solid var(--rail);
+  background:
+    radial-gradient(90% 70% at 50% 0%, rgba(255, 255, 255, 0.07), transparent 65%),
+    #0d5c34;
+  box-shadow: inset 0 0 0 1px rgba(200, 160, 74, 0.28);
+}
+
+.sb-row {
+  display: flex;
+  gap: 6px;
+}
+
+.sb-row-top > .sb-spot {
+  flex: 1 1 0;
+}
+
+.sb-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.sb-grid-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.sb-grid-6 {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.sb-grid-7 {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.sb-spot {
+  position: relative;
+  min-width: 0;
+  min-height: 46px;
+  padding: 5px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.14);
+  color: #f3ecd5;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background 0.12s,
+    box-shadow 0.12s;
+}
+
+/* Small and Big are the biggest spots on a real table; beat the flex:1 above. */
+.sb-row-top > .sb-spot-wide {
+  flex-grow: 1.5;
+}
+
+.sb-layout:not(.sb-layout-locked) .sb-spot:hover {
+  background: rgba(200, 160, 74, 0.26);
+  box-shadow: inset 0 0 0 1px #fff;
+}
+
+.sb-layout-locked .sb-spot {
+  cursor: default;
+}
+
+/* The four even-money spots and Any Triple carry the table's name for them. */
+.sb-spot-word {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.sb-spot-total {
+  font-size: 19px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.sb-spot-dice {
+  display: flex;
+  gap: 3px;
+}
+
+.sb-spot-pay {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(240, 226, 186, 0.78);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sb-spot-small,
+.sb-spot-big {
+  background: rgba(0, 0, 0, 0.26);
+}
+
+.sb-spot-anyTriple {
+  background: rgba(200, 160, 74, 0.16);
+  border-color: rgba(230, 200, 110, 0.6);
+}
+
+/* A winning spot after the dice land. */
+.sb-spot-win {
+  background: rgba(200, 160, 74, 0.42);
+  border-color: #fff;
+  box-shadow:
+    0 0 0 1px #fff,
+    0 0 14px rgba(200, 160, 74, 0.8);
+  animation: sbflash 0.5s ease-out 2;
+}
+
+@keyframes sbflash {
+  50% {
+    background: rgba(240, 214, 140, 0.75);
+  }
+}
+
+.sb-chip {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 4px;
+  border-radius: 50%;
+  background: var(--brass);
+  border: 1.4px dashed #fff;
+  color: #1a1408;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* ------------------------------------------------------------- the controls */
+
+.sb-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.sb-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sb-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sb-staked {
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-hintline {
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-align: center;
+  max-width: 620px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .sb-row-top {
+    flex-wrap: wrap;
+  }
+
+  .sb-grid-7 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .sb-grid-5 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .sb-spot-total {
+    font-size: 16px;
+  }
+}
+
+/* ================================================================ collected: baccarat */
+/* ================================================================ Baccarat */
+
+.bac {
+  width: 100%;
+  max-width: 1180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Two hands and five betting spots: a short table, so it does not want the
+   full half-round felt the seated games use. */
+.bac-table {
+  width: 100%;
+  min-height: 0;
+  padding: 22px 26px 26px;
+  border-radius: 24px 24px 120px 120px / 24px 24px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* --- the two hands */
+
+.bac-hands {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(16px, 5vw, 64px);
+  flex-wrap: wrap;
+}
+
+.bac-hand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  transition: border-color 0.25s, background 0.25s;
+}
+
+.bac-hand-won {
+  border-color: rgba(200, 160, 74, 0.7);
+  background: rgba(200, 160, 74, 0.1);
+  box-shadow: 0 0 22px rgba(200, 160, 74, 0.18);
+}
+
+.bac-hand-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.bac-hand-name {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.bac-hand-player .bac-hand-name {
+  color: #9dc4f0;
+}
+
+.bac-hand-banker .bac-hand-name {
+  color: #efa6a0;
+}
+
+/* The total is the only number that matters in baccarat, so it is the biggest
+   thing on the felt. */
+.bac-total {
+  min-width: 30px;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.75);
+}
+
+.bac-cards {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 92px;
+}
+
+.bac-card {
+  display: block;
+  animation: bac-deal 0.3s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* Laid across the pair, the way a dealer places a third card. Rotating is a
+   transform, so the box still measures 66 wide — the margins buy back the
+   overhang. */
+.bac-card-third {
+  margin: 0 14px;
+}
+
+@keyframes bac-deal {
+  from {
+    transform: translate(30px, -90px) rotate(-14deg);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.bac-versus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+}
+
+.bac-versus-mark {
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.bac-net {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  animation: bac-pop 0.3s ease-out;
+}
+
+.bac-up {
+  color: var(--win);
+}
+
+.bac-down {
+  color: var(--lose);
+}
+
+@keyframes bac-pop {
+  from {
+    transform: scale(0.75);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* --- the caller's line */
+
+.bac-callout {
+  min-height: 22px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.bac-callout-loud {
+  border-color: rgba(200, 160, 74, 0.4);
+  color: #f3e2b8;
+}
+
+/* --- the layout */
+
+.bac-layout {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.bac-spot {
+  position: relative;
+  flex: 1 1 120px;
+  max-width: 190px;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--felt-line);
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform 0.12s;
+}
+
+.bac-spot:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.bac-spot:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.bac-spot:disabled {
+  cursor: default;
+  opacity: 0.82;
+}
+
+.bac-spot-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bac-spot-pays {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+}
+
+.bac-spot-chips {
+  margin-top: auto;
+  display: flex;
+  justify-content: center;
+  min-height: 34px;
+}
+
+/* The house colours: player blue, banker red, tie green, pairs a quiet gold. */
+.bac-spot-player {
+  border-color: rgba(120, 170, 230, 0.75);
+}
+
+.bac-spot-player .bac-spot-name {
+  color: #b9d8fa;
+}
+
+.bac-spot-banker {
+  border-color: rgba(226, 120, 110, 0.75);
+}
+
+.bac-spot-banker .bac-spot-name {
+  color: #f6c2bc;
+}
+
+.bac-spot-tie {
+  border-color: rgba(120, 210, 150, 0.7);
+}
+
+.bac-spot-tie .bac-spot-name {
+  color: #b7e9c9;
+}
+
+.bac-spot-playerPair .bac-spot-name,
+.bac-spot-bankerPair .bac-spot-name {
+  font-size: 11px;
+  color: #e4cf9b;
+}
+
+.bac-spot-won {
+  border-color: var(--brass);
+  background: rgba(200, 160, 74, 0.2);
+  box-shadow: inset 0 0 18px rgba(200, 160, 74, 0.24);
+}
+
+.bac-spot-push {
+  border-color: var(--push);
+  background: rgba(217, 180, 92, 0.1);
+}
+
+.bac-spot-lost {
+  opacity: 0.45;
+}
+
+/* --- the shoe indicator in the top bar */
+
+.bac-shoe {
+  position: relative;
+  width: 118px;
+  height: 20px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bac-shoe-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(200, 160, 74, 0.22), rgba(200, 160, 74, 0.45));
+  transition: width 0.4s;
+}
+
+.bac-shoe-text {
+  position: relative;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* --- the bead plate and the tableau card */
+
+.bac-side {
+  width: 100%;
+  max-width: 1180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.bac-road {
+  width: 100%;
+  padding: 10px 14px 12px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.bac-road-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.bac-road-title {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.bac-tally {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bac-ink-player {
+  color: #9dc4f0;
+}
+
+.bac-ink-banker {
+  color: #efa6a0;
+}
+
+.bac-ink-tie {
+  color: #8fdcab;
+}
+
+.bac-beads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 22px;
+}
+
+.bac-road-empty {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.bac-bead {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  animation: bac-pop 0.25s ease-out;
+}
+
+.bac-bead-player {
+  background: #2f6ea8;
+}
+
+.bac-bead-banker {
+  background: #a83a33;
+}
+
+.bac-bead-tie {
+  background: #2b7d4e;
+}
+
+/* A pair marker sits on the corner of the bead, as it does on a real road. */
+.bac-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+.bac-dot-player {
+  left: -1px;
+  top: -1px;
+  background: #79b6f0;
+}
+
+.bac-dot-banker {
+  right: -1px;
+  bottom: -1px;
+  background: #f0938b;
+}
+
+.bac-tableau {
+  width: 100%;
+  padding: 12px 14px 10px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.bac-tableau-title {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 8px;
+}
+
+.bac-grid {
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bac-grid th,
+.bac-grid td {
+  width: 26px;
+  height: 20px;
+  text-align: center;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  font-weight: 600;
+}
+
+.bac-grid-corner {
+  width: 68px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.bac-cell-draw {
+  background: rgba(200, 160, 74, 0.22);
+  color: #f3e2b8;
+}
+
+.bac-cell-stand {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bac-tableau-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
+/* --- the chip tray */
+
+.bac-bet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.bac-chips {
+  display: flex;
+  gap: 8px;
+}
+
+.bac-chip {
+  display: inline-flex;
+  border-radius: 50%;
+  padding: 2px;
+  border: 2px solid transparent;
+}
+
+.bac-chip-on {
+  border-color: var(--brass);
+  box-shadow: 0 0 12px rgba(200, 160, 74, 0.4);
+}
+
+.bac-staked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.bac-staked b {
+  font-size: 22px;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+
+.bac-hintline {
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
+/* ================================================================ collected: war */
+/* ================================================================ Casino War */
+
+.war {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.war-tagline {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-left: 10px;
+}
+
+.war-felt {
+  position: relative;
+  width: 100%;
+  padding: 14px 22px 20px;
+  border-radius: 20px;
+  background:
+    radial-gradient(70% 55% at 50% 0%, rgba(255, 255, 255, 0.12), transparent 60%),
+    linear-gradient(180deg, var(--felt) 0%, var(--felt-dark) 100%);
+  border: 10px solid var(--rail);
+  box-shadow:
+    inset 0 0 0 2px rgba(200, 160, 74, 0.3),
+    0 14px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- the shoe gauge */
+
+.war-shoe {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.war-shoe-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.32);
+  overflow: hidden;
+}
+
+.war-shoe-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #8e6b22, var(--brass));
+  transition: width 0.25s ease-out;
+}
+
+.war-shoe-text {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.62);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- the two sides */
+
+.war-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.war-side-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.war-cards {
+  display: flex;
+  gap: 8px;
+  min-height: 92px;
+  align-items: center;
+}
+
+/* --- the burn pile, between the two hands */
+
+.war-burn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+}
+
+.war-burn .card {
+  width: 30px;
+  height: 42px;
+}
+
+.war-burn-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.war-burn-idle {
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* --- the betting spots */
+
+.war-spots {
+  display: flex;
+  gap: 34px;
+  align-items: flex-end;
+  margin-top: 6px;
+}
+
+.war-spot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.war-spot-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.war-spot-empty {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+}
+
+/* --- the verdict line */
+
+.war-verdict {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  min-height: 26px;
+}
+
+.war-verdict-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.war-verdict-tie {
+  color: var(--push);
+  letter-spacing: 0.02em;
+}
+
+.war-verdict-cards {
+  font-size: 13px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.war-verdict-net {
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.war-verdict-idle {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.war-up {
+  color: var(--win);
+}
+
+.war-down {
+  color: var(--lose);
+}
+
+/* --- controls */
+
+.war-bets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.war-bet-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.war-bet-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  width: 34px;
+}
+
+.war-bet-note {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-left: 4px;
+}
+
+.war-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #e8d4a4;
+  background: rgba(200, 160, 74, 0.1);
+  border: 1px solid rgba(200, 160, 74, 0.26);
+  border-radius: 7px;
+  padding: 6px 10px;
+  margin: 0;
+}
+
+/* --- the outcome strip */
+
+.war-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+
+.war-chit {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.war-chit-win,
+.war-chit-warWin {
+  background: #1c7a45;
+}
+
+.war-chit-lose,
+.war-chit-warLose {
+  background: #9c2f2a;
+}
+
+.war-chit-surrender {
+  background: #7a6320;
+}
+
+/* A won war and a lost war are the interesting ones, so they get an outline the
+   flat wins and losses don't. */
+.war-chit-warWin,
+.war-chit-warLose {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+/* ================================================================ collected: bigsix */
+/* ================================================================ Big Six */
+
+.bs6 {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.bs6-tagline {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-left: 10px;
+}
+
+.bs6-stage {
+  display: flex;
+  gap: 26px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* --- the wheel */
+
+.bs6-wheel {
+  position: relative;
+  flex: none;
+}
+
+/* The whole wheel body turns; the clapper outside it does not. */
+.bs6-wheel-spin {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+
+.bs6-wheel-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.bs6-wheel-rim {
+  fill: #2c1a10;
+  stroke: var(--brass);
+  stroke-width: 3;
+}
+
+.bs6-seg {
+  stroke: rgba(0, 0, 0, 0.4);
+  stroke-width: 0.5;
+}
+
+/* One colour per denomination, the way a real wheel prints the bills. */
+.bs6-seg-1,
+.bs6-fill-1 {
+  fill: #d8d2c4;
+  background: #d8d2c4;
+  color: #23201a;
+}
+
+.bs6-seg-2,
+.bs6-fill-2 {
+  fill: #2f6fa8;
+  background: #2f6fa8;
+  color: #fff;
+}
+
+.bs6-seg-5,
+.bs6-fill-5 {
+  fill: #1c7a45;
+  background: #1c7a45;
+  color: #fff;
+}
+
+.bs6-seg-10,
+.bs6-fill-10 {
+  fill: #b5202a;
+  background: #b5202a;
+  color: #fff;
+}
+
+.bs6-seg-20,
+.bs6-fill-20 {
+  fill: #6b3fa0;
+  background: #6b3fa0;
+  color: #fff;
+}
+
+.bs6-seg-joker,
+.bs6-fill-joker {
+  fill: #d8a326;
+  background: #d8a326;
+  color: #2a2000;
+}
+
+.bs6-seg-logo,
+.bs6-fill-logo {
+  fill: #17181c;
+  background: #17181c;
+  color: #fff;
+}
+
+.bs6-seg-face {
+  fill: rgba(0, 0, 0, 0.72);
+  font-size: 10px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+/* The dark segments need light ink; SVG has no inheritance trick for this so
+   the override is spelled out. */
+.bs6-seg-2 + .bs6-seg-face,
+.bs6-seg-5 + .bs6-seg-face,
+.bs6-seg-10 + .bs6-seg-face,
+.bs6-seg-20 + .bs6-seg-face,
+.bs6-seg-logo + .bs6-seg-face {
+  fill: rgba(255, 255, 255, 0.94);
+}
+
+.bs6-peg {
+  fill: #e6c15a;
+  stroke: #6d5220;
+  stroke-width: 0.6;
+}
+
+.bs6-wheel-hub {
+  fill: #241610;
+  stroke: var(--brass);
+  stroke-width: 1.4;
+}
+
+.bs6-wheel-hub2 {
+  fill: #3a2416;
+  stroke: rgba(200, 160, 74, 0.45);
+  stroke-width: 1;
+}
+
+.bs6-wheel-mark {
+  fill: var(--brass);
+  font-size: 22px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+/* A leather clapper hanging over the pegs at twelve o'clock. */
+.bs6-clapper {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 9px;
+  height: 34px;
+  margin-left: -4.5px;
+  border-radius: 3px 3px 5px 5px;
+  background: linear-gradient(180deg, #c8a04a, #7a5a1c 60%, #4a3410);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
+  z-index: 2;
+}
+
+/* --- the readout beside the wheel */
+
+.bs6-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.bs6-board {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 220px;
+  min-height: 22px;
+}
+
+.bs6-board-empty {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.bs6-hist {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bs6-result {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.bs6-result-face {
+  font-size: 22px;
+  font-weight: 800;
+  min-width: 66px;
+  height: 62px;
+  padding: 0 10px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.bs6-result-net {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.bs6-up {
+  color: var(--win);
+}
+
+.bs6-down {
+  color: var(--lose);
+}
+
+.bs6-result-idle {
+  color: var(--ink-dim);
+  font-size: 14px;
+}
+
+/* --- the layout */
+
+.bs6-layout {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  padding: 8px;
+  border-radius: 12px;
+  background: #0d5c34;
+  border: 3px solid var(--rail);
+}
+
+.bs6-spot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 9px 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  cursor: pointer;
+  transition: filter 0.1s, box-shadow 0.15s;
+}
+
+.bs6-spot:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+
+.bs6-locked .bs6-spot {
+  cursor: default;
+}
+
+.bs6-spot-won {
+  box-shadow:
+    0 0 0 2px var(--brass),
+    0 0 16px rgba(200, 160, 74, 0.7);
+}
+
+.bs6-spot-face {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.bs6-spot-pays {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.86;
+}
+
+/* The stops-over-54 and the edge, printed on the felt. No other table tells you
+   this, which is rather the point of printing it. */
+.bs6-spot-math {
+  font-size: 8px;
+  opacity: 0.68;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bs6-spot-chip {
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 11px;
+  background: var(--brass);
+  color: #1a1408;
+  font-size: 10px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* --- controls */
+
+.bs6-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.bs6-chips {
+  display: flex;
+  gap: 6px;
+}
+
+.bs6-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bs6-staked {
+  font-size: 12px;
+  color: var(--ink-dim);
+  margin-right: 6px;
+}
+
+.bs6-hintline {
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-align: center;
+  max-width: 580px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ================================================================ collected: keno */
+/* ==================================================================== keno */
+
+.kn {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.kn-card-name {
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.kn-layout {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.kn-left {
+  flex: 1 1 460px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kn-side {
+  flex: 0 1 280px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ------------------------------------------------------------- the rack */
+
+.kn-rack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--felt-line);
+  background:
+    radial-gradient(120% 100% at 50% 0%, var(--felt) 0%, var(--felt-dark) 100%);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35);
+}
+
+.kn-row-nums {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+}
+
+.kn-cell {
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease,
+    color 120ms ease;
+}
+
+.kn-cell:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Marked but not yet called. */
+.kn-cell.kn-mark {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: #1a1408;
+  font-weight: 800;
+}
+
+/* Called by the house, not on the ticket. */
+.kn-cell.kn-call {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.95);
+  color: #16181b;
+}
+
+/* Marked AND called — the only cell that matters. */
+.kn-cell.kn-hit {
+  background: var(--win);
+  border-color: #8fe6b3;
+  color: #06301b;
+  font-weight: 800;
+  box-shadow: 0 0 14px rgba(88, 201, 138, 0.55);
+}
+
+/* The ball that just came out. */
+.kn-cell.kn-latest {
+  transform: scale(1.14);
+  z-index: 2;
+  box-shadow: 0 0 0 2px var(--brass);
+}
+
+/* ------------------------------------------------------- the called board */
+
+.kn-board {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  min-height: 44px;
+}
+
+.kn-board-label {
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.kn-board-label b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.kn-balls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.kn-balls-empty {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.kn-ball {
+  min-width: 24px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #16181b;
+  font-variant-numeric: tabular-nums;
+}
+
+.kn-ball-hit {
+  background: var(--win);
+  color: #06301b;
+}
+
+/* ------------------------------------------------------------- the ticket */
+
+.kn-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.kn-ticket-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.kn-ticket-line b {
+  color: var(--ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------------------------------------- the pay table */
+
+.kn-pay {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.kn-pay-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+.kn-edge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--lose);
+}
+
+.kn-pay-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+
+.kn-pay-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kn-pay-table th {
+  text-align: right;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+  padding: 0 0 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.kn-pay-table th:first-child,
+.kn-pay-table td:first-child {
+  text-align: left;
+}
+
+.kn-pay-table td {
+  text-align: right;
+  padding: 3px 0;
+  color: var(--ink);
+}
+
+.kn-pay-odds {
+  color: var(--ink-dim);
+  font-size: 11px;
+}
+
+/* The row the ticket is currently sitting on, while the balls are still coming. */
+.kn-pay-live td {
+  color: var(--brass);
+  font-weight: 700;
+}
+
+/* The row that actually paid. */
+.kn-pay-won td {
+  background: rgba(88, 201, 138, 0.16);
+  color: var(--win);
+  font-weight: 800;
+}
+
+.kn-truth {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+/* ------------------------------------------------------------- the result */
+
+.kn-result {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.kn-result-head {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.kn-result-sub {
+  font-size: 11px;
+  color: var(--ink-dim);
+  line-height: 1.4;
+}
+
+.kn-up {
+  color: var(--win);
+}
+
+.kn-down {
+  color: var(--lose);
+}
+
+/* ------------------------------------------------------------- the controls */
+
+.kn-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.kn-quick {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.kn-quick-label {
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-right: 2px;
+}
+
+.kn-spot {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.kn-spot:hover:not(:disabled) {
+  border-color: var(--brass);
+}
+
+.kn-spot-on {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: #1a1408;
+}
+
+.kn-bets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kn-chip {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.kn-chip-on {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: #1a1408;
+}
+
+.kn-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
