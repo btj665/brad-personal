@@ -6,8 +6,9 @@
 // end of it. Same code either way, and no clock in here.
 
 import { makeRng, randomSeed, type Rng } from '../engine/rng'
+import { playBonus } from './bonus'
 import { evaluate, findSymbol, windowOf } from './evaluate'
-import type { Machine, SpinResult, Step, SymbolId, Win } from './types'
+import type { BonusPlay, Machine, SpinResult, Step, SymbolId, Win } from './types'
 
 export type Phase = 'idle' | 'complete'
 
@@ -104,7 +105,24 @@ export function resolveSpin(
     for (let i = 0; i < freeSpinsAwarded; i++) playScreen(true, extra)
   }
 
-  return { steps, freeSpinsAwarded, staked, paid }
+  // The bonus is bought off the paid screen only, so a free game can't buy one and
+  // a cascade can't buy one twice.
+  let bonus: BonusPlay | undefined
+  if (machine.bonus) {
+    const seeded = findSymbol(steps[0].window, machine.bonus.trigger).length
+    if (seeded >= machine.bonus.triggerCount) {
+      bonus = playBonus(
+        machine.bonus,
+        staked,
+        machine.strips.length * machine.rows,
+        seeded,
+        rng,
+      )
+      paid += bonus.paid
+    }
+  }
+
+  return { steps, freeSpinsAwarded, bonus, staked, paid }
 }
 
 export class SlotGame {

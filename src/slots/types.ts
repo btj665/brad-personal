@@ -61,6 +61,65 @@ export type Feature =
       expandingWild?: SymbolId
     }
 
+/** A bonus round: a second game the base game buys you.
+ *
+ *  All three are resolved the moment they are triggered, before the player touches
+ *  anything — the wheel already knows where it will stop and the pick board is
+ *  already dealt. Your clicks choose the order things are revealed in, not the
+ *  total. That is not a shortcut; it is how the cabinets do it, and it is the only
+ *  version whose return can be enumerated or measured honestly. */
+export type Bonus =
+  | {
+      kind: 'wheel'
+      trigger: SymbolId
+      triggerCount: number
+      /** Each wedge's award, as a multiple of the total stake. */
+      wedges: number[]
+    }
+  | {
+      kind: 'pick'
+      trigger: SymbolId
+      triggerCount: number
+      /** Awards hidden on the board, as multiples of the total stake. */
+      prizes: number[]
+      /** How many duds are mixed in. Turning one over ends the round, so the
+       *  ratio of prizes to duds is the whole price of this feature. */
+      enders: number
+    }
+  | {
+      kind: 'holdSpin'
+      trigger: SymbolId
+      triggerCount: number
+      /** Respins granted, and re-granted in full whenever a new coin lands. */
+      respins: number
+      /** Coin values as multiples of the total stake, with relative weights. */
+      coins: Array<{ value: number; weight: number }>
+      /** Chance an empty cell catches a coin on a respin. */
+      coinChance: number
+      /** Filling every cell pays this much more, again × total stake. */
+      fullScreen: number
+    }
+
+/** What a triggered bonus actually did. Everything the cabinet needs to put on a
+ *  show is in here, so the UI never decides an outcome. */
+export interface BonusPlay {
+  kind: Bonus['kind']
+  /** Coins awarded. */
+  paid: number
+  /** wheel: which wedge it stopped on. */
+  wedge?: number
+  /** pick: what was turned over, in order. The last entry is the dud that ended
+   *  it, unless the board ran out first. */
+  reveals?: number[]
+  /** pick: what the player never got to, for the sting at the end. */
+  missed?: number[]
+  /** holdSpin: the grid after the trigger and after every respin. `null` is an
+   *  empty cell; a number is a coin's value in coins. */
+  grids?: Array<Array<number | null>>
+  /** holdSpin: true when every cell filled. */
+  full?: boolean
+}
+
 export interface Machine {
   id: string
   label: string
@@ -78,6 +137,10 @@ export interface Machine {
   linePays: LinePays
   scatterPays?: ScatterPays
   feature: Feature
+  /** The bonus round, if this cabinet has one. Separate from `feature` because a
+   *  machine can have both — Rockslide tumbles *and* buys free games *and* could
+   *  still hand you a wheel. */
+  bonus?: Bonus
   /** What the strips were cut to return, as a fraction. The test asserts the
    *  computed return lands on this. */
   targetRtp: number
@@ -118,6 +181,9 @@ export interface SpinResult {
   steps: Step[]
   /** Free games this spin bought, if any. */
   freeSpinsAwarded: number
+  /** The bonus round this spin bought, already played out. Its `paid` is included
+   *  in the spin's `paid`. */
+  bonus?: BonusPlay
   staked: number
   paid: number
 }
