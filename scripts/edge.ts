@@ -66,11 +66,17 @@ const pct = (x: number) => `${(x * 100).toFixed(3)}%`
 
 console.log(`\nHouse edge vs. basic strategy — ${ROUNDS.toLocaleString()} rounds each\n`)
 console.log(
-  ['game'.padEnd(18), 'simulated'.padStart(10), '±2σ'.padStart(8), 'published'.padStart(10)].join(
-    '  ',
-  ),
+  [
+    'game'.padEnd(18),
+    'simulated'.padStart(10),
+    '±2σ'.padStart(8),
+    'recorded'.padStart(10),
+    'published'.padStart(10),
+  ].join('  '),
 )
-console.log('-'.repeat(52))
+console.log('-'.repeat(64))
+
+const gaps: string[] = []
 
 for (const preset of PRESETS) {
   if (ONLY && preset.id !== ONLY) continue
@@ -83,12 +89,31 @@ for (const preset of PRESETS) {
       pct(edge).padStart(10),
       pct(2 * stderr).padStart(8),
       pct(expected).padStart(10),
+      (preset.published === undefined ? '—' : pct(preset.published / 100)).padStart(10),
       off ? '  <-- off' : '',
     ].join('  '),
   )
+  if (preset.published !== undefined) {
+    gaps.push(
+      `  ${preset.rules.label}: measured ${pct(edge)} against a published ` +
+        `${pct(preset.published / 100)}.`,
+    )
+  }
 }
 
 console.log(
-  '\nA positive edge is the house winning. The rightmost column is the figure\n' +
-    'recorded in presets.ts; the simulation should land on it.\n',
+  '\nA positive edge is the house winning. "recorded" is the figure written down\n' +
+    'in presets.ts and the simulation should land on it; "published" is what the\n' +
+    'outside world quotes, where that is a different number.\n',
 )
+
+if (gaps.length > 0) {
+  console.log('Where we knowingly differ from the published figure:\n')
+  console.log(gaps.join('\n'))
+  console.log(
+    '\n  Both variants are played with the ordinary six-deck chart plus the\n' +
+      '  deviations documented in strategy/basic.ts, not with a chart drawn for\n' +
+      '  the variant. Spanish 21 also leaves out redoubling, which published\n' +
+      '  analyses of the 0.40% game assume and which is worth about 0.34%.\n',
+  )
+}

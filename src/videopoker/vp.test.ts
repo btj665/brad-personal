@@ -4,9 +4,9 @@ import { makeRng } from '../engine/rng'
 import type { Card, Rank, Suit } from '../engine/types'
 import { winningHold } from './autohold'
 import { classifyDeuces, classifyStandard } from './classify'
-import { VideoPokerGame } from './engine'
-import { variantById } from './paytables'
-import { solve } from './solver'
+import { drawPools, HAND_COUNTS, VideoPokerGame } from './engine'
+import { payFor, variantById } from './paytables'
+import { exactDrawEV, solve } from './solver'
 
 let uid = 0
 function c(spec: string): Card {
@@ -214,5 +214,238 @@ describe('a game', () => {
     const hint = game.hint()
     expect(hint).toHaveLength(5)
     expect(hint.every((b) => typeof b === 'boolean')).toBe(true)
+  })
+})
+
+// --------------------------------------------------------------- multi-hand
+
+/** Rank+suit, ignoring uid: two hands can legitimately hold the same card, so
+ *  object identity is the wrong thing to compare. */
+const key = (card: Card) => `${card.rank}${card.suit}`
+
+describe('multi-hand decks', () => {
+  it('gives every hand its own copy of the same 47 cards', () => {
+    const game = new VideoPokerGame({ seed: 21, bankroll: 1000, hands: 10 })
+    game.deal()
+    const onScreen = new Set(game.hand!.cards.map(key))
+    const pools = drawPools(game.deck, 10, makeRng(4))
+
+    expect(pools).toHaveLength(10)
+    const canon = pools[0].map(key).sort().join(' ')
+    for (const pool of pools) {
+      expect(pool).toHaveLength(47)
+      // Nothing already face up can come back, not even into a later hand.
+      expect(pool.some((c) => onScreen.has(key(c)))).toBe(false)
+      // And it is the same 47 every time — the hands do not deal around each
+      // other. This is the fact the whole return equivalence rests on.
+      expect(pool.map(key).sort().join(' ')).toBe(canon)
+    }
+    // Same cards, independently shuffled.
+    expect(pools[1].map(key).join(' ')).not.toBe(pools[0].map(key).join(' '))
+  })
+
+  it('draws independently, so one card can land in several hands at once', () => {
+    const game = new VideoPokerGame({ seed: 55, bankroll: 1_000_000, hands: 10 })
+    game.setCoins(1)
+    let collided = 0
+    for (let i = 0; i < 60; i++) {
+      game.deal()
+      game.hand!.held = [true, true, true, true, false] // exactly one card drawn
+      game.draw()
+      const replacements = game.last!.draws.map((d) => key(d.cards[4]))
+      if (new Set(replacements).size < replacements.length) collided++
+    }
+    // Ten draws out of 47 cards: the birthday bound puts a repeat at ~64%, so
+    // this is nowhere near a coin flip. A shared deck would make it impossible.
+    expect(collided).toBeGreaterThan(25)
+    expect(collided).toBeLessThan(60)
+  })
+
+  it('leaves hand 1 exactly as single-hand play dealt it', () => {
+    for (const n of HAND_COUNTS) {
+      const one = new VideoPokerGame({ seed: 77, bankroll: 100_000, autoHold: 'winners' })
+      const many = new VideoPokerGame({ seed: 77, bankroll: 100_000, autoHold: 'winners', hands: n })
+      one.deal()
+      many.deal()
+      expect(many.hand!.cards.map(key)).toEqual(one.hand!.cards.map(key))
+      expect(many.hand!.held).toEqual(one.hand!.held)
+      one.draw()
+      many.draw()
+      expect(many.last!.draws).toHaveLength(n)
+      expect(many.last!.draws[0].cards.map(key)).toEqual(one.last!.draws[0].cards.map(key))
+      expect(many.last!.final!.map(key)).toEqual(one.last!.final!.map(key))
+    }
+  })
+})
+
+describe('multi-hand betting', () => {
+  it('offers only the hand counts a machine has, and locks them mid-deal', () => {
+    const game = new VideoPokerGame({ seed: 1, bankroll: 1000 })
+    expect(game.hands).toBe(1)
+    game.setHands(3)
+    expect(game.hands).toBe(3)
+    game.setHands(7) // no seven-play machine exists; snap to the nearest
+    expect(game.hands).toBe(5)
+    game.setHands(0)
+    expect(game.hands).toBe(1)
+    game.setHands(10)
+    game.deal()
+    game.setHands(1)
+    expect(game.hands).toBe(10)
+    expect(game.hand!.hands).toBe(10)
+  })
+
+  it('takes N × coins up front and pays each hand on its own', () => {
+    const variant = variantById('jacks-9-6')
+    const game = new VideoPokerGame({ variantId: 'jacks-9-6', seed: 8, bankroll: 1000, hands: 5 })
+    game.setCoins(5)
+    expect(game.totalBet()).toBe(25)
+    game.deal()
+    expect(game.bankroll).toBe(975)
+    expect(game.hand!.bet).toBe(25)
+    expect(game.hand!.coins).toBe(5)
+    game.draw()
+
+    const settled = game.last!
+    expect(settled.draws).toHaveLength(5)
+    for (const d of settled.draws) expect(d.won).toBe(payFor(variant, d.category) * 5)
+    expect(settled.won).toBe(settled.draws.reduce((s, d) => s + d.won, 0))
+    expect(game.bankroll).toBe(1000 - 25 + settled.won)
+  })
+
+  it('will not deal a bet the bankroll cannot cover', () => {
+    const game = new VideoPokerGame({ seed: 2, bankroll: 20, hands: 10 })
+    game.setCoins(5)
+    expect(game.totalBet()).toBe(50)
+    expect(game.canDeal()).toBe(false)
+    game.setHands(3) // fifteen coins fits
+    expect(game.canDeal()).toBe(true)
+  })
+
+  it('never lets the bankroll leak chips across ten hands', () => {
+    const game = new VideoPokerGame({ variantId: 'jacks-9-6', seed: 4, bankroll: 100_000, hands: 10 })
+    game.setCoins(2)
+    for (let i = 0; i < 200; i++) {
+      if (!game.canDeal()) break
+      const before = game.bankroll
+      game.deal()
+      game.hand!.held = game.hand!.cards.map((_, k) => (i + k) % 3 === 0)
+      game.draw()
+      expect(game.last!.bet).toBe(20)
+      expect(game.bankroll).toBe(before - game.last!.bet + game.last!.won)
+    }
+  })
+})
+
+describe('multi-hand returns the same as one hand', () => {
+  it('gives every hand the identical exact EV, bit for bit', () => {
+    // The proof, not a measurement. For a fixed hold, the exact expected pay of a
+    // hand is the average over every draw its pool allows; all N pools hold the
+    // same 47 cards, so all N averages are the same number and the N-hand
+    // expectation is exactly N times the one-hand expectation. Holding three
+    // leaves C(47,2) = 1081 draws, small enough to enumerate for every hand.
+    const variant = variantById('jacks-9-6')
+    const rng = makeRng(31)
+    let checked = 0
+
+    for (let d = 0; d < 40; d++) {
+      const game = new VideoPokerGame({ variantId: 'jacks-9-6', seed: 100 + d, bankroll: 1000, hands: 10 })
+      game.deal()
+      const dealt = game.hand!.cards
+      const held = dealt.slice(0, 3)
+      const pools = drawPools(game.deck, 10, rng)
+      const evs = pools.map((pool) => exactDrawEV(held, pool, variant))
+
+      expect(evs[0]).not.toBeNull()
+      for (const ev of evs) expect(ev).toBe(evs[0])
+      // So the ten-hand expectation is ten times the one-hand expectation. Only
+      // approximately here, and only because adding the same double ten times is
+      // not the same rounding as multiplying it by ten — the per-hand numbers
+      // above are equal exactly.
+      const total = evs.reduce<number>((s, ev) => s + (ev ?? 0), 0)
+      expect(total).toBeCloseTo(10 * (evs[0] ?? 0), 12)
+      checked++
+    }
+    expect(checked).toBe(40)
+  })
+
+  it('solves the deal once however many hands are lit', { timeout: 60000 }, () => {
+    // The solver samples, so it draws on the rng. If Ten Play solved once per
+    // drawn hand it would burn ten times as much of the stream; identical rng
+    // state after the deal is proof that the hold is computed once, on the dealt
+    // five, exactly as single-hand play computes it.
+    const one = new VideoPokerGame({ seed: 41, bankroll: 100_000, autoHold: 'optimal' })
+    const ten = new VideoPokerGame({ seed: 41, bankroll: 100_000, autoHold: 'optimal', hands: 10 })
+    one.deal()
+    ten.deal()
+    expect(ten.rng.state()).toBe(one.rng.state())
+    expect(ten.hand!.held).toEqual(one.hand!.held)
+    expect(ten.hint()).toEqual(one.hint())
+  })
+
+  it('measures the same return at 1, 3, 5 and 10 hands, with a wider swing', () => {
+    // One fixed cheap rule — auto-hold winners — played at every hand count off
+    // the same list of seeds, so the deal and the holds are identical across the
+    // runs and the only thing that varies is how many hands they feed.
+    const DEALS = 6000
+    const master = makeRng(0xf00d)
+    const seeds = Array.from({ length: DEALS }, () => master.int(0x7fffffff))
+
+    const runs = HAND_COUNTS.map((n) => {
+      let sum = 0
+      let sumSq = 0
+      let netSum = 0
+      let netSq = 0
+      for (const seed of seeds) {
+        const g = new VideoPokerGame({
+          variantId: 'jacks-9-6',
+          seed,
+          bankroll: 1e9,
+          autoHold: 'winners',
+          hands: n,
+        })
+        g.setCoins(1)
+        g.deal()
+        g.draw()
+        const l = g.last!
+        const perCoin = l.won / l.bet
+        sum += perCoin
+        sumSq += perCoin * perCoin
+        const net = l.won - l.bet
+        netSum += net
+        netSq += net * net
+      }
+      const mean = sum / DEALS
+      const perCoinVar = sumSq / DEALS - mean * mean
+      const netMean = netSum / DEALS
+      return {
+        n,
+        ret: mean,
+        se: Math.sqrt(perCoinVar / DEALS),
+        perCoinSd: Math.sqrt(perCoinVar),
+        netSd: Math.sqrt(netSq / DEALS - netMean * netMean),
+      }
+    })
+
+    const base = runs[0]
+    for (const r of runs.slice(1)) {
+      // Four sigma, and generous at that: the runs share hand 1, so the real
+      // error bar on the difference is narrower than this sum of variances.
+      const tol = 4 * Math.sqrt(base.se * base.se + r.se * r.se)
+      expect(Math.abs(r.ret - base.ret)).toBeLessThan(tol)
+    }
+
+    // What multi-hand actually moves. The swing on a single deal, counted in
+    // coins, grows faster than the bet does, because the hands share their held
+    // cards and so rise and fall together.
+    for (let i = 1; i < runs.length; i++) {
+      expect(runs[i].netSd).toBeGreaterThan(runs[i - 1].netSd * 1.3)
+    }
+    // Per coin wagered it goes the other way: N hands average out, so volatility
+    // per coin falls towards the covariance floor. Both statements are true and
+    // people conflate them.
+    for (let i = 1; i < runs.length; i++) {
+      expect(runs[i].perCoinSd).toBeLessThan(runs[i - 1].perCoinSd)
+    }
   })
 })

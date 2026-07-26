@@ -114,6 +114,14 @@ export function BlackjackScreen() {
       ((game.human.insuranceReturned ?? 0) - game.human.insurance)
     : 0
 
+  // Free Bet only: what the house currently has riding on the player's hands. It
+  // is real money on a win and vapour on a push, so it is worth showing on its
+  // own rather than folded into the bankroll, which it never enters.
+  const houseMoney = game.human.hands.reduce(
+    (total, hand) => total + (hand.outcome ? 0 : hand.freeBet),
+    0,
+  )
+
   return (
     <>
       <header className="topbar">
@@ -126,6 +134,16 @@ export function BlackjackScreen() {
         </div>
 
         <div className="topbar-right">
+          {houseMoney > 0 && (
+            <span
+              className="bjv-house-pill"
+              title="Free wagers the house has put up on your hands. They pay like your own chips, cost you nothing when they lose, and are taken back on a push."
+            >
+              <span className="bjv-house-label">House</span>
+              <b>{houseMoney.toLocaleString()}</b>
+            </span>
+          )}
+
           <span className="bankroll">
             <span className="bankroll-label">Bankroll</span>
             <b>{game.human.bankroll.toLocaleString()}</b>

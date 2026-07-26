@@ -8,7 +8,16 @@
 import { isTenValue } from './cards'
 import { evaluate, isBlackjack, isBusted, isCharlie, isResolved, makeHand } from './hand'
 import { makeRng, randomSeed, type Rng } from './rng'
-import { DEFAULT_RULES, blackjackWinnings, legalActions, ratio } from './rules'
+import {
+  DEFAULT_RULES,
+  blackjackWinnings,
+  isFreeDouble,
+  isFreeSplit,
+  legalActions,
+  ratio,
+  spanishBonus,
+  wagerUnit,
+} from './rules'
 import { Shoe } from './shoe'
 import { botAction, botBet, botInsurance } from './strategy/bot'
 import { Counter } from './strategy/count'
@@ -625,11 +634,22 @@ export class Game {
       }
 
       case 'double': {
-        seat.bankroll -= hand.bet
-        hand.bet *= 2
+        const amount = wagerUnit(hand)
+        const free = isFreeDouble(hand, this.rules)
+        // A free double never touches the bankroll: the house's chip sits beside
+        // the player's and is only ever settled, never staked.
+        if (free) hand.freeBet += amount
+        else {
+          seat.bankroll -= amount
+          hand.bet += amount
+        }
         hand.doubled = true
         hand.cards.push(this.draw(true))
-        this.say(`${seat.name} doubles down — ${describe(hand)}.`)
+        this.say(
+          free
+            ? `${seat.name} takes a free double — ${describe(hand)}.`
+            : `${seat.name} doubles down — ${describe(hand)}.`,
+        )
         break
       }
 
@@ -637,28 +657,36 @@ export class Game {
         // The second card slides across to start a new hand, which stays a
         // single card until it becomes the active hand — exactly as the dealer
         // does it.
-        seat.bankroll -= hand.bet
+        const amount = wagerUnit(hand)
+        const free = isFreeSplit(hand, this.rules)
+        if (!free) seat.bankroll -= amount
+
         const moved = hand.cards.pop()!
         const aces = hand.splitAces || hand.cards[0].rank === 'A'
 
         hand.fromSplit = true
         hand.splitAces = aces
 
-        const fresh = makeHand(`${seat.index}-${seat.hands.length}`, [moved], hand.bet, {
+        // On a free split the house backs the NEW hand, so it carries no money of
+        // the player's at all. The original half keeps the wager it already had.
+        const fresh = makeHand(`${seat.index}-${seat.hands.length}`, [moved], free ? 0 : amount, {
           fromSplit: true,
           splitAces: aces,
+          freeBet: free ? amount : 0,
         })
         seat.hands.splice(handIndex + 1, 0, fresh)
 
         hand.cards.push(this.draw(true))
         this.settleSplitAce(seat, hand)
-        this.say(`${seat.name} splits ${moved.rank}s.`)
+        this.say(free ? `${seat.name} free splits ${moved.rank}s.` : `${seat.name} splits ${moved.rank}s.`)
         break
       }
 
       case 'surrender': {
         hand.surrendered = true
-        this.say(`${seat.name} surrenders.`)
+        // Handing back a doubled hand is the rescue, not a surrender of a live
+        // two-card hand, and it is worth saying so out loud at the table.
+        this.say(hand.doubled ? `${seat.name} rescues the double.` : `${seat.name} surrenders.`)
         break
       }
     }
@@ -784,6 +812,13 @@ export class Game {
         hand.outcome = outcome
         hand.returned = returned
         seat.bankroll += returned
+
+        if (outcome === 'win') {
+          const bonus = spanishBonus(hand, this.rules)
+          if (bonus) {
+            this.say(`${seat.name} makes a ${bonus.name} — pays ${bonus.pay[0]}:${bonus.pay[1]}.`)
+          }
+        }
       }
 
       if (seat.bankroll < this.rules.minBet) seat.busted = true
@@ -800,6 +835,9 @@ export class Game {
   ): { outcome: Outcome; returned: number; consumed: number } {
     const bet = hand.bet
 
+    // A surrender, and Spanish 21's double-down rescue, both hand the house half
+    // of what is on the hand. On a doubled hand half of it IS the original bet,
+    // which is exactly what the rescue is meant to return.
     if (hand.surrendered) return { outcome: 'surrender', returned: bet / 2, consumed: 0 }
 
     const natural = isBlackjack(hand)
@@ -810,7 +848,10 @@ export class Game {
     }
 
     if (natural) {
-      return dealerBJ
+      // Spanish 21: the player's natural is paid in full even when the dealer
+      // turns one over. Everywhere else that is a push.
+      const beaten = dealerBJ && !this.rules.player21Wins
+      return beaten
         ? { outcome: 'push', returned: bet, consumed: owed }
         : {
             outcome: 'blackjack',
@@ -822,6 +863,13 @@ export class Game {
     // A bust is lost on its own merits, before the dealer's hand matters at all.
     if (isBusted(hand)) return { outcome: 'bust', returned: 0, consumed: Math.min(owed, bet) }
 
+    const total = evaluate(hand.cards).total
+
+    // Spanish 21: a player 21 can neither be beaten nor pushed. This has to come
+    // before the dealer-blackjack and dealer-22 branches, both of which would
+    // otherwise take it.
+    if (this.rules.player21Wins && total === 21) return this.payWin(hand)
+
     if (dealerBJ) {
       if (obo) {
         const forfeit = Math.min(owed, bet)
@@ -830,19 +878,31 @@ export class Game {
       return { outcome: 'lose', returned: 0, consumed: 0 }
     }
 
-    if (isCharlie(hand, this.rules)) return { outcome: 'charlie', returned: bet * 2, consumed: 0 }
+    if (isCharlie(hand, this.rules)) {
+      return { outcome: 'charlie', returned: bet * 2 + hand.freeBet, consumed: 0 }
+    }
 
     // Free Bet style: the dealer's 22 is not a bust, it's a push.
     if (this.rules.dealerPush22 && dealerValue.total === 22) {
+      // Only the player's own chips come back. The free chip is the house's and
+      // goes back in the rack — a push on a free double is worth nothing at all,
+      // which is most of what pays for the rule.
       return { outcome: 'push', returned: bet, consumed: 0 }
     }
 
-    if (dealerValue.busted) return { outcome: 'win', returned: bet * 2, consumed: 0 }
+    if (dealerValue.busted) return this.payWin(hand)
 
-    const total = evaluate(hand.cards).total
-    if (total > dealerValue.total) return { outcome: 'win', returned: bet * 2, consumed: 0 }
+    if (total > dealerValue.total) return this.payWin(hand)
     if (total < dealerValue.total) return { outcome: 'lose', returned: 0, consumed: 0 }
     return { outcome: 'push', returned: bet, consumed: 0 }
+  }
+
+  /** A won hand: the player's stake back, matched by the house, plus whatever the
+   *  house's own free chip won alongside it, plus any Spanish bonus. */
+  private payWin(hand: Hand): { outcome: Outcome; returned: number; consumed: number } {
+    const bonus = spanishBonus(hand, this.rules)
+    const extra = bonus ? hand.bet * ratio(bonus.pay) : 0
+    return { outcome: 'win', returned: hand.bet * 2 + hand.freeBet + extra, consumed: 0 }
   }
 
   // --- between rounds

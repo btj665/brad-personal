@@ -93,6 +93,10 @@ export function countDeviation(
   seat: Seat,
   rules: RuleSet,
 ): Action | null {
+  // A doubled hand still on the clock is waiting on a Spanish 21 rescue answer.
+  // It takes no more cards, so every deviation below is illegal on it.
+  if (hand.doubled) return null
+
   const upValue = rankValue(up.rank)
   const { total, soft } = evaluate(hand.cards)
   const pairRank =

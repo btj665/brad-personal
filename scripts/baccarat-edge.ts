@@ -9,8 +9,12 @@
 //    drives, the same shoe, the same settlement code. The exact numbers verify
 //    the tableau; the simulation verifies the engine that wraps it.
 //
-//   npx tsx scripts/baccarat-edge.ts
+//   npx tsx scripts/baccarat-edge.ts            (25M coups, about 40 seconds)
 //   npx tsx scripts/baccarat-edge.ts 2000000
+//
+// The default is 25 million because of the Tie bet: one coup in ten pays 8:1, so
+// its standard error falls slowly, and a couple of million coups would leave it
+// a quarter of a percent adrift. Player and Banker settle down inside 100,000.
 //
 // Published (8 decks): Banker 1.06%, Player 1.24%, Tie at 8:1 14.36%,
 // either pair at 11:1 10.36%.

@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 
 import { randomSeed } from '../../engine/rng'
-import { VideoPokerGame, type AutoHoldMode } from '../../videopoker/engine'
+import type { Card } from '../../engine/types'
+import { HAND_COUNTS, VideoPokerGame, type AutoHoldMode } from '../../videopoker/engine'
 import type { PayCategory } from '../../videopoker/classify'
 import { VARIANTS, payFor } from '../../videopoker/paytables'
 import { PlayingCard } from '../Card'
@@ -19,6 +20,14 @@ const AUTO_LABEL: Record<AutoHoldMode, string> = {
   off: 'Auto-hold',
   winners: 'Auto-hold: winners',
   optimal: 'Auto-hold: best',
+}
+
+/** What the machines call themselves. */
+const HANDS_LABEL: Record<number, string> = {
+  1: 'Single Line',
+  3: 'Triple Play',
+  5: 'Five Play',
+  10: 'Ten Play',
 }
 
 /** The order and labels the pay table is shown in, per family. */
@@ -50,9 +59,8 @@ const DEUCES_ROWS: Array<[PayCategory, string]> = [
   ['threeOfAKind', 'Three of a kind'],
 ]
 
-function PayTable({ game }: { game: VideoPokerGame }) {
+function PayTable({ game, hit }: { game: VideoPokerGame; hit: PayCategory | null }) {
   const rows = game.variant.family === 'deuces' ? DEUCES_ROWS : STANDARD_ROWS
-  const winning = game.last?.category ?? null
   const bet = game.coins
 
   return (
@@ -62,12 +70,20 @@ function PayTable({ game }: { game: VideoPokerGame }) {
           const per = payFor(game.variant, cat)
           if (per === 0) return null
           return (
-            <tr key={cat} className={winning === cat ? 'vp-pay-hit' : undefined}>
+            <tr key={cat} className={hit === cat ? 'vp-pay-hit' : undefined}>
               <td className="vp-pay-name">{label}</td>
               <td className="vp-pay-amt">{per * bet}</td>
             </tr>
           )
         })}
+        {game.hands > 1 && (
+          <tr className="vpm-pay-foot">
+            <td colSpan={2}>
+              Every figure is what ONE hand pays. {game.hands} hands are in play, so the bet is{' '}
+              {game.hands} × {game.coins} = {game.totalBet()}.
+            </td>
+          </tr>
+        )}
       </tbody>
     </table>
   )
@@ -93,22 +109,86 @@ const CAT_LABEL: Partial<Record<PayCategory, string>> = {
   nothing: '',
 }
 
+interface RowSpec {
+  key: string
+  label: string
+  cards: Card[]
+  /** Cards not drawn yet, shown face down the way a real machine does. */
+  pending?: boolean[]
+  category: PayCategory | null
+  won: number
+}
+
+/** One of the hands stacked above the dealt row. Not interactive: the holds were
+ *  chosen once, on the row below. */
+function HandRow({ row }: { row: RowSpec }) {
+  const paid = row.won > 0
+  const cat = row.category ? CAT_LABEL[row.category] : ''
+
+  return (
+    <div className={`vpm-row${paid ? ' vpm-row-paid' : ''}`}>
+      <span className="vpm-row-label">{row.label}</span>
+      <div className="vpm-row-cards">
+        {row.cards.length === 0
+          ? [0, 1, 2, 3, 4].map((i) => <span key={i} className="vpm-ghost" />)
+          : row.cards.map((card, i) => (
+              <PlayingCard key={`${i}-${card.uid}`} card={card} down={row.pending?.[i]} />
+            ))}
+      </div>
+      <span className="vpm-row-pay">
+        {cat ? <span className="vpm-row-cat">{cat}</span> : null}
+        {paid ? <b className="vpm-row-won">+{row.won}</b> : null}
+      </span>
+    </div>
+  )
+}
+
 export function VideoPokerScreen() {
   const [game, setGame] = useState(() => new VideoPokerGame({ seed: randomSeed(), bankroll: START }))
   const [coach, setCoach] = useState(false)
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   // The optimal hold is expensive, so compute it only when the coach is on and
-  // only once per dealt hand.
+  // only once per dealt hand. It is a property of the dealt five, so Ten Play
+  // costs exactly what one line costs — never solve per drawn hand.
   const hint = useMemo(() => {
     if (!coach || game.phase !== 'dealt' || !game.hand) return null
     return game.hint()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coach, game.phase, game.round])
 
-  const display = game.hand ?? game.last
+  const dealt = game.hand
+  // Last round's rows are only worth showing while they still match the machine
+  // the player is sitting at; changing the hand count clears the screen the way
+  // a real one does.
+  const done =
+    game.phase === 'complete' && game.last && game.last.hands === game.hands ? game.last : null
+  const liveHands = dealt?.hands ?? game.hands
+
+  const display = dealt ?? done
   const cards = display?.final ?? display?.cards ?? []
-  const held = game.hand?.held ?? display?.cards.map(() => true) ?? []
+  const held = dealt?.held ?? display?.cards.map(() => true) ?? []
+
+  // Hands 2..N, stacked so the numbering climbs away from the dealt row.
+  const upper: RowSpec[] = []
+  for (let i = liveHands - 1; i >= 1; i--) {
+    const label = `Hand ${i + 1}`
+    const drawn = done?.draws[i]
+    if (dealt) {
+      upper.push({
+        key: `p${i}`,
+        label,
+        cards: dealt.cards,
+        pending: dealt.held.map((h) => !h),
+        category: null,
+        won: 0,
+      })
+    } else if (drawn) {
+      upper.push({ key: `d${i}`, label, cards: drawn.cards, category: drawn.category, won: drawn.won })
+    } else {
+      upper.push({ key: `g${i}`, label, cards: [], category: null, won: 0 })
+    }
+  }
 
   const changeVariant = useCallback((id: string) => game.setVariant(id), [game])
   const rebuy = useCallback(() => {
@@ -118,12 +198,14 @@ export function VideoPokerScreen() {
         variantId: game.variant.id,
         bankroll: START,
         autoHold: game.autoHold,
+        hands: game.hands,
       }),
     )
   }, [game])
 
-  const broke = game.bankroll < game.coins && game.phase !== 'dealt'
-  const won = game.phase === 'complete' ? game.last?.won ?? 0 : 0
+  const broke = game.bankroll < game.totalBet() && game.phase !== 'dealt'
+  const won = done?.won ?? 0
+  const paidHands = done ? done.draws.filter((d) => d.won > 0).length : 0
 
   return (
     <>
@@ -141,6 +223,7 @@ export function VideoPokerScreen() {
               </option>
             ))}
           </select>
+          <span className="vpm-machine-name">{HANDS_LABEL[game.hands]}</span>
         </div>
         <div className="topbar-right">
           <span className="bankroll">
@@ -165,7 +248,7 @@ export function VideoPokerScreen() {
       </header>
 
       <WinToast
-        net={game.phase === 'complete' ? won : 0}
+        net={game.phase === 'complete' ? game.last?.won ?? 0 : 0}
         token={game.phase === 'complete' ? `vp-${game.round}` : 'vp-live'}
       />
 
@@ -174,9 +257,23 @@ export function VideoPokerScreen() {
           <p className="vp-note">{game.variant.note}</p>
 
           <div className="vp-machine">
-            <PayTable game={game} />
+            <PayTable game={game} hit={done?.category ?? null} />
 
             <div className="vp-screen">
+              {liveHands > 1 && (
+                <div className={`vpm-rows vpm-rows-${liveHands}`}>
+                  {upper.map((row) => (
+                    <HandRow key={row.key} row={row} />
+                  ))}
+                </div>
+              )}
+
+              {liveHands > 1 && (
+                <span className="vpm-deal-label">
+                  Hand 1 — the deal. Hold here; every hand above draws from these holds.
+                </span>
+              )}
+
               <div className="vp-cards">
                 {cards.length === 0
                   ? [0, 1, 2, 3, 4].map((i) => <span key={i} className="card-ghost" />)
@@ -201,25 +298,46 @@ export function VideoPokerScreen() {
               </div>
 
               <div className="vp-result">
-                {game.phase === 'complete' && game.last?.category && CAT_LABEL[game.last.category] ? (
+                {done && liveHands > 1 ? (
                   <span className={`vp-win${won > 0 ? ' vp-win-paid' : ''}`}>
-                    {CAT_LABEL[game.last.category]}
+                    {paidHands === 0
+                      ? `No hand paid — down ${done.bet}`
+                      : `${paidHands} of ${liveHands} hands paid — win ${won}`}
+                  </span>
+                ) : done && done.category && CAT_LABEL[done.category] ? (
+                  <span className={`vp-win${won > 0 ? ' vp-win-paid' : ''}`}>
+                    {CAT_LABEL[done.category]}
                     {won > 0 ? ` — win ${won}` : ''}
                   </span>
                 ) : game.phase === 'dealt' ? (
                   <span className="vp-prompt">
-                    {game.autoHold !== 'off' && game.hand?.held.some(Boolean)
+                    {game.autoHold !== 'off' && dealt?.held.some(Boolean)
                       ? 'Auto-held — tap cards to change, then Draw.'
                       : 'Tap cards to hold, then Draw.'}
                   </span>
                 ) : (
-                  <span className="vp-prompt">Bet 1–5 credits and deal.</span>
+                  <span className="vp-prompt">Pick a machine, bet, and deal.</span>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="vp-controls">
+          <div className="vp-controls vpm-controls">
+            <div className="vpm-hands">
+              {HAND_COUNTS.map((n) => (
+                <button
+                  key={n}
+                  className={`vpm-hand${game.hands === n ? ' vpm-hand-on' : ''}`}
+                  disabled={game.phase === 'dealt'}
+                  onClick={() => game.setHands(n)}
+                  title={HANDS_LABEL[n]}
+                >
+                  {n}
+                </button>
+              ))}
+              <span className="vp-coin-label">hands</span>
+            </div>
+
             <div className="vp-coins">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
@@ -231,7 +349,15 @@ export function VideoPokerScreen() {
                   {n}
                 </button>
               ))}
-              <span className="vp-coin-label">coins</span>
+              <span className="vp-coin-label">coins each</span>
+            </div>
+
+            <div className={`vpm-bet${game.hands > 1 ? ' vpm-bet-multi' : ''}`}>
+              <span className="vpm-bet-label">Total bet</span>
+              <b className="vpm-bet-amt">{game.totalBet()}</b>
+              <span className="vpm-bet-calc">
+                {game.hands} × {game.coins}
+              </span>
             </div>
 
             {broke ? (
@@ -243,8 +369,12 @@ export function VideoPokerScreen() {
                 Draw
               </button>
             ) : (
-              <button className="btn btn-primary btn-big" disabled={!game.canDeal()} onClick={() => game.deal()}>
-                Deal
+              <button
+                className="btn btn-primary btn-big"
+                disabled={!game.canDeal()}
+                onClick={() => game.deal()}
+              >
+                Deal <span className="vpm-btn-bet">{game.totalBet()}</span>
               </button>
             )}
           </div>

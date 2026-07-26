@@ -10,6 +10,12 @@
 // house edge is published as 0.41% from combinatorial analysis. The simulator
 // lands on 0.391% ± 0.081%, which is how we know the dealer rules, the payouts,
 // the split and double logic and the strategy chart are all right.
+//
+// Free Bet and Spanish 21 carry a second figure, `published`, because for those
+// two the measured number is knowingly higher than the quoted one: the bots play
+// the ordinary six-deck chart plus the deviations in `strategy/basic.ts`, not a
+// chart drawn for the variant. Recording the gap rather than papering over it is
+// the point — `edge` stays the number this engine actually produces.
 
 import { DEFAULT_RULES } from '../engine/rules'
 import type { RuleSet } from '../engine/types'
@@ -20,6 +26,12 @@ export interface Preset {
   /** Measured house edge vs. basic strategy, in percent. Negative favours the
    *  player — which is exactly why the liberal game below does not exist. */
   edge: number
+  /** The figure the outside world publishes for this game, where it differs from
+   *  what we measure. It differs only for the two variants, and only because the
+   *  bots play the ordinary chart plus a few deviations rather than a chart drawn
+   *  for the variant — see the notes in `strategy/basic.ts`. Leaving both numbers
+   *  side by side is the honest way to record that gap. */
+  published?: number
   note: string
 }
 
@@ -84,6 +96,42 @@ export const PRESETS: Preset[] = [
       doubleAfterSplit: false,
       surrender: 'none',
       maxSplitHands: 2,
+    },
+  },
+  {
+    id: 'free-bet',
+    edge: 1.19,
+    published: 1.04,
+    note: 'The house pays for your doubles and your splits — free double on any hard 9, 10 or 11, free split on any pair but tens — and takes it all back with one line of small print: a dealer 22 pushes. Your blackjack still beats it.',
+    rules: {
+      ...DEFAULT_RULES,
+      label: 'Free Bet',
+      decks: 6,
+      dealerHitsSoft17: true,
+      dealerPush22: true,
+      freeDouble: true,
+      freeSplit: true,
+      surrender: 'none',
+    },
+  },
+  {
+    id: 'spanish-21',
+    edge: 1.28,
+    published: 0.4,
+    note: 'A 48-card deck with every ten pulled out, and a long list of gifts to pay for it: double on any number of cards, rescue a bad double, any 21 of yours always wins, and five, six and seven-card 21s pay a bonus.',
+    rules: {
+      ...DEFAULT_RULES,
+      label: 'Spanish 21',
+      decks: 6,
+      removeTens: true,
+      dealerHitsSoft17: true,
+      player21Wins: true,
+      spanishBonuses: true,
+      doubleAnyCards: true,
+      doubleRescue: true,
+      resplitAces: true,
+      hitSplitAces: true,
+      surrender: 'late',
     },
   },
   {

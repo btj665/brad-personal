@@ -38,6 +38,10 @@ export interface RuleSet {
 
   // --- the shoe
   decks: number
+  /** Spanish 21's 48-card deck: every rank-10 card comes out, jacks, queens and
+   *  kings stay. Two fewer ten-values per deck is worth well over 2% to the
+   *  house on its own — everything else in that game is paying for this. */
+  removeTens: boolean
   /** Fraction of the shoe dealt before the cut card comes out. 0.75 = 75%. */
   penetration: number
   /** Burn one card after each shuffle, as most casinos do. */
@@ -53,17 +57,35 @@ export interface RuleSet {
   /** ENHC only: on a dealer blackjack the player loses the original bet only —
    *  split and double wagers are returned. This is the European standard. */
   originalBetsOnly: boolean
-  /** Free-Bet style: a dealer total of 22 pushes against any live player hand. */
+  /** Free-Bet style: a dealer total of 22 pushes against any live player hand.
+   *  A player natural is paid before this is consulted, so it still beats a 22. */
   dealerPush22: boolean
+  /** Spanish 21: a player total of 21 can neither be beaten nor pushed. It wins
+   *  through a dealer 21 and a player natural wins through a dealer natural. */
+  player21Wins: boolean
 
   // --- the payoffs
   blackjackPayout: Ratio
   insurancePayout: Ratio
+  /** Spanish 21's bonus ladder: the five/six/seven-card 21s and the 6-7-8 and
+   *  7-7-7 hands, paid on the original wager. See `spanishBonus` for the table. */
+  spanishBonuses: boolean
 
   // --- player options
   double: DoubleRule
   doubleAfterSplit: boolean
   doubleOnSplitAces: boolean
+  /** Spanish 21: double on three, four or five cards, not just the first two. */
+  doubleAnyCards: boolean
+  /** Spanish 21's double-down rescue: after seeing the double card the player may
+   *  hand the hand back, forfeiting the doubled half and keeping the original
+   *  bet. It settles down the surrender path, because that is what it is. */
+  doubleRescue: boolean
+  /** Free Bet: the house puts up the double on any hard 9, 10 or 11. It wins like
+   *  a real wager and costs nothing when it loses. */
+  freeDouble: boolean
+  /** Free Bet: the house puts up the second hand on any pair but ten-values. */
+  freeSplit: boolean
 
   /** Total hands one seat may end up with. 4 is the casino norm; 1 = no split. */
   maxSplitHands: number
@@ -106,8 +128,18 @@ export type Outcome =
 export interface Hand {
   id: string
   cards: Card[]
-  /** Chips currently at risk on this hand (doubled hands hold twice the base). */
+  /** The player's OWN chips at risk on this hand (a paid double holds twice the
+   *  base). Every chip that leaves the bankroll is counted here and nowhere else,
+   *  which is what makes the accounting checkable. */
   bet: number
+  /** A wager the HOUSE put up: Free Bet's free doubles and free splits.
+   *
+   *  It is deliberately not folded into `bet`, because it obeys different rules
+   *  at every step: it is never deducted from the bankroll, it pays like a real
+   *  wager when the hand wins, it is simply taken back when the hand loses, and
+   *  — the one everybody gets wrong — it is taken back rather than returned when
+   *  the hand PUSHES. A push on a free-doubled hand is worth exactly nothing. */
+  freeBet: number
   doubled: boolean
   /** True for every hand produced by a split, including the original half. */
   fromSplit: boolean

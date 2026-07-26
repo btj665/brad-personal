@@ -34,7 +34,11 @@ export function Settings({
                 key={p.id}
                 className={`preset${rules.label === p.rules.label ? ' preset-on' : ''}`}
                 onClick={() => onApply({ ...p.rules }, seats)}
-                title={p.note}
+                title={
+                  p.published === undefined
+                    ? p.note
+                    : `${p.note}\n\nPublished elsewhere as ${p.published.toFixed(2)}%. We measure ${p.edge.toFixed(2)}% because the bots play the ordinary chart plus a handful of deviations rather than one drawn for this variant.`
+                }
               >
                 <span className="preset-name">{p.rules.label}</span>
                 <span className={`preset-edge${p.edge < 0 ? ' preset-edge-good' : ''}`}>
@@ -46,7 +50,8 @@ export function Settings({
           </div>
           <p className="hint">
             The percentage is the house edge against perfect basic strategy, measured by simulating
-            eight million rounds of each game. Run <code>npm run edge</code> to reproduce it.
+            eight million rounds of each game. Run <code>npm run edge</code> to reproduce it. The two
+            variants sit above their published figures on purpose — hover one to read why.
           </p>
         </Section>
 
@@ -66,6 +71,12 @@ export function Settings({
             step={0.05}
             format={(v) => `${Math.round(v * 100)}%`}
             onChange={(v) => set('penetration', v)}
+          />
+          <Toggle
+            label="Spanish deck (remove the tens)"
+            hint="48 cards: every rank-10 comes out, jacks, queens and kings stay. Worth over 2% to the house on its own — Spanish 21 spends the rest of this panel paying you back for it."
+            value={rules.removeTens}
+            onChange={(v) => set('removeTens', v)}
           />
           <Toggle label="Burn a card after the shuffle" value={rules.burnCard} onChange={(v) => set('burnCard', v)} />
           <Toggle
@@ -102,6 +113,12 @@ export function Settings({
             value={rules.dealerPush22}
             onChange={(v) => set('dealerPush22', v)}
           />
+          <Toggle
+            label="Any player 21 always wins"
+            hint="The Spanish 21 rule. Your 21 is never beaten and never pushed, and your blackjack beats the dealer's."
+            value={rules.player21Wins}
+            onChange={(v) => set('player21Wins', v)}
+          />
         </Section>
 
         <Section title="The payoffs">
@@ -117,6 +134,12 @@ export function Settings({
             value={rules.evenMoney}
             disabled={!rules.insurance}
             onChange={(v) => set('evenMoney', v)}
+          />
+          <Toggle
+            label="Spanish 21 bonuses"
+            hint="Five-card 21 pays 3:2, six-card 2:1, seven-card 3:1. 6-7-8 and 7-7-7 pay 3:2 mixed, 2:1 suited, 3:1 in spades. Never on a doubled or split hand."
+            value={rules.spanishBonuses}
+            onChange={(v) => set('spanishBonuses', v)}
           />
           <Choice<number | null>
             label="Charlie"
@@ -148,9 +171,33 @@ export function Settings({
             value={rules.doubleOnSplitAces}
             onChange={(v) => set('doubleOnSplitAces', v)}
           />
+          <Toggle
+            label="Double on any number of cards"
+            hint="Spanish 21. Hit into a hard 11 and you may still double it."
+            value={rules.doubleAnyCards}
+            onChange={(v) => set('doubleAnyCards', v)}
+          />
+          <Toggle
+            label="Double-down rescue"
+            hint="Spanish 21. After seeing the double card you may hand the hand back and keep the original bet. It is the Surrender button."
+            value={rules.doubleRescue}
+            onChange={(v) => set('doubleRescue', v)}
+          />
+          <Toggle
+            label="Free double (9, 10, 11)"
+            hint="Free Bet. The house puts up the double on any hard 9, 10 or 11: it pays like a real wager and costs nothing when it loses."
+            value={rules.freeDouble}
+            onChange={(v) => set('freeDouble', v)}
+          />
         </Section>
 
         <Section title="Splitting">
+          <Toggle
+            label="Free split (any pair but tens)"
+            hint="Free Bet. The house backs the second hand. Ten-value pairs still cost you your own chips."
+            value={rules.freeSplit}
+            onChange={(v) => set('freeSplit', v)}
+          />
           <Choice
             label="Split to"
             value={rules.maxSplitHands}

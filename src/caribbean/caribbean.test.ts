@@ -208,6 +208,11 @@ describe('the $1 progressive', () => {
     expect(s.net).toBe(50 - ANTE - 1)
   })
 
+  it('pays nothing at all when the side bet was not made', () => {
+    const s = play('As Ks Qs Js 10s', 'Ah Kh 8d 5c 3d', 0)
+    expect(s.progressivePay).toBe(0)
+  })
+
   it('is a losing bet at a $200,000 meter and a winning one above break-even', () => {
     expect(progressiveReturn(p)).toBeCloseTo(0.9472, 4)
     const meter = breakEvenMeter(p)
@@ -328,6 +333,23 @@ describe('a hand at the table', () => {
     expect(game.canDeal()).toBe(false)
     game.setAnte(5)
     expect(game.canDeal()).toBe(true)
+  })
+
+  it('keeps the ante inside the table limits', () => {
+    const game = new CaribbeanGame({ seed: 3, bankroll: 100_000, ante: 10 })
+    game.setAnte(1)
+    expect(game.ante).toBe(DEFAULT_CARIBBEAN.minAnte)
+    game.setAnte(10_000)
+    expect(game.ante).toBe(DEFAULT_CARIBBEAN.maxAnte)
+  })
+
+  it('will not move the ante or the side bet once the cards are out', () => {
+    const game = new CaribbeanGame({ seed: 3, bankroll: 100_000, ante: 10 })
+    game.deal()
+    game.setAnte(50)
+    game.toggleProgressive()
+    expect(game.ante).toBe(10)
+    expect(game.progressive).toBe(false)
   })
 
   it('replays identically from the same seed', () => {

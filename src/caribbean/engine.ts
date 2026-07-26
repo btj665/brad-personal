@@ -2,10 +2,10 @@
 //
 // The whole game is: post an ante, look at five cards, and either walk away or
 // commit twice the ante against a dealer who only plays back with ace-king or
-// better. There is no draw and no second decision, which is why the house edge
-// is so much larger than the games it sits next to on the floor — the player's
-// single point of leverage is worth about half a percent, and the ante he
-// surrenders on a fold is worth 5%.
+// better. No draw, no second decision, nothing to press an advantage with —
+// which is why the edge is several times that of the games sitting either side
+// of it on the floor. The player folds outright on about 48% of hands, and the
+// Raise only earns its schedule on the hands where the dealer opens.
 //
 // Deterministic and clock-free like every other engine here: same seed, same
 // shuffle, same hands, forever.
@@ -113,8 +113,9 @@ export function resolveHand(args: ResolveArgs): Settlement {
 
   if (!qualifies) {
     // Ante pays even money, Raise comes back untouched. The player's hand is
-    // never even compared — this is where the 5% lives, because half the hands
-    // strong enough to raise with collect one unit instead of three.
+    // never even compared — which is most of where the 5% lives: the dealer
+    // fails to open on nearly 44% of the hands the player raised into, and a
+    // royal flush collects the same one unit as a pair of deuces.
     antePay = args.ante * 2
     raisePay = args.raise
   } else if (cmp > 0) {

@@ -50,16 +50,26 @@ export function isCharlie(hand: Hand, rules: RuleSet): boolean {
   return hand.cards.length >= rules.charlie && !isBusted(hand)
 }
 
+/** A doubled hand takes its one card and stops — unless the house offers
+ *  double-down rescue, in which case the player still owes one decision: keep the
+ *  hand or hand it back for the original bet.
+ *
+ *  A free double is deliberately excluded. The house's chip costs nothing when it
+ *  loses, so buying the hand back could only throw away the live half. */
+export function canRescue(hand: Hand, rules: RuleSet): boolean {
+  if (!rules.doubleRescue || !hand.doubled) return false
+  if (hand.freeBet > 0) return false
+  if (hand.stood || hand.surrendered || isBusted(hand)) return false
+  return evaluate(hand.cards).total !== 21
+}
+
 /** A hand is done when it can take no more cards. */
 export function isResolved(hand: Hand, rules: RuleSet): boolean {
-  return (
-    hand.stood ||
-    hand.surrendered ||
-    hand.doubled ||
-    isBusted(hand) ||
-    isCharlie(hand, rules) ||
-    evaluate(hand.cards).total === 21
-  )
+  if (hand.stood || hand.surrendered) return true
+  if (isBusted(hand) || isCharlie(hand, rules)) return true
+  if (evaluate(hand.cards).total === 21) return true
+  if (hand.doubled) return !canRescue(hand, rules)
+  return false
 }
 
 export function makeHand(id: string, cards: Card[], bet: number, opts: Partial<Hand> = {}): Hand {
@@ -67,6 +77,7 @@ export function makeHand(id: string, cards: Card[], bet: number, opts: Partial<H
     id,
     cards,
     bet,
+    freeBet: 0,
     doubled: false,
     fromSplit: false,
     splitAces: false,

@@ -75,7 +75,7 @@ export interface CaribbeanRules {
  *  still rather than a counter that creeps up 70¢ a bet — because that is the
  *  only version whose return is a single checkable number. It is a bad bet at
  *  the seeded meter and a good one above break-even; `breakEvenMeter` says
- *  where the line is, and `scripts/caribbean-edge.ts` prints both. */
+ *  where the line is, and `npm run cstud:edge` prints the return at both. */
 export const DEFAULT_CARIBBEAN: CaribbeanRules = {
   label: 'Caribbean Stud Poker',
   raisePay: {
@@ -101,8 +101,8 @@ export const DEFAULT_CARIBBEAN: CaribbeanRules = {
 }
 
 /** Exact counts of the 2,598,960 five-card hands, by Raise-schedule row.
- *  `scripts/caribbean-edge.ts` re-derives every one of these by enumerating the
- *  whole deck and throws if they disagree, so they cannot quietly rot. */
+ *  `npm run cstud:edge` re-derives every one of these by enumerating the whole
+ *  deck and throws if they disagree, so they cannot quietly rot. */
 export const HAND_COUNTS: Record<PayKey, number> = {
   royal: 4,
   straightFlush: 36,
