@@ -7,6 +7,7 @@ import { CaribbeanScreen } from './caribbean/CaribbeanScreen'
 import { CrapsScreen } from './craps/CrapsScreen'
 import { KenoScreen } from './keno/KenoScreen'
 import { LetItRideScreen } from './letitride/LetItRideScreen'
+import { MStudScreen } from './mstud/MStudScreen'
 import { PaiGowScreen } from './paigow/PaiGowScreen'
 import { RouletteScreen } from './roulette/RouletteScreen'
 import { SicBoScreen } from './sicbo/SicBoScreen'
@@ -22,6 +23,7 @@ type GameId =
   | 'uth'
   | 'threecard'
   | 'caribbean'
+  | 'mstud'
   | 'letitride'
   | 'war'
   | 'craps'
@@ -49,6 +51,7 @@ const FLOOR: Array<{ group: string; games: Entry[] }> = [
       { id: 'uth', label: "Ultimate Hold'em", blurb: 'Ante, blind, trips' },
       { id: 'threecard', label: 'Three Card Poker', blurb: 'Ante/play and pair plus' },
       { id: 'caribbean', label: 'Caribbean Stud', blurb: 'Five cards, one dealer up' },
+      { id: 'mstud', label: 'Mississippi Stud', blurb: 'Three streets, 1x–3x raises' },
       { id: 'letitride', label: 'Let It Ride', blurb: 'Three bets, pull two back' },
       { id: 'war', label: 'Casino War', blurb: 'High card, or go to war' },
     ],
@@ -78,6 +81,7 @@ const SCREENS: Record<GameId, () => React.JSX.Element> = {
   uth: UthScreen,
   threecard: ThreeCardScreen,
   caribbean: CaribbeanScreen,
+  mstud: MStudScreen,
   letitride: LetItRideScreen,
   war: WarScreen,
   craps: CrapsScreen,

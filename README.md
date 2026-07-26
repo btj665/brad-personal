@@ -1,35 +1,75 @@
 # The Tables
 
-Six casino games that share one deterministic engine core, one poker-hand
-evaluator, and one deck of hand-drawn SVG cards:
+Fifteen casino games that share one deterministic engine core, two poker-hand
+evaluators, and one deck of hand-drawn SVG cards.
+
+**Card tables**
 
 - **Blackjack** — a five-seat table, a multi-deck shoe with a cut card, four
-  robot players, and every rule variant as a live switch.
-- **Ultimate Texas Hold'em** — ante, blind and trips, the 4×/2×/1× raise
-  ladder, the blind bonus, and a dealer who has to open.
+  robot players, and every rule variant as a live switch — including **Free Bet**
+  (free doubles and splits, dealer pushes on 22) and **Spanish 21** (48-card
+  deck, the bonus ladder, double-down rescue).
+- **Baccarat** — punto banco on eight decks, the drawing tableau that neither
+  side may deviate from, banker commission, both pair bets, and a bead plate.
 - **Pai Gow Poker** — a 53-card deck with the joker, split into a high and a low
   hand by the house way, 5% commission, and the Fortune bonus.
-- **Video Poker** — five variants (Jacks or Better, Bonus, Double Bonus, Deuces
-  Wild), with an optimal-play coach that solves the best hold exactly.
-- **Roulette** — American, European and French (with la partage), a spinning
-  wheel with a ball that rides to the winning pocket, and the full betting
-  layout: straights, and splits, streets, corners and lines placed on the edges
-  and corners of the numbers.
+- **Ultimate Texas Hold'em** — ante, blind and trips, the 4×/2×/1× raise
+  ladder, the blind bonus, and a dealer who has to open.
+- **Three Card Poker** — ante/play against a dealer who needs a queen, the ante
+  bonus, and Pair Plus on either of its two historical pay tables.
+- **Caribbean Stud** — five cards each against one dealer card face up, a dealer
+  who qualifies on ace-king, the raise ladder, and a progressive that prints its
+  own break-even meter.
+- **Mississippi Stud** — three community cards turned one at a time, 1×–3×
+  raises at every street, and a pay table that settles on the *total* wagered.
+- **Let It Ride** — three bets, two of which you may pull back as the board
+  comes out, and no dealer hand to beat.
+- **Casino War** — one card each, and the only decision in the building that
+  matters: surrender half, or go to war.
+
+**Dice & wheels**
+
 - **Craps** — a realistic table layout with pass / don't pass and come / don't
   come at true-odds, place bets on the box numbers, and the field.
+- **Roulette** — American, European and French (with la partage), a spinning
+  wheel with a ball that rides to the winning pocket, and the full betting
+  layout: straights, splits, streets, corners and lines placed on the edges
+  and corners of the numbers.
+- **Sic Bo** — three dice and all 52 spots, every one priced on the felt.
+- **Big Six** — the money wheel, 54 stops, and the worst odds on the floor
+  printed next to each symbol.
+
+**Machines**
+
+- **Video Poker** — five variants (Jacks or Better, Bonus, Double Bonus, Deuces
+  Wild), an optimal-play coach that solves the best hold exactly, auto-hold, and
+  Triple / Five / Ten Play.
+- **Keno** — pick one to ten of eighty, drawn twenty at a time, with the exact
+  hypergeometric odds and an honest note about what the ticket costs you.
 
 ```bash
 npm run dev          # play them            → http://localhost:5173
-npm test             # 191 engine tests
+npm test             # 614 engine tests
 npm run build
 
+npm run edges         # every game's validation, one sweep
+
 npm run edge          # blackjack house edge, every ruleset, by simulation
+npm run baccarat:edge # baccarat, exact + 25M coups
+npm run paigow:edge   # pai gow house edge
 npm run uth:edge      # ultimate hold'em house edge
 npm run uth:trips     # the trips side-bet edge
-npm run paigow:edge   # pai gow house edge
-npm run vp:return     # video poker return of optimal play
-npm run roulette:edge # roulette house edge, all three wheels
+npm run tcp:edge      # three card poker, exact
+npm run cstud:edge    # caribbean stud, exact + a billion hands
+npm run mstud:edge    # mississippi stud, exact
+npm run lir:edge      # let it ride, exact
+npm run war:edge      # casino war, exact
 npm run craps:edge    # craps house edge, the main bets
+npm run roulette:edge # roulette house edge, all three wheels
+npm run sicbo:edge    # sic bo, exact, all 216 rolls
+npm run bigsix:edge   # big six, exact, all 54 stops
+npm run vp:return     # video poker return, 1 / 3 / 5 / 10 hands
+npm run keno:return   # keno, exact hypergeometric
 npm run poker:freq    # the poker evaluator vs. textbook hand frequencies
 ```
 
@@ -38,14 +78,37 @@ npm run poker:freq    # the poker evaluator vs. textbook hand frequencies
 ## How we know it's right
 
 Every one of these games has a house edge that is known from published analysis.
-So none of them are validated by "it looks like it works" — each is simulated for
-millions of hands and made to land on its known number. If a payout, a dealer
-rule, or a strategy chart were wrong, the edge would come out wrong.
+So none of them are validated by "it looks like it works" — each is measured and
+made to land on its known number. If a payout, a dealer rule, or a strategy
+chart were wrong, the edge would come out wrong.
+
+**Where the outcome space is small enough, we don't simulate at all — we
+enumerate it.** An exact number can be asserted in a test; a sampled one can
+only be checked against an error bar. Eight of the fifteen games are now solved
+exactly:
+
+| Game | Method | Measured | Published |
+|---|---|---|---|
+| Sic Bo — all 52 spots | all 216 rolls | exact, every spot | every spot |
+| Big Six — all 7 symbols | all 54 stops | exact, every symbol | every symbol |
+| Keno — picks 1–10 | BigInt hypergeometric | 25.000%–30.184% | — |
+| Three Card Poker — ante/play | 407,170,400 hand pairs | 3.373% | 3.37% |
+| Three Card Poker — Pair Plus | all 22,100 hands | 7.276% / 2.317% | 7.28% / 2.32% |
+| Mississippi Stud | all 1,326 starting hands | 4.915% | 4.910% |
+| Let It Ride | 51,979,200 ordered rounds | 3.508% | 3.51% |
+| Casino War | the 312-card composition | 2.877% | 2.88% |
+| Baccarat — banker | all ≤6-card sequences | 1.058% | 1.06% |
+| Baccarat — player / tie / pairs | as above | 1.235% / 14.360% / 10.361% | 1.24% / 14.36% / 10.36% |
+
+And the games that are still simulated:
 
 | Game | Simulated | Known |
 |---|---|---|
 | Blackjack (Vegas Strip, basic strategy) | 0.391% ± 0.08% | 0.41% |
+| Blackjack (Free Bet) | 1.19% | 1.04% — see below |
+| Blackjack (Spanish 21) | 1.28% | 0.40% — see below |
 | Pai Gow Poker (house way, dealer banks) | 2.72% ± 0.22% | ~2.84% |
+| Caribbean Stud (A-K-J-8-3 rule) | 5.3229% | 5.32% for this rule |
 | Roulette — European, even money | 2.673% | 2.70% |
 | Roulette — French, la partage | 1.314% | 1.35% |
 | Craps — pass line | 1.458% | 1.41% |
@@ -54,17 +117,37 @@ rule, or a strategy chart were wrong, the edge would come out wrong.
 
 The poker evaluator is checked a second way: deal two million five-card hands and
 its category frequencies match the textbook odds to four decimal places (`npm run
-poker:freq`). That matters because four of the six games settle on it.
+poker:freq`). That matters because seven of the fifteen games settle on it. The
+three-card evaluator in `poker/eval3.ts` is checked harder still — a census over
+all 22,100 three-card hands, which is the only real proof that a straight
+outranks a flush when you only hold three cards.
 
-Video poker is the one return that resists a quick Monte Carlo: the royal flush
-pays 800 and shows up once in ~40,000 hands, so the average takes an enormous
-number of deals to settle even though each deal's value is computed exactly. Its
-correctness rests instead on the pieces being unit-tested directly — the hand
-classifier against every category, and the solver picking the known-correct hold
-(keep the flush, hold four to the royal over a made flush, keep the pair).
+Video poker's *return* resists a quick Monte Carlo — the royal pays 800 and shows
+up once in ~40,000 hands — so its correctness rests on the pieces being tested
+directly. Multi-hand, though, is proved exactly: enumerating every draw from all
+ten pools, the largest disagreement between the ten hands' expected values is
+**0**. That is what "the return doesn't change, only the variance" means, and it
+is asserted rather than sampled.
 
-Two real bugs were caught this way and would not have been caught otherwise:
+### Bugs this caught
 
+- **Sic Bo, the total 6 and 15 spots.** Priced at 18:1, which yields a 12.04%
+  edge — the published figure is 16.67%, which is that spot at **17:1**. The
+  enumeration made a one-unit paytable error impossible to miss. Two of the
+  reference edges it was checked against were also wrong: 30.09% is a *specific*
+  triple paying 150:1, not any triple at 30:1, and 18.98% is the total-9 figure,
+  not a specific double. The test now asserts all 52 spots with no exception list.
+- **Caribbean Stud's target, not its code.** The engine measured 5.32% against a
+  "published" 5.22% and the gap was real but misattributed: 5.22% is *upcard-aware
+  optimal* play, and the A-K-J-8-3 rule the game plays is 5.32%. Found by
+  building a second, independent implementation and running a billion hands
+  against it.
+- **Casino War can't be validated by simulation.** Its non-tie branch has exactly
+  zero expected value but contributes ±1 unit of noise, so a flat-bet estimator
+  has a standard error of ~0.1 percentage points per million rounds — it cannot
+  resolve 2.88% to two decimals however long you run it. The script prints the
+  exact and the sampled columns side by side (2.877% against 2.915%) so the
+  difference is visible rather than mysterious.
 - **Blackjack, European no-hole-card.** The dealer was skipping its second card
   against a lone player natural — but it must draw, because a dealer natural
   *pushes* that hand. Skipping it turned every one of those pushes into a 3:2
@@ -82,56 +165,53 @@ Two real bugs were caught this way and would not have been caught otherwise:
 ```
 src/
   engine/       Blackjack, and the shared card primitives.
-    types.ts        Card, Rank, Suit — used by all three games.
+    types.ts        Card, Rank, Suit — used by every game.
     rng.ts          Seeded PRNG. Every game replays from one integer.
     cards.ts        Ranks, suits, building a shoe.
-    shoe.ts         Multi-deck shoe, cut card, penetration, burn, CSM.
-    table.ts        The blackjack state machine.
+    shoe.ts         Multi-deck shoe, cut card, penetration, burn, CSM, and the
+                    48-card Spanish deck as a filter.
+    table.ts        The blackjack state machine, incl. free bets and the
+                    Spanish bonus ladder.
     strategy/       Basic strategy, Hi-Lo counting, the bots.
 
   poker/
-    eval.ts         The hand evaluator. Ranks five cards, finds the best five
-                    of seven, and knows the two things Pai Gow needs: the
-                    semi-wild joker and the wheel ranking.
+    eval.ts         The five-card evaluator. Ranks five, finds the best five of
+                    seven, and knows the two things Pai Gow needs: the semi-wild
+                    joker and the wheel ranking.
+    eval3.ts        The three-card evaluator, deliberately a separate type from
+                    the five-card one — with three cards a straight beats a
+                    flush, and nominally distinct enums stop that being mixed up.
 
-  uth/            Ultimate Texas Hold'em.
-    engine.ts       ante → blind → 4x → flop → 2x → river → 1x/fold → showdown.
-    strategy.ts     The published preflop / flop / river charts.
-    rules.ts        Blind bonus and Trips pay tables.
-
-  paigow/         Pai Gow Poker.
-    engine.ts       deal 7 → set high/low → reveal → settle, 5% commission.
-    houseway.ts     How to split seven cards. Never fouls (tested over 5000
-                    real hands). The dealer and bots both follow it.
-    fortune.ts      The seven-card Fortune bonus, incl. five aces and the
-                    seven-card straight flush.
-
-  videopoker/     Video Poker.
-    classify.ts     A hand → a paying category, for both the standard family and
-                    the fully-wild Deuces family.
-    solver.ts       The optimal hold: the exact average payout of all 32 ways to
-                    keep cards. Exact for holds of two-plus cards, sampled below.
-    paytables.ts    The five variants.
-
-  roulette/       Roulette.
-    wheel.ts        Pocket order and colours for all three wheels.
-    bets.ts         Every bet as the numbers it covers and what it pays,
-                    including la partage on the French wheel.
-
-  craps/
-    engine.ts       Come-out and point rolls; pass/come/odds/place/field
-                    settlement, resolved bet by bet on every roll.
+  baccarat/       rules.ts holds the drawing tableau as an explicit switch, plus
+                  resolveCoup() — the reference walk the tests and the exact
+                  enumeration both call.
+  uth/            ante → blind → 4x → flop → 2x → river → 1x/fold → showdown.
+  paigow/         deal 7 → set high/low → reveal → settle, 5% commission.
+  threecard/      ante/play, the ante bonus, both Pair Plus tables.
+  caribbean/      fold or raise 2x; the progressive's return in closed form.
+  mstud/          three streets of 1x–3x, paid on the total wagered.
+  letitride/      three bets, two pull-backs, both published charts.
+  war/            high card, then surrender or war.
+  craps/          come-out and point rolls; pass/come/odds/place/field.
+  roulette/       three wheels; every bet as the numbers it covers.
+  sicbo/          52 spots as coverage plus price, and the exact edge of each.
+  keno/           odds.ts does the hypergeometric in BigInt, because C(80,20)
+                  is 393x past MAX_SAFE_INTEGER and doubles lose it silently.
+  bigsix/         54 stops; the edge is a closed form and an enumeration that
+                  must agree.
+  videopoker/     classify → solver → paytables, single line through Ten Play.
 
   ui/             React. Reads the engines, never simulates them.
-    Shell.tsx       The lobby: switch between the six tables.
+    Shell.tsx       The lobby, grouped into card tables, dice and machines.
     ...             One screen per game, plus shared Card and Chip components.
 ```
 
 **None of the engines have a clock.** Each advances exactly one *beat* per
-`step()` and returns a description of what happened. The UI calls `step()` on a
-timer for casino pacing; the tests and simulators call it in a tight loop. Same
-code, same results — which is why millions of hands take seconds and every game
-replays perfectly from its seed.
+`step()` and returns a description of what happened, or resolves synchronously
+where there is nothing to pace. The UI calls `step()` on a timer for casino
+pacing; the tests and simulators call it in a tight loop. Same code, same
+results — which is why millions of hands take seconds and every game replays
+perfectly from its seed.
 
 ---
 
@@ -139,23 +219,24 @@ replays perfectly from its seed.
 
 Three of the games seat you next to others; the rule there is that **the players
 next to you never make a play that would make you wince.** This is enforced by
-tests, not hoped for. (Video poker, roulette and craps are played solo against
-the house, so there's no one to be irritated by — but video poker has a coach
-that plays the hand perfectly.)
+tests, not hoped for.
 
 - **Blackjack** — all four bots play correct basic strategy against every
   two-card hand, upcard, count, and ruleset. They differ only in bet sizing and
   a couple of harmless human habits (one won't surrender; one overbets). The
   counter uses the Illustrious 18 — minus splitting tens, which is correct and
   is also the single most annoying thing a stranger can do at a table.
-- **Ultimate Hold'em** — the bots play the published simple charts: raise 4×
-  with the standard preflop hands, 2× on a made pair or strong draw, and 1× or
-  fold at the river by hidden-pair. Sound, never-embarrassing play. It gives up
-  a little to the theoretical optimum (which needs a solver), and `npm run
-  uth:edge` reports honestly what it costs.
+- **Ultimate Hold'em** — the bots play the published simple charts. Sound,
+  never-embarrassing play. It gives up a little to the theoretical optimum
+  (which needs a solver), and `npm run uth:edge` reports honestly what it costs.
 - **Pai Gow** — the dealer and the bots set their hands by the house way, the
   same fixed procedure a real dealer must follow. It plays close to optimal and,
   by law and by test, never fouls.
+
+The other twelve are played solo against the house. Several of them have a
+**Coach** that shows what correct play would be: video poker solves the hold
+exactly, and three card poker, let it ride, mississippi stud and caribbean stud
+highlight what their published charts say.
 
 ---
 
@@ -163,54 +244,110 @@ that plays the hand perfectly.)
 
 **Blackjack.** Chips, then Deal. Hit / Stand / Double / Split / Surrender on the
 buttons or `H S D P R`. The "Rules" panel — or the game-name dropdown on the
-felt — switches between seven real games and lets you set every variant by hand:
+felt — switches between nine real games and lets you set every rule by hand:
 decks, penetration, H17/S17, European no-hole-card, 3:2 vs 6:5, surrender,
-re-split and hit aces, Charlies, and more. **Coach** shows the book play;
-**Count** shows the running Hi-Lo.
+re-split and hit aces, Charlies, free bets, the Spanish deck and its bonuses.
+**Coach** shows the book play; **Count** shows the running Hi-Lo.
 
-**Ultimate Hold'em.** Post the ante and blind (and an optional Trips bonus).
-Raise 4× before the flop, 2× after it, or 1× at the river — or fold. **Coach**
-tells you what the charts say.
+**Baccarat.** Chips on Player, Banker, Tie or either pair, then Deal. Nothing to
+decide after that — the tableau plays both hands, and the "Show the tableau"
+button prints the grid it is following. The bead plate keeps the shoe's history.
 
 **Pai Gow.** Bet (and an optional Fortune bonus). Then arrange your seven cards:
 click two for the low hand, and the engine won't let you foul. Or hit **Play
-house way** — or tick "set for me" up top to have every hand set automatically.
+house way** — or tick "set for me" up top.
 
-**Video Poker.** Pick a variant from the dropdown (its return is on the label).
-Bet 1–5 coins, deal, tap the cards to hold, draw. **Coach** highlights the cards
-perfect play would keep. **Auto-hold** pre-selects holds on the deal — *winners*
-keeps exactly the cards of a dealt paying hand (so a winner is never thrown away
-by accident), *best* pre-holds the solver's optimal play; either way, tap any
-card to override before drawing.
+**Ultimate Hold'em.** Post the ante and blind (and an optional Trips bonus).
+Raise 4× before the flop, 2× after it, or 1× at the river — or fold.
 
-**Roulette.** Pick a wheel. Click a chip value, then the layout: a number for a
-straight-up, or one of the dots on the edges and corners for a split, street,
-corner or line, plus dozens, columns and the even-money bets (right-click to
-clear a spot). Spin, and watch the ball ride to the pocket. "Same bets"
-re-places the last round.
+**Three Card Poker.** Ante, and optionally Pair Plus. Look at three cards, then
+Fold or Play. The dealer needs a queen to open. Both Pair Plus schedules are
+selectable, so the one-pip flush difference between them is visible.
+
+**Caribbean Stud.** Ante, and optionally the $1 progressive. One dealer card
+shows; Fold or Raise twice the ante. The rail states the progressive's live
+return and its break-even meter, because a side bet that is only good above a
+threshold should say so.
+
+**Mississippi Stud.** Ante, then two hole cards. Raise 1×, 2× or 3× — or fold —
+before each of the three community cards. Everything is paid on the *total*
+wagered, which is why the ladder is worth climbing on a good hand.
+
+**Let It Ride.** Three equal bets go up. After three cards you may pull the first
+back; after the fourth card, the second. The third always rides.
+
+**Casino War.** One card each. On a tie, surrender half or double up and go to
+war. **Going to war is always the better of the two** — the simulator proves it.
 
 **Craps.** Click a chip, then a bet: Pass / Don't Pass on the come-out; Come /
 Don't Come and the box numbers once a point is set; Add Odds behind the line; the
 field any time. Roll the dice. The puck up top shows the point.
 
+**Roulette.** Pick a wheel. Click a chip value, then the layout: a number for a
+straight-up, or one of the dots on the edges and corners for a split, street,
+corner or line, plus dozens, columns and the even-money bets (right-click to
+clear a spot). Spin, and watch the ball ride to the pocket.
+
+**Sic Bo.** Chip, then a spot — every one prints what it pays. Small, Big, Odd
+and Even all lose to a triple. Shake, and the winning spots light.
+
+**Big Six.** Pick a symbol and spin. Each spot prints its stops-out-of-54 and its
+exact house edge, which is the most useful thing anyone can tell you about this
+game.
+
+**Video Poker.** Pick a variant (its return is on the label) and a machine: one,
+three, five or ten hands. Bet 1–5 coins **each** — the total bet panel shows what
+that actually comes to, which is the thing that surprises people about Ten Play.
+Deal, tap the cards to hold, draw; every hand draws from its own deck.
+**Coach** highlights the cards perfect play would keep. **Auto-hold** pre-selects
+holds on the deal — *winners* keeps exactly the cards of a dealt paying hand,
+*best* pre-holds the solver's optimal play; either way, tap any card to override
+before drawing.
+
+**Keno.** Mark one to ten of the eighty numbers, or use quick pick. Twenty are
+called. The rail shows the pay table for your pick count and the house edge that
+comes with it.
+
 ---
 
 ## What isn't here
 
+- **Spanish 21 measures 1.28% against a published 0.40%, and that gap is real.**
+  About 0.34% of it is redoubling, which isn't implemented and which the
+  published figure assumes. The rest is that both blackjack variants play the
+  ordinary six-deck chart plus documented deviations, not a chart drawn for the
+  variant — a real Spanish chart reworks the whole hard-total block for the
+  missing tens. Free Bet is closer (1.19% against 1.04%) for the same reason.
+  The settlement is exercised by tests; it's the strategy that's approximate,
+  and `npm run edge` prints the discrepancy rather than rounding it away.
+- **Keno's rate card is transcribed, not sourced.** The maths is exact — the
+  probabilities sum to 1 in BigInt and the 1-in-8,911,711 ten-spot is asserted —
+  but the network here blocks every gambling reference host, so the pay table
+  itself comes from memory. The 1-spot landing on exactly 75.000% is that card's
+  known signature, which is reassuring but not proof. Swap a row in
+  `keno/paytables.ts` and the printed edge follows it; nothing asserts a
+  hardcoded return.
+- **Blackjack Switch isn't here.** It needs a two-hand-with-swapping state
+  machine rather than the rule switches Free Bet and Spanish 21 fit into.
+- Caribbean Stud plays the published A-K-J-8-3 rule, not upcard-aware optimal
+  play; that's the ~0.10% between the two published figures. Its progressive
+  meter is fixed rather than growing, since that's the only version whose return
+  is a single checkable number, and there's no aggregate payout cap.
 - Blackjack uses the 4–8 deck strategy chart at every deck count; a few
   single-deck cells differ by a fraction of a percent.
 - Ultimate Hold'em bots play the simple charts, not a perfect solver, so their
-  measured edge sits above the ~2.19% theoretical floor. The engine itself is
-  exact — settlement is verified against a hand-derived all-in case, and the
-  Trips edge and evaluator frequencies pin down the rest.
-- Pai Gow is dealer-banked only (no player banking rotation), and side bets are
-  Trips (Hold'em) and Fortune (Pai Gow) — no 21+3 or Perfect Pairs.
+  measured edge sits above the ~2.19% theoretical floor.
+- Pai Gow is dealer-banked only (no player banking rotation).
+- Side bets are sparse by design: Trips (Hold'em), Fortune (Pai Gow), Pair Plus
+  (three card), both baccarat pairs, the war tie, and the caribbean progressive.
+  No 21+3, Perfect Pairs, Dragon Bonus, 6-Card Bonus, Match the Dealer, or
+  keno/video-poker multipliers.
 - Craps covers the line, come, odds, place and field bets — not the proposition
-  and hardway center bets. Roulette's inside bets (splits, streets, corners,
-  lines) are all clickable now; the exotic zero bets beyond the single-zero
+  and hardway center bets. Roulette's exotic zero bets beyond the single-zero
   splits and the American top line aren't laid out, though the engine settles
   any set of numbers.
-- The engines are all driven end-to-end through their own APIs in tests, and the
-  dev server compiles and serves every screen — but this was built without a
-  browser to hand, so **the rendering itself is unverified by eye.** Run `npm
-  run dev` and look at it.
+- **The rendering is checked now.** All fifteen screens are driven through a
+  headless browser, screenshotted and asserted free of console errors — the
+  earlier caveat that this had been built without a browser to hand no longer
+  applies. What isn't automated is taste: run `npm run dev` and judge the
+  layout yourself.
