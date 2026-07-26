@@ -28,7 +28,8 @@
     "war:edge": "tsx scripts/war-edge.ts",
     "bigsix:edge": "tsx scripts/bigsix-edge.ts",
     "keno:return": "tsx scripts/keno-return.ts",
-    "edges": "tsx scripts/all-edges.ts"
+    "edges": "tsx scripts/all-edges.ts",
+    "slots:rtp": "tsx scripts/slots-rtp.ts"
   },
   "dependencies": {
     "react": "^19.2.7",

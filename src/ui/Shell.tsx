@@ -11,6 +11,7 @@ import { MStudScreen } from './mstud/MStudScreen'
 import { PaiGowScreen } from './paigow/PaiGowScreen'
 import { RouletteScreen } from './roulette/RouletteScreen'
 import { SicBoScreen } from './sicbo/SicBoScreen'
+import { SlotsScreen } from './slots/SlotsScreen'
 import { ThreeCardScreen } from './threecard/ThreeCardScreen'
 import { UthScreen } from './uth/UthScreen'
 import { VideoPokerScreen } from './videopoker/VideoPokerScreen'
@@ -31,6 +32,7 @@ type GameId =
   | 'sicbo'
   | 'bigsix'
   | 'videopoker'
+  | 'slots'
   | 'keno'
 
 interface Entry {
@@ -69,6 +71,7 @@ const FLOOR: Array<{ group: string; games: Entry[] }> = [
     group: 'Machines',
     games: [
       { id: 'videopoker', label: 'Video Poker', blurb: 'Five variants, up to ten hands' },
+      { id: 'slots', label: 'Slots', blurb: 'Four cabinets, four mechanics' },
       { id: 'keno', label: 'Keno', blurb: 'Pick ten of eighty, exact odds' },
     ],
   },
@@ -89,6 +92,7 @@ const SCREENS: Record<GameId, () => React.JSX.Element> = {
   sicbo: SicBoScreen,
   bigsix: BigSixScreen,
   videopoker: VideoPokerScreen,
+  slots: SlotsScreen,
   keno: KenoScreen,
 }
 

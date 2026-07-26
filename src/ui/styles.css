@@ -6500,3 +6500,282 @@ main.main {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+/* ================================================================ slots */
+
+.sl {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 18px 16px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.sl-picker {
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sl-blurb {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.sl-note {
+  margin: 0;
+  max-width: 760px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+
+/* The cabinet: pay table down the left, the reels in the glass. */
+.sl-cabinet {
+  display: grid;
+  grid-template-columns: minmax(200px, 250px) 1fr;
+  gap: 16px;
+  width: 100%;
+  align-items: start;
+}
+
+.sl-paytable {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sl-paytable-head {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.sl-pay-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.sl-pay-vals {
+  font-size: 11px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}
+
+.sl-pay-scatter {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* The glass. */
+.sl-screen {
+  background: linear-gradient(180deg, #10161d, #0a0d11);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sl-reels {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.sl-reel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 6px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+}
+
+.sl-sym {
+  width: 64px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--ink);
+  transition: background 0.16s, border-color 0.16s, transform 0.16s;
+}
+
+.sl-sym-blank {
+  background: rgba(255, 255, 255, 0.02);
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.sl-sym-wild {
+  background: linear-gradient(160deg, #6b3fa0, #3b2159);
+  border-color: rgba(200, 160, 74, 0.55);
+  color: #fff;
+}
+
+.sl-sym-scatter {
+  background: linear-gradient(160deg, #b8232f, #6d1219);
+  border-color: rgba(255, 215, 218, 0.4);
+  color: #fff;
+}
+
+/* A cell that is part of a win. */
+.sl-sym-win {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px rgba(200, 160, 74, 0.45), 0 0 18px rgba(200, 160, 74, 0.3);
+  transform: translateY(-2px);
+}
+
+.sl-reels-spinning .sl-sym {
+  opacity: 0.96;
+}
+
+.sl-readout {
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13.5px;
+}
+
+.sl-prompt {
+  color: var(--ink-dim);
+}
+
+.sl-win {
+  color: var(--win);
+  font-weight: 650;
+}
+
+.sl-mult {
+  background: rgba(200, 160, 74, 0.16);
+  border: 1px solid rgba(200, 160, 74, 0.5);
+  color: var(--brass);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sl-free {
+  background: rgba(88, 201, 138, 0.14);
+  border: 1px solid rgba(88, 201, 138, 0.45);
+  color: var(--win);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sl-controls {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.sl-coins {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sl-coin {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sl-coin-on {
+  background: rgba(200, 160, 74, 0.2);
+  border-color: var(--brass);
+  color: var(--brass);
+}
+
+.sl-coin-label,
+.sl-bet-label,
+.sl-bet-lines {
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.sl-bet {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 14px;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+.sl-bet b {
+  font-size: 20px;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The house telling the truth about itself, same as every other game here. */
+.sl-truth {
+  margin: 0;
+  max-width: 720px;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
+.sl-truth b {
+  color: var(--ink);
+}
+
+@media (max-width: 900px) {
+  .sl-cabinet {
+    grid-template-columns: 1fr;
+  }
+
+  .sl-sym {
+    width: 46px;
+    height: 44px;
+    font-size: 16px;
+  }
+}
