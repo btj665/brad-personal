@@ -1,7 +1,8 @@
 # The Tables
 
-Fifteen casino games that share one deterministic engine core, two poker-hand
-evaluators, and one deck of hand-drawn SVG cards.
+Sixteen casino games — including a slot floor of four cabinets — sharing one
+deterministic engine core, two poker-hand evaluators, and one deck of hand-drawn
+SVG cards.
 
 **Card tables**
 
@@ -44,12 +45,18 @@ evaluators, and one deck of hand-drawn SVG cards.
 - **Video Poker** — five variants (Jacks or Better, Bonus, Double Bonus, Deuces
   Wild), an optimal-play coach that solves the best hold exactly, auto-hold, and
   Triple / Five / Ten Play.
+- **Slots** — four cabinets, chosen to be four different *mechanics* rather than
+  four themes, because the theme is the only part of a slot that doesn't change
+  the arithmetic: a three-reel stepper with doubling wilds, a thirty-line game
+  whose scatter pays on how many landed anywhere, a cascading screen where
+  winners crumble and the chain escalates, and a free-games round with wilds that
+  fill a whole reel.
 - **Keno** — pick one to ten of eighty, drawn twenty at a time, with the exact
   hypergeometric odds and an honest note about what the ticket costs you.
 
 ```bash
 npm run dev          # play them            → http://localhost:5173
-npm test             # 614 engine tests
+npm test             # 685 engine tests
 npm run build
 
 npm run edges         # every game's validation, one sweep
@@ -69,6 +76,7 @@ npm run roulette:edge # roulette house edge, all three wheels
 npm run sicbo:edge    # sic bo, exact, all 216 rolls
 npm run bigsix:edge   # big six, exact, all 54 stops
 npm run vp:return     # video poker return, 1 / 3 / 5 / 10 hands
+npm run slots:rtp     # every cabinet's return, exact base + measured feature
 npm run keno:return   # keno, exact hypergeometric
 npm run poker:freq    # the poker evaluator vs. textbook hand frequencies
 ```
@@ -77,14 +85,16 @@ npm run poker:freq    # the poker evaluator vs. textbook hand frequencies
 
 ## How we know it's right
 
-Every one of these games has a house edge that is known from published analysis.
-So none of them are validated by "it looks like it works" — each is measured and
-made to land on its known number. If a payout, a dealer rule, or a strategy
-chart were wrong, the edge would come out wrong.
+Every one of these games except the slots has a house edge that is known from
+published analysis. So none of them are validated by "it looks like it works" —
+each is measured and made to land on its known number. If a payout, a dealer
+rule, or a strategy chart were wrong, the edge would come out wrong. (The slots
+are the exception, and they get their own section below: nobody publishes a
+slot's return because it is designed rather than derived.)
 
 **Where the outcome space is small enough, we don't simulate at all — we
 enumerate it.** An exact number can be asserted in a test; a sampled one can
-only be checked against an error bar. Eight of the fifteen games are now solved
+only be checked against an error bar. Eight of the table games are now solved
 exactly:
 
 | Game | Method | Measured | Published |
@@ -114,6 +124,73 @@ And the games that are still simulated:
 | Craps — pass line | 1.458% | 1.41% |
 | Craps — field (2×/3×) | 2.744% | 2.78% |
 | Ultimate Hold'em (Trips side bet) | 3.64% | pay-table dependent |
+
+### Slots are the exception, and the interesting one
+
+Every other game here has a house edge that exists outside this repository. A
+slot doesn't: its return is not a consequence of the rules, it is **designed**,
+by choosing how often each symbol appears on each reel strip. There is no
+published figure to check against.
+
+That makes them easier to verify rather than harder. The strips and the pay table
+are the whole specification, so the return can be **enumerated exactly** — and it
+is enumerated through the same evaluator the live game uses, on a one-row window
+with a single flat line, so the computed return and the played game cannot drift
+apart. Each cabinet then asserts that figure against the number it was cut to
+hit.
+
+| Cabinet | Mechanic | Exact base | Measured | Cut for |
+|---|---|---|---|---|
+| Bars & Sevens | 3-reel stepper, doubling wilds | 89.838% | 89.914% | 90% |
+| Bell Ringer | 30 lines, scatter pays on screen count | 94.982% | 95.011% | 95% |
+| Rockslide | cascading reels, 1×→10× ladder | 49.219% *(first drop)* | 94.858% | 95% |
+| The Late Show | expanding wilds, free games at 2× | 70.897% *(base game)* | 95.993% | 96% |
+
+The two feature machines **cannot** be enumerated: a cascade feeds its own next
+screen and a free-games round changes the screen's distribution, so the state
+space is unbounded. For those, the exact column is the first screen only — a real
+number, and the cross-check that the strips are right — and the full return is
+measured. `npm run slots:rtp` prints both, and never blurs them together.
+
+Measuring a slot is harder than it looks, which cost real time here. A five-reel
+machine's per-spin return has a standard deviation of **3 to 12 times the stake**,
+so a single run of half a million spins pins the return to only about a
+percentage point. The Late Show was reported at 96% on the strength of two 4M-spin
+runs reading 95.9% and 95.7%; eight independent seeds put the truth at 95.0%,
+four and a half standard errors below the claim. Both original runs were real —
+just two sigma high, which one stream cannot tell you.
+
+Re-cutting it was itself worth the trouble. Because `resolveSpin` never consults
+the pay table when it draws stops, a given seed produces an *identical* sequence
+of screens whatever the pay table says. So instead of re-simulating each
+candidate, the fix tallied multiplier-weighted win counts per (symbol, run
+length, base or free) over one fixed 12M-spin stream — an exact linear model of
+the return as a function of the pay card, verified by reproducing the raw figure
+to six digits. Candidates were then scored against that identical stream, which
+removes sampling noise from the comparison entirely. The whole gap turned out to
+sit in the ace column. The trim was fitted on eight seeds and then confirmed on
+**sixteen seeds disjoint from the fit**, reading 96.182% ± 0.300% over 24M spins;
+`npm run slots:rtp` independently reads 95.993% ± 0.425%. The sweep now defaults
+to eight seeds of 1.5M spins and prints the per-spin SD beside every figure, so
+the next person doesn't repeat the mistake.
+
+Two arithmetic traps are worth knowing before editing a strip, both of which
+produced absurd returns during the build:
+
+- **Blanks are the machine.** Without a frequent non-paying symbol, every screen
+  of three matching symbols pays, and a three-reel stepper returns **375%**. The
+  dead space between symbols sets the price, not the pay table.
+- **A doubling wild counts twice over.** Each reel weighs a symbol at
+  `(count + 2·wilds)`, not `(count + wilds)` — the multiplier lands once in the
+  odds and once in the pay. Missing it made a strip that looked tight return
+  **160%**, and it only surfaced by breaking the return down per symbol.
+
+And one about the mechanic itself: **Rockslide's cascade amplifies its first drop
+by 1.93×, not the 2–3× a naive model predicts.** A win removes about three cells
+out of twenty and the other seventeen are *known non-winners* that survive
+intact, so the chance of continuing is roughly half a fresh screen's hit
+frequency rather than equal to it. Chains die faster than a geometric model
+suggests, and the 10× rung is reached on 0.18% of spins.
 
 The poker evaluator is checked a second way: deal two million five-card hands and
 its category frequencies match the textbook odds to four decimal places (`npm run
@@ -200,6 +277,15 @@ src/
   bigsix/         54 stops; the edge is a closed form and an enumeration that
                   must agree.
   videopoker/     classify → solver → paytables, single line through Ten Play.
+  slots/          types.ts is the whole specification of a cabinet: strips, rows,
+                  paylines, pay table, feature. evaluate.ts reads a stopped
+                  screen; rtp.ts enumerates the return from the strips through
+                  that same evaluator; machine.ts resolves a spin — every cascade
+                  in a chain, every free game it bought — into a list of steps
+                  the UI walks on a timer.
+    machines/     One file per cabinet, and each is data plus a feature tag: the
+                  engine does the work, so a new machine is a pay table and a
+                  set of strips, not a new state machine.
 
   ui/             React. Reads the engines, never simulates them.
     Shell.tsx       The lobby, grouped into card tables, dice and machines.
@@ -304,6 +390,12 @@ holds on the deal — *winners* keeps exactly the cards of a dealt paying hand,
 *best* pre-holds the solver's optimal play; either way, tap any card to override
 before drawing.
 
+**Slots.** Pick a cabinet from the dropdown (its return is on the label), set
+coins per line, and spin. Winning cells light; on Rockslide they crumble and the
+screen drops again at a rising multiplier until the chain dies. The line under
+the machine states what that cabinet actually returns, computed from its strips —
+there is no reason a slot shouldn't tell you.
+
 **Keno.** Mark one to ten of the eighty numbers, or use quick pick. Twenty are
 called. The rail shows the pay table for your pick count and the house edge that
 comes with it.
@@ -329,6 +421,20 @@ comes with it.
   hardcoded return.
 - **Blackjack Switch isn't here.** It needs a two-hand-with-swapping state
   machine rather than the rule switches Free Bet and Spanish 21 fit into.
+- **The slot cabinets are original, deliberately.** They implement the mechanics
+  of the machines they were modelled on — the stepper's doubling wild, the
+  count-anywhere scatter ladder, the tumbling screen, the expanding-wild free
+  round — with their own names, symbols and strips. No real performer is named or
+  depicted and no other company's cabinet names appear, because the mechanic is
+  the part worth building and the trademark isn't. Nothing here reproduces any
+  commercial machine's actual reel strips or pay table, so the returns are ours
+  and match nothing on a real floor.
+- Slots have no progressive meters, no nudge or hold features, no "ways" games
+  (243-ways and the like — every cabinet here pays on defined lines), and the
+  reels snap rather than spinning with easing. The cascade refills from the
+  reel's own strip rather than from a physical column above it, which is the
+  right model for the arithmetic and is why the enumerated base return stays
+  meaningful.
 - Caribbean Stud plays the published A-K-J-8-3 rule, not upcard-aware optimal
   play; that's the ~0.10% between the two published figures. Its progressive
   meter is fixed rather than growing, since that's the only version whose return
