@@ -135,3 +135,16 @@ test('WMO weather codes map to labels', async () => {
   assert.deepEqual(describeWmo(95), ['Thunderstorm', '⛈️']);
   assert.equal(describeWmo(9999)[0], 'Unknown');
 });
+
+test('cluster weight favors fresher stories', () => {
+  const now = Date.now();
+  const item = (title, link, ts) => ({ title, link, sourceName: 'A', timestamp: ts, description: '', image: '', categories: [] });
+  const clusters = clusterItems([
+    item('Fresh breaking story about the harbor fire downtown', 'a', now - 30 * 60e3),        // 30 min old
+    item('Stale story about the mountain road closure vote', 'b', now - 2 * 86400e3),          // 2 days old
+  ]);
+  const fresh = clusters.find((c) => /harbor/.test(c.title));
+  const stale = clusters.find((c) => /mountain/.test(c.title));
+  assert.ok(fresh.weight > stale.weight * 2, `expected ${fresh.weight} > 2x ${stale.weight}`);
+  assert.equal(clusters[0], fresh); // fresh story ranks first despite equal coverage
+});
