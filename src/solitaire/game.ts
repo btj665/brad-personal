@@ -25,9 +25,16 @@ export function follows(upper: Card, lower: Card, rule: Build): boolean {
 
   const a = rankOrder(upper.rank)
   const b = rankOrder(lower.rank)
-  const step = rule.direction === 'down' ? -1 : 1
-  const wrapped = rule.wrap ? (b - a + 13 * step + 13) % 13 === (step + 13) % 13 : false
-  if (b !== a + step && !wrapped) return false
+  if (rule.direction === 'either') {
+    // Golf and Black Hole take a card a rank either side of the top; with wrap on,
+    // ace and king are neighbours too (a gap of twelve ranks, the long way round).
+    const gap = Math.abs(a - b)
+    if (gap !== 1 && !(rule.wrap && gap === 12)) return false
+  } else {
+    const step = rule.direction === 'down' ? -1 : 1
+    const wrapped = rule.wrap ? (b - a + 13 * step + 13) % 13 === (step + 13) % 13 : false
+    if (b !== a + step && !wrapped) return false
+  }
 
   switch (rule.match) {
     case 'alternateColour':
@@ -36,6 +43,8 @@ export function follows(upper: Card, lower: Card, rule: Build): boolean {
       return upper.suit === lower.suit
     case 'sameColour':
       return isRed(upper) === isRed(lower)
+    case 'differentSuit':
+      return upper.suit !== lower.suit
     case 'anySuit':
       return true
   }
@@ -134,12 +143,12 @@ export class Solitaire {
     for (let row = 0; row < deepest; row++) {
       for (let i = 0; i < v.tableau.piles; i++) {
         if (row >= counts[i]) continue
-        const down =
-          v.tableau.faceDown === 'none'
-            ? false
-            : v.tableau.faceDown === 'allButLast'
-              ? row < counts[i] - 1
-              : row < v.tableau.faceDown
+        const fd = v.tableau.faceDown
+        let down: boolean
+        if (Array.isArray(fd)) down = row < fd[i]
+        else if (fd === 'none') down = false
+        else if (fd === 'allButLast') down = row < counts[i] - 1
+        else down = row < fd
         by('tableau', i).cards.push({ card: take(), faceUp: !down })
       }
     }
@@ -200,6 +209,7 @@ export class Solitaire {
    *  time. Marked by dealing the stock straight onto the tableau, which only these
    *  games do. */
   discardsRuns(): boolean {
+    if (this.variant.foundations.discardRuns !== undefined) return this.variant.foundations.discardRuns
     return this.variant.stock.kind === 'tableau' || this.variant.foundations.base === 'K'
   }
 
@@ -239,6 +249,13 @@ export class Solitaire {
         return isRun(src, src.cards.length - count, this.variant.foundations.build)
       }
       if (count !== 1) return false
+      const fbuild = this.variant.foundations.build
+      if (fbuild.direction === 'either') {
+        // Golf/Black Hole: not a monotone ace-to-king climb, so it never "wants"
+        // one particular rank — any card a step either side of the top will do.
+        if (dst.cards.length === 0) return true
+        return follows(dst.cards[dst.cards.length - 1].card, head, fbuild)
+      }
       const want = this.foundationWants(dst)
       if (!want) return false
       if (want.rank !== head.rank) return false
@@ -337,6 +354,23 @@ export class Solitaire {
       return true
     }
 
+    if (v.stock.kind === 'foundation') {
+      // Golf turns the stock straight onto the play pile, whatever the card is;
+      // it simply becomes the new base to build away from.
+      if (stock.cards.length === 0) return false
+      const foundation = this.get('foundation-0')!
+      const n = Math.min(v.stock.draw, stock.cards.length)
+      for (let i = 0; i < n; i++) {
+        const c = stock.cards.pop()!
+        c.faceUp = true
+        foundation.cards.push(c)
+      }
+      this.history.push({ action: { from: 'stock', to: 'waste', count: n }, flipped: null })
+      this.moves++
+      this.touch()
+      return true
+    }
+
     if (v.stock.kind !== 'waste') return false
     const waste = this.get('waste-0')!
 
@@ -387,6 +421,13 @@ export class Solitaire {
         const cols = this.piles.filter((p) => p.kind === 'tableau')
         for (let i = action.count - 1; i >= 0; i--) {
           const c = cols[i].cards.pop()!
+          c.faceUp = false
+          stock.cards.push(c)
+        }
+      } else if (this.variant.stock.kind === 'foundation') {
+        const foundation = this.get('foundation-0')!
+        for (let i = 0; i < action.count; i++) {
+          const c = foundation.cards.pop()!
           c.faceUp = false
           stock.cards.push(c)
         }

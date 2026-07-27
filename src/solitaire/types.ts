@@ -53,12 +53,19 @@ export type Match =
   /** Spider's easy mode, Yukon: rank alone decides. */
   | 'anySuit'
   | 'sameColour'
+  /** Thumb and Pouch, Indian: any suit *except* the card's own. A hair looser
+   *  than alternate colour and a hair tighter than anySuit — the whole identity
+   *  of those games is this one rule, so it earns its own value. */
+  | 'differentSuit'
   /** Nothing may be built here at all. */
   | 'none'
 
 export interface Build {
-  /** 'down' is king-on-queen; 'up' is the foundation direction. */
-  direction: 'up' | 'down'
+  /** 'down' is king-on-queen; 'up' is the foundation direction. 'either' is the
+   *  Golf/Black Hole pile that will take a card a rank above *or* below its top,
+   *  and Alaska's tableau run that may turn around — a direction the ace-to-king
+   *  foundations never need. */
+  direction: 'up' | 'down' | 'either'
   match: Match
   /** Ace on king and king on ace. Rare, and off by default. */
   wrap: boolean
@@ -86,6 +93,9 @@ export type StockKind =
   | 'waste'
   /** Spider: deal one card straight onto every column. */
   | 'tableau'
+  /** Golf: turn a card straight onto the single foundation, no matter its rank —
+   *  it becomes the new base you build away from. */
+  | 'foundation'
 
 export interface Variant {
   id: string
@@ -106,8 +116,10 @@ export interface Variant {
      *  many; an array gives each pile its own count. */
     deal: number | number[]
     /** How many of each pile's cards are face down. Klondike is "all but the
-     *  last"; FreeCell is none. */
-    faceDown: 'allButLast' | 'none' | number
+     *  last"; FreeCell is none. A number fixes the same count on every pile; an
+     *  array gives each pile its own, which Yukon and Scorpion need because their
+     *  buried block deepens column by column. */
+    faceDown: 'allButLast' | 'none' | number | number[]
   }
 
   foundations: {
@@ -116,6 +128,12 @@ export interface Variant {
      *  whatever the deal turned up. */
     base: Rank | 'dealt'
     build: Build
+    /** Whether a completed suit run is discarded whole (Spider) rather than the
+     *  foundation being built a card at a time. Normally inferred from the shape
+     *  of the game; set explicitly only where the inference misfires — Easthaven
+     *  deals across the tableau like Spider yet keeps ordinary ace-up
+     *  foundations, so it must say so. */
+    discardRuns?: boolean
   }
 
   cells: number

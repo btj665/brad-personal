@@ -1,8 +1,8 @@
 # The Tables
 
-Sixteen casino games — including a slot floor of four cabinets — sharing one
-deterministic engine core, two poker-hand evaluators, and one deck of hand-drawn
-SVG cards.
+Sixteen casino games — including a slot floor of four cabinets — plus a
+**35-variant solitaire room**, all sharing one deterministic engine core, two
+poker-hand evaluators, and one deck of hand-drawn SVG cards.
 
 **Card tables**
 
@@ -55,9 +55,16 @@ SVG cards.
 - **Keno** — pick one to ten of eighty, drawn twenty at a time, with the exact
   hypergeometric odds and an honest note about what the ticket costs you.
 
+**Patience**
+
+- **Solitaire** — thirty-five variants across nine families (Klondike, FreeCell,
+  Spider, Canfield, Yukon, Forty Thieves, Scorpion, Golf and the Klondike
+  cousins), all played by one data-driven engine and dealt onto one drag-and-drop
+  table. A variant is a *record*, not a program.
+
 ```bash
 npm run dev          # play them            → http://localhost:5173
-npm test             # 758 engine tests
+npm test             # 1,142 engine tests
 npm run build
 
 npm run edges         # every game's validation, one sweep
@@ -80,6 +87,7 @@ npm run vp:return     # video poker return, 1 / 3 / 5 / 10 hands
 npm run slots:rtp     # every cabinet's return, exact base + measured feature
 npm run keno:return   # keno, exact hypergeometric
 npm run poker:freq    # the poker evaluator vs. textbook hand frequencies
+npm run sol:solve     # solitaire winnability, per variant, by an auto-player
 ```
 
 ---
@@ -278,6 +286,71 @@ is asserted rather than sampled.
 
 ---
 
+## Solitaire is data, not code
+
+There are several hundred named patience games, and commercial collections ship a
+thousand-plus by permuting settings — so "all of them" is not a finite target.
+But the overwhelming majority are the *same machine* with different parameters:
+how many piles, what may sit on what, how many cards lift as a unit, what an empty
+column accepts, what the stock does. So a variant here is a `Variant` **record**
+and one engine (`solitaire/game.ts`) plays every one of them, holding no rules of
+its own. Adding a game is adding a record; it is not adding code — which is the
+only way covering a catalogue this size stays honest rather than turning into a
+thousand hand-written special cases.
+
+**Thirty-five variants across nine families:**
+
+| Family | Variants |
+|---|---|
+| Klondike | draw 1, draw 3, Vegas single-pass, Thumb & Pouch, Whitehead, Westcliff, Easthaven, Double Klondike |
+| FreeCell | standard, two-cell, Baker's Game |
+| Canfield | draw 1, draw 3, Rainbow, Storehouse, Chameleon |
+| Yukon | Yukon, Alaska, Russian |
+| Forty Thieves | Forty Thieves, Josephine, Streets, Limited, Forty & Eight, Number Ten, Australian |
+| Spider | 1-suit, 2-suit, 4-suit, Spiderette |
+| Scorpion | Scorpion, Wasp |
+| Golf | Golf, Golf (wrap), Black Hole |
+
+Each is proved *playable*, not just plausible: a greedy random-legal-move bot
+opens every one of the 35 into a live position across ten seeds — none threw,
+none dealt into an immediate dead end — and a 226-case test deals each variant's
+exact deck once with unique cards, builds the pile counts the record asks for,
+replays identically from its seed, and never lets a face-down card move. The six
+Spider-family games are checked to discard a planted full suit run and nothing
+short of one.
+
+**What the model won't hold, and doesn't pretend to.** Some famous games aren't
+"build foundations from a tableau" at all, and forcing them into this record would
+misrepresent how they play. Pyramid, Tri Peaks and pairing-Golf *remove* cards in
+pairs; Accordion collapses a row onto itself; Montana and Gaps are wholly
+positional; Clock is a fixed layout; Monte Carlo pairs by adjacency; three-deck
+games like Sixty Thieves exceed the two-deck shoe. Each needs a fundamentally
+different core, so `variants/index.ts` names them in an exclusion list rather than
+bending them into a shape that lies about them.
+
+**Winnability, honestly bounded.** The suite's discipline is that every game
+states a number and is held to it; for solitaire that number is the fraction of
+deals that can be won. `npm run sol:solve` runs a bounded depth-first auto-player
+over many deals per variant and reports a win rate with a confidence interval —
+but with a node budget, so a deal it can't crack inside the budget counts as a
+*give-up*, and every rate is therefore a **lower bound** on true winnability,
+printed as such. That is why the `solvable` field on most records is left `null`
+rather than filled with a weak number: the bot solves FreeCell almost always and
+1-suit Spider often, but on 4-suit Spider or Vegas Klondike it gives up more often
+than it wins, and quoting "47%" for a game the literature knows is mostly winnable
+would be worse than saying nothing. The `published` note on each record carries
+the real guidance; the bot is a sanity check on the shape of the game, not an
+oracle.
+
+Two things the addition needed, both additive to the engine and none of which
+touched an existing variant's behaviour: a `differentSuit` build rule (Thumb &
+Pouch builds on any suit *but* its own), a `direction: 'either'` foundation (Golf
+and Black Hole take a card a rank above *or* below the pile top), a `foundation`
+stock kind (Golf turns cards straight onto the play pile), and an array
+`faceDown` (Yukon and Scorpion bury a block that deepens column by column).
+
+---
+
 ## The shape of it
 
 ```
@@ -333,8 +406,16 @@ src/
                   engine does the work, so a new machine is a pay table and a
                   set of strips, not a new state machine.
 
+  solitaire/      types.ts is the whole specification of a patience game; game.ts
+                  is the one engine that reads it and plays it — deal, legality,
+                  moves, undo (with the card-flip it caused), Spider's whole-suit
+                  discard, and win detection. solver.ts is the bounded auto-player
+                  that measures winnability.
+    variants/     One record per game, grouped by family, with the exclusion list
+                  of the games this model deliberately won't hold.
+
   ui/             React. Reads the engines, never simulates them.
-    Shell.tsx       The lobby, grouped into card tables, dice and machines.
+    Shell.tsx       The lobby, grouped into card tables, dice, machines, patience.
     ...             One screen per game, plus shared Card and Chip components.
 ```
 
@@ -459,6 +540,15 @@ cabinets, four palettes, no bitmaps anywhere.
 called. The rail shows the pay table for your pick count and the house edge that
 comes with it.
 
+**Solitaire.** Pick a game from the grouped dropdown — its `note` explains the
+rules, which matters when it's Baker's Game (builds by suit) or Thumb and Pouch
+(any suit but its own). Drag a card, or a correctly-built run beneath it, onto a
+pile; legal targets light while you drag and an illegal drop snaps back.
+Double-click sends a card home. Click the stock to turn it. **Hint** flashes a
+legal move, **Auto-finish** sends everything that can go home, **Undo** walks back
+through every move including the flips they caused, **Restart** re-deals the same
+shuffle and **New deal** cuts a fresh one.
+
 ---
 
 ## What isn't here
@@ -505,6 +595,13 @@ comes with it.
 - Ultimate Hold'em bots play the simple charts, not a perfect solver, so their
   measured edge sits above the ~2.19% theoretical floor.
 - Pai Gow is dealer-banked only (no player banking rotation).
+- **Solitaire covers the tableau-building families, not the pairing or positional
+  ones.** Pyramid, Tri Peaks, Accordion, Montana/Gaps, Clock and Monte Carlo are
+  named in the exclusion list rather than faked — they need a different engine.
+  And most variants' `solvable` field is `null` on purpose: the auto-player gives
+  a lower bound, not a true winnability, so where it can't crack a game often
+  enough to be worth quoting, the record says nothing and leans on its `published`
+  note instead.
 - Side bets are sparse by design: Trips (Hold'em), Fortune (Pai Gow), Pair Plus
   (three card), both baccarat pairs, the war tie, and the caribbean progressive.
   No 21+3, Perfect Pairs, Dragon Bonus, 6-Card Bonus, Match the Dealer, or
@@ -513,8 +610,9 @@ comes with it.
   and hardway center bets. Roulette's exotic zero bets beyond the single-zero
   splits and the American top line aren't laid out, though the engine settles
   any set of numbers.
-- **The rendering is checked now.** All fifteen screens are driven through a
-  headless browser, screenshotted and asserted free of console errors — the
-  earlier caveat that this had been built without a browser to hand no longer
-  applies. What isn't automated is taste: run `npm run dev` and judge the
-  layout yourself.
+- **The rendering is checked now.** All seventeen screens are driven through a
+  headless browser, screenshotted and asserted free of console errors, and the
+  solitaire drag is confirmed by a real pointer drag that moves a card between
+  piles — the earlier caveat that this had been built without a browser to hand
+  no longer applies. What isn't automated is taste: run `npm run dev` and judge
+  the layout yourself.

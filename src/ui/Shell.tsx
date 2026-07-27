@@ -14,6 +14,7 @@ import { SicBoScreen } from './sicbo/SicBoScreen'
 import { SlotsScreen } from './slots/SlotsScreen'
 import { ThreeCardScreen } from './threecard/ThreeCardScreen'
 import { UthScreen } from './uth/UthScreen'
+import { SolitaireScreen } from './solitaire/SolitaireScreen'
 import { VideoPokerScreen } from './videopoker/VideoPokerScreen'
 import { WarScreen } from './war/WarScreen'
 
@@ -34,6 +35,7 @@ type GameId =
   | 'videopoker'
   | 'slots'
   | 'keno'
+  | 'solitaire'
 
 interface Entry {
   id: GameId
@@ -75,6 +77,10 @@ const FLOOR: Array<{ group: string; games: Entry[] }> = [
       { id: 'keno', label: 'Keno', blurb: 'Pick ten of eighty, exact odds' },
     ],
   },
+  {
+    group: 'Patience',
+    games: [{ id: 'solitaire', label: 'Solitaire', blurb: 'Klondike, FreeCell, Spider — 35 games' }],
+  },
 ]
 
 const SCREENS: Record<GameId, () => React.JSX.Element> = {
@@ -94,6 +100,7 @@ const SCREENS: Record<GameId, () => React.JSX.Element> = {
   videopoker: VideoPokerScreen,
   slots: SlotsScreen,
   keno: KenoScreen,
+  solitaire: SolitaireScreen,
 }
 
 export function App() {
