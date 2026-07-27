@@ -1,28 +1,31 @@
 // An honest, bounded automatic player — not a perfect solver.
 //
 // Perfect solvability for games like Klondike is a research result; this is a
-// pragmatic depth-first search that *attempts* a deal and reports whether it
-// found a win, ran out of the board (a real loss), or hit its node budget and
-// gave up. Because it can give up, every win rate it produces is a LOWER BOUND
-// on true winnability: the games it fails to solve include some it simply
-// didn't have the budget to crack. `scripts/sol-solve.ts` reports the give-up
-// rate alongside every number so the reader knows how tight that bound is.
+// pragmatic best-first search that *attempts* a deal and reports whether it
+// found a win, exhausted the reachable graph without one (a real loss), or hit
+// its node budget and gave up. Because it can give up, every win rate it produces
+// is a LOWER BOUND on true winnability: the games it fails to solve include some
+// it simply didn't have the budget to crack. `scripts/sol-solve.ts` reports the
+// give-up rate alongside every number so the reader knows how tight that bound is.
 //
 // The search is a perfect-information one: it can see the face-down cards, which
 // is exactly how the published "X% winnable" figures are defined — a thoughtful
 // player who knows the whole deal. The engine exposes those cards on `piles`, so
 // the hash and the move generator both use them.
 //
-// Three things make the search tractable:
-//   1. Safe auto-moves. A card that can never again be needed in the tableau is
-//      forced home without branching. This collapses long forced tails to a
-//      single edge and is most of why FreeCell is solvable at all here.
-//   2. A canonical board hash + transposition set, so a position is expanded
-//      once however it was reached. Interchangeable columns and cells are sorted
-//      away, and for colour-based games the four red/black-preserving suit
-//      relabelings are folded together too.
-//   3. A node budget and a depth cap, so an unwinnable-looking deal is abandoned
-//      rather than searched forever — and reported as 'gaveup', not 'lost'.
+// Four things make the search tractable:
+//   1. Best-first order. The frontier is a heap keyed by a "distance from won"
+//      heuristic, so the search expands the most promising open position rather
+//      than committing depth-first to one subtree — the failure mode that left a
+//      plain DFS unable to finish winnable FreeCell deals.
+//   2. Safe auto-moves. A card that can never again be needed in the tableau is
+//      forced home without branching, collapsing long forced tails to one edge.
+//   3. A canonical board hash + transposition set, so a position is expanded once
+//      however it was reached. Interchangeable columns and cells are sorted away,
+//      and for colour-based games the four red/black-preserving suit relabelings
+//      are folded together too.
+//   4. A node budget and a frontier cap, so a deep or unwinnable-looking deal is
+//      abandoned rather than searched forever — and reported 'gaveup', not 'lost'.
 
 import { RANKS } from '../engine/cards'
 import type { Card, Rank, Suit } from '../engine/types'

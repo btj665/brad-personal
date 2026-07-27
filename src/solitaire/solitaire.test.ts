@@ -149,6 +149,46 @@ describe('Spider discards a finished suit', () => {
     // Ten columns, ten cards off the stock — one each.
     expect(after.map((n, i) => n - before[i])).toEqual(new Array(10).fill(1))
   })
+
+  it('deals the number of suits the variant asks for', () => {
+    for (const [id, n] of [['spider-1', 1], ['spider-2', 2], ['spider-4', 4]] as const) {
+      const g = new Solitaire({ variant: variantById(id), seed: 8 })
+      const suits = new Set(g.piles.flatMap((p) => p.cards.map((x) => x.card.suit)))
+      expect(suits.size).toBe(n)
+      // The card count and per-rank multiplicity are unchanged — only the suits fold.
+      expect(g.piles.flatMap((p) => p.cards)).toHaveLength(104)
+    }
+  })
+
+  it('carries a same-suit run but not a mixed one — the whole difficulty knob', () => {
+    // A group only lifts as a unit when it is one suit, which is what makes four
+    // suits hard and one suit easy. Plant both runs in 4-suit Spider and an empty
+    // column to drop onto.
+    const g = new Solitaire({ variant: variantById('spider-4'), seed: 1 })
+    const cols = g.piles.filter((p) => p.kind === 'tableau')
+    const [a, b, empty] = cols
+    a.cards = ['9S', '8S', '7S'].map((s) => ({ card: c(s), faceUp: true }))
+    b.cards = ['9H', '8S', '7H'].map((s) => ({ card: c(s), faceUp: true }))
+    empty.cards = [] // Spider deals no empty column, so make one
+
+    // The single-suit run of three lifts; the mixed one does not.
+    expect(g.canMove(a.id, empty.id, 3)).toBe(true)
+    expect(g.canMove(b.id, empty.id, 3)).toBe(false)
+    // …but its top card alone always moves.
+    expect(g.canMove(b.id, empty.id, 1)).toBe(true)
+  })
+
+  it('will not discard a run that is not one suit', () => {
+    const g = new Solitaire({ variant: variantById('spider-4'), seed: 2 })
+    const col = g.get('tableau-0')!
+    const foundation = g.piles.find((p) => p.kind === 'foundation')!
+    const ranks = ['K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2', 'A']
+    // A full K-to-A run, but the 7 is a heart among spades.
+    col.cards = ranks.map((r) => ({ card: c(`${r}${r === '7' ? 'H' : 'S'}`), faceUp: true }))
+    expect(g.canMove(col.id, foundation.id, 13)).toBe(false)
+    col.cards[6].card = c('7S') // make it all spades
+    expect(g.canMove(col.id, foundation.id, 13)).toBe(true)
+  })
 })
 
 describe('a won game', () => {

@@ -109,6 +109,11 @@ export interface Variant {
   decks: 1 | 2
   /** Ranks removed before dealing, if any — some games play a short deck. */
   strip?: Rank[]
+  /** Distinct suits in the shoe. Spider's whole difficulty is this number: at 1
+   *  every run is trivially one suit and lifts freely; at 4 a liftable run is
+   *  rare. The card count is unchanged — the copies redistribute across fewer
+   *  suits — so `decks: 2, suits: 1` is 104 cards, all spades. Defaults to 4. */
+  suits?: 1 | 2 | 4
 
   tableau: {
     piles: number
@@ -153,9 +158,14 @@ export interface Variant {
     redeals: number
   }
 
-  /** Tableau building. */
+  /** Tableau building — the rule for *placing* a card on a pile. */
   build: Build
   lift: Lift
+  /** The rule a multi-card *lift* must satisfy, when it differs from placement.
+   *  Spider is the case: you may drop any card on a card one higher (`build` is
+   *  any-suit), but a group only moves as a unit when it is a same-suit run — so
+   *  `liftMatch: 'sameSuit'`. Defaults to `build.match`. */
+  liftMatch?: Match
   empty: EmptyRule
 
   /** Foundations may be played back down into the tableau. Off in most games. */

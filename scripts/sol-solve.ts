@@ -10,12 +10,15 @@
 // published figure from the literature is printed underneath each variant so the
 // measured number can be sanity-checked against it.
 //
-//   npm run sol:solve                        all variants, 200 deals each
-//   npm run sol:solve -- --seeds 500         more deals, tighter intervals
-//   npm run sol:solve -- --budget 300000     search harder per deal
+//   npm run sol:solve                        all variants, 200 deals × 20k nodes
+//   npm run sol:solve -- --seeds 40          fewer deals, wider intervals, faster
+//   npm run sol:solve -- --budget 80000      search harder per deal
 //   npm run sol:solve -- freecell klondike-1 just these variants
 //
-// Deals are seeds 1..N, so every run is reproducible.
+// Deals are seeds 1..N, so every run is reproducible. Runtime is dominated by the
+// hard, deep games (Klondike, Spider, Forty Thieves): those burn the whole node
+// budget on nearly every deal, so a full default run is long — narrow it with
+// --seeds / --budget or a variant list for a quick look.
 
 import { solveDeal, type Verdict } from '../src/solitaire/solver'
 import type { Variant } from '../src/solitaire/types'

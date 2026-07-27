@@ -349,6 +349,17 @@ and Black Hole take a card a rank above *or* below the pile top), a `foundation`
 stock kind (Golf turns cards straight onto the play pile), and an array
 `faceDown` (Yukon and Scorpion bury a block that deepens column by column).
 
+**Spider's difficulty is a real knob, not cosmetics.** The trap is that its three
+suit levels look like the same game with a label change — and in the first cut
+they *were*, all built any-suit on a full four-suit shoe, so the solver measured
+1-suit and 4-suit as identically unwinnable. The fix is two parts: a `suits`
+count that folds the 104-card shoe onto one, two or four suits (one suit is 104
+spades, eight of each rank), and a `liftMatch` rule that separates *placing* a
+card (any suit, a rank lower) from *carrying a run as a unit* (same suit only) —
+which is exactly the real rule, and the reason one suit is gentle and four is
+brutal. With that, the auto-player wins a clear majority of 1-suit deals and
+almost none at four, which is the gradient the labels always promised.
+
 ---
 
 ## The shape of it

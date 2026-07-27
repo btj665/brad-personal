@@ -101,6 +101,20 @@ export class Solitaire {
       const gone = new Set(v.strip)
       deck = deck.filter((c) => !gone.has(c.rank))
     }
+    // Fold the deck down to `suits` distinct suits without changing the card
+    // count — Spider at one suit is 104 spades, not 26 cards. The copies of each
+    // rank are handed out round-robin among the allowed suits, so the
+    // multiplicity stays even and the same-suit lift rule then does the work of
+    // making one suit easy and four hard.
+    if (v.suits && v.suits < 4) {
+      const allow: Card['suit'][] = (['S', 'H', 'D', 'C'] as const).slice(0, v.suits)
+      const seen = new Map<Rank, number>()
+      deck = deck.map((c) => {
+        const n = seen.get(c.rank) ?? 0
+        seen.set(c.rank, n + 1)
+        return { ...c, suit: allow[n % allow.length] }
+      })
+    }
     for (let i = deck.length - 1; i > 0; i--) {
       const j = this.rng.int(i + 1)
       const t = deck[i]
@@ -205,6 +219,13 @@ export class Solitaire {
     return { rank: RANKS[(base + next) % 13], suit: top.suit }
   }
 
+  /** The build rule a liftable run must satisfy — placement's rule unless the
+   *  variant overrides `liftMatch` (Spider: place any suit, carry one suit). */
+  private liftBuild(): Build {
+    const m = this.variant.liftMatch
+    return m ? { ...this.variant.build, match: m } : this.variant.build
+  }
+
   /** Spider-family: the foundations take a whole finished suit, not one card at a
    *  time. Marked by dealing the stock straight onto the tableau, which only these
    *  games do. */
@@ -272,7 +293,10 @@ export class Solitaire {
     if (count > 1) {
       if (this.variant.lift === 'one') return false
       if (this.variant.lift === 'sequence' || this.variant.lift === 'freeCell') {
-        if (!isRun(src, src.cards.length - count, this.variant.build)) return false
+        // A group lifts as a unit only when it satisfies the lift rule, which is
+        // the placement rule unless the game says otherwise. Spider places any
+        // suit but only carries a same-suit run.
+        if (!isRun(src, src.cards.length - count, this.liftBuild())) return false
       }
     }
     if (this.variant.lift === 'freeCell' && count > this.capacity(dst.cards.length === 0)) return false

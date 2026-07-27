@@ -6,9 +6,18 @@ import type { Variant } from '../types'
 
 const foundation = { direction: 'down', match: 'sameSuit', wrap: false } as const
 
-const BASE: Omit<Variant, 'id' | 'label' | 'blurb' | 'note' | 'strip' | 'build' | 'published'> = {
+// Spider places any card on a card one higher — colour and suit ignored — but a
+// group only travels as a unit when it is a single-suit run. That split is
+// `build` any-suit for placement, `liftMatch` same-suit for the lift, and it is
+// what makes the suit count the whole difficulty: at one suit every run is
+// trivially same-suit, at four they almost never are.
+const build = { direction: 'down', match: 'anySuit', wrap: false } as const
+
+const BASE: Omit<Variant, 'id' | 'label' | 'blurb' | 'note' | 'strip' | 'published'> = {
   family: 'Spider',
   decks: 2,
+  build,
+  liftMatch: 'sameSuit',
   tableau: { piles: 10, deal: [6, 6, 6, 6, 5, 5, 5, 5, 5, 5], faceDown: 'allButLast' },
   // Eight discarded runs, one per suit-deck; modelled as eight foundations that
   // each hold a finished sequence.
@@ -27,8 +36,8 @@ export const SPIDER_1: Variant = {
   id: 'spider-1',
   label: 'Spider (1 suit)',
   blurb: 'Two decks of spades. The gentle Spider.',
-  note: 'Ten columns, two decks, but every card is a spade — so a run may be built and lifted regardless of colour, and most deals can be won.',
-  build: { direction: 'down', match: 'anySuit', wrap: false },
+  note: 'Ten columns, two decks, but every card is a spade — so every run is trivially one suit and lifts as a unit, and most deals can be won.',
+  suits: 1,
   published: 'the easiest Spider; a large majority winnable',
 }
 
@@ -38,8 +47,8 @@ export const SPIDER_2: Variant = {
   id: 'spider-2',
   label: 'Spider (2 suits)',
   blurb: 'Two suits. The usual middle ground.',
-  note: 'Spades and hearts. A run only lifts as a unit when it is all one suit, so the two colours are constantly in each other’s way. The common tournament setting.',
-  build: { direction: 'down', match: 'anySuit', wrap: false },
+  note: 'Spades and hearts. A run only lifts as a unit when it is all one suit, so the two suits are constantly in each other’s way. The common tournament setting.',
+  suits: 2,
   published: 'roughly half of deals winnable with good play',
 }
 
@@ -50,7 +59,7 @@ export const SPIDER_4: Variant = {
   label: 'Spider (4 suits)',
   blurb: 'All four suits. The hard one.',
   note: 'The complete game: all four suits, so a liftable run must be a single suit in sequence. Even strong play wins a minority of deals.',
-  build: { direction: 'down', match: 'anySuit', wrap: false },
+  suits: 4,
   published: 'a hard game; well under half of deals winnable',
 }
 
@@ -65,6 +74,6 @@ export const SPIDERETTE: Variant = {
   tableau: { piles: 7, deal: [1, 2, 3, 4, 5, 6, 7], faceDown: 'allButLast' },
   foundations: { piles: 4, base: 'K', build: foundation },
   stock: { kind: 'tableau', draw: 7, redeals: 0 },
-  build: { direction: 'down', match: 'anySuit', wrap: false },
-  published: 'comparable to 1-suit Spider',
+  suits: 4,
+  published: 'a single-deck four-suit game, so about as hard as Spider proper',
 }
