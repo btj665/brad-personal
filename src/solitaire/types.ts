@@ -112,8 +112,9 @@ export interface Variant {
 
   foundations: {
     piles: number
-    /** Ace-low games start at A. Canfield-likes start at whatever was dealt. */
-    base: 'A' | 'dealt'
+    /** Ace-low games start at A; Spider discards down from K. Canfield-likes take
+     *  whatever the deal turned up. */
+    base: Rank | 'dealt'
     build: Build
   }
 

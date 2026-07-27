@@ -8,7 +8,7 @@
 import { buildShoeCards, RANKS } from '../engine/cards'
 import { makeRng, randomSeed, type Rng } from '../engine/rng'
 import type { Card, Rank } from '../engine/types'
-import type { Action, Build, Move, Pile, PileCard, Variant } from './types'
+import type { Action, Build, Move, Pile, Variant } from './types'
 
 /** Ace low: the order a foundation is built in. */
 export function rankOrder(rank: Rank): number {
@@ -196,6 +196,13 @@ export class Solitaire {
     return { rank: RANKS[(base + next) % 13], suit: top.suit }
   }
 
+  /** Spider-family: the foundations take a whole finished suit, not one card at a
+   *  time. Marked by dealing the stock straight onto the tableau, which only these
+   *  games do. */
+  discardsRuns(): boolean {
+    return this.variant.stock.kind === 'tableau' || this.variant.foundations.base === 'K'
+  }
+
   /** How many cards this game will let you lift right now. */
   capacity(toEmpty: boolean): number {
     const v = this.variant
@@ -221,6 +228,16 @@ export class Solitaire {
     const head = moving[0].card
 
     if (dst.kind === 'foundation') {
+      // Spider and its kin don't build a foundation a card at a time — they
+      // discard a whole finished suit at once. Such a foundation only ever takes
+      // a complete run onto an empty pile, never a single card.
+      if (this.discardsRuns()) {
+        if (dst.cards.length !== 0) return false
+        const ranks = 13 - (this.variant.strip?.length ?? 0)
+        if (count !== ranks) return false
+        if (head.rank !== 'K') return false
+        return isRun(src, src.cards.length - count, this.variant.foundations.build)
+      }
       if (count !== 1) return false
       const want = this.foundationWants(dst)
       if (!want) return false
@@ -423,9 +440,9 @@ export class Solitaire {
   autoFinish(limit = 400): number {
     let moved = 0
     for (let pass = 0; pass < limit; pass++) {
-      const move = this.legalMoves().find(
-        (m) => this.get(m.to)!.kind === 'foundation' && m.count === 1,
-      )
+      // A finished run discarding to a Spider foundation is worth auto-playing too,
+      // so this looks for any tableau→foundation move rather than only singles.
+      const move = this.legalMoves().find((m) => this.get(m.to)!.kind === 'foundation')
       if (!move) break
       this.move(move.from, move.to, move.count)
       moved++

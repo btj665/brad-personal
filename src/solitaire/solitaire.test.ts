@@ -124,6 +124,33 @@ describe('playing Klondike', () => {
   })
 })
 
+describe('Spider discards a finished suit', () => {
+  it('takes a full K-to-A run to a foundation, and nothing less', () => {
+    const g = new Solitaire({ variant: variantById('spider-1'), seed: 4 })
+    const col = g.get('tableau-0')!
+    const foundation = g.piles.find((p) => p.kind === 'foundation')!
+
+    // Plant a complete spade run at the top of a column.
+    const ranks = ['K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2', 'A']
+    col.cards = ranks.map((r) => ({ card: c(`${r}S`), faceUp: true }))
+
+    expect(g.canMove(col.id, foundation.id, 12)).toBe(false) // 12 is not a finished suit
+    expect(g.canMove(col.id, foundation.id, 13)).toBe(true)
+    g.move(col.id, foundation.id, 13)
+    expect(foundation.cards).toHaveLength(13)
+    expect(col.cards).toHaveLength(0)
+  })
+
+  it('deals the stock straight onto the columns', () => {
+    const g = new Solitaire({ variant: variantById('spider-1'), seed: 6 })
+    const before = g.piles.filter((p) => p.kind === 'tableau').map((p) => p.cards.length)
+    g.drawStock()
+    const after = g.piles.filter((p) => p.kind === 'tableau').map((p) => p.cards.length)
+    // Ten columns, ten cards off the stock — one each.
+    expect(after.map((n, i) => n - before[i])).toEqual(new Array(10).fill(1))
+  })
+})
+
 describe('a won game', () => {
   it('recognises when every card is home', () => {
     const g = new Solitaire({ variant: variantById('freecell'), seed: 2 })
