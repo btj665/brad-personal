@@ -57,6 +57,7 @@
   //   '.' / ' ' = transparent
   // Rendered to cached offscreen canvases and blitted (pixels stay crisp).
   // ---------------------------------------------------------------------------
+  const DEBUG = location.hash === "#debug";
   const rle = (runs) => runs.map(([c, n]) => c.repeat(n)).join("");
 
   const SPRITES = {
@@ -465,7 +466,10 @@
     Audio.sfx.shoot();
   }
   function enemyFire(x, y, vx = 0, vy = 260, kind = "bolt") {
-    eshots.push({ x, y, vx, vy, r: 5, kind, spin: 0 });
+    // Each shot carries its own hitbox half-extents (hw, hh) so tall laser
+    // beams collide fairly and small bolts stay tight.
+    const dims = kind === "laser" ? { hw: 3, hh: 13 } : { hw: 4, hh: 6 };
+    eshots.push({ x, y, vx, vy, kind, spin: 0, hw: dims.hw, hh: dims.hh });
     Audio.sfx.enemyShoot();
   }
 
@@ -475,6 +479,7 @@
   const player = {
     x: W / 2, y: H - 70,
     w: 40, h: 34,
+    hitW: 9, hitH: 10,   // forgiving core hitbox (smaller than the drawn ship)
     speed: 340,
     cooldown: 0,
     fireRate: 0.28,
@@ -881,7 +886,7 @@
         // Formation fire
         if (Math.random() < e.fireChance) {
           if (m.key === "laser") {
-            enemyFire(e.x, e.y + 12, 0, 340);
+            enemyFire(e.x, e.y + 14, 0, 300, "laser");
           } else {
             const aim = Math.atan2(player.y - e.y, player.x - e.x);
             enemyFire(e.x, e.y + 12, Math.cos(aim) * 150, Math.abs(Math.sin(aim)) * 150 + 160);
@@ -889,8 +894,9 @@
         }
       }
 
-      // Reaching the bottom = player loses a life (invaders landed)
-      if (e.y > H - 60 && e.state !== "warp") {
+      // Only a marching-formation invader that reaches the bottom counts as
+      // "landed" — divers and warp attackers are meant to fly past and loop.
+      if (e.state === "form" && e.y > H - 60) {
         e.alive = false;
         burst(e.x, e.y, e.color, 12);
         damagePlayer();
@@ -992,16 +998,18 @@
       if (hit) bullets.splice(i, 1);
     }
 
-    // Enemy shots vs player / shield
+    // Enemy shots vs player / shield (box overlap using each shot's hitbox)
     for (let i = eshots.length - 1; i >= 0; i--) {
       const s = eshots[i];
-      // Shield blocks enemy fire from below going up? Enemy shots go down; shield
-      // sits above the player and protects in Astro Battles.
+      // Shield sits above the player and blocks incoming fire in Astro Battles.
       if (shield.active && Math.abs(s.y - shield.y) < 8 && s.vy > 0) {
         if (shield.hitAt(s.x)) { eshots.splice(i, 1); continue; }
       }
       if (player.alive && player.invuln <= 0 &&
-          dist2(s.x, s.y, player.x, player.y) < (s.r + 14) * (s.r + 14)) {
+          Math.abs(s.x - player.x) < s.hw + player.hitW &&
+          Math.abs(s.y - player.y) < s.hh + player.hitH) {
+        if (DEBUG) console.log("DEATH by SHOT kind=" + s.kind +
+          " dx=" + Math.abs(s.x - player.x).toFixed(1) + " dy=" + Math.abs(s.y - player.y).toFixed(1));
         eshots.splice(i, 1);
         damagePlayer();
         continue;
@@ -1012,7 +1020,8 @@
     if (player.alive && player.invuln <= 0) {
       for (const e of enemies) {
         if (!e.alive) continue;
-        if (Math.abs(e.x - player.x) < e.w / 2 + 12 && Math.abs(e.y - player.y) < e.h / 2 + 12) {
+        if (Math.abs(e.x - player.x) < e.w / 2 + player.hitW &&
+            Math.abs(e.y - player.y) < e.h / 2 + player.hitH) {
           e.alive = false;
           burst(e.x, e.y, e.color, 18);
           Audio.sfx.explode();
@@ -1051,22 +1060,34 @@
       ctx.fillRect(b.x - 2, b.y - 10, 4, 16);
       ctx.restore();
     }
-    // Enemy bolts
+    // Enemy fire
     for (const s of eshots) {
-      ctx.save();
-      ctx.translate(s.x, s.y);
-      ctx.rotate(s.spin);
-      ctx.shadowColor = "#ff2e6a";
-      ctx.shadowBlur = 10;
-      ctx.fillStyle = "#ffbcd0";
-      ctx.beginPath();
-      ctx.moveTo(0, -6);
-      ctx.lineTo(4, 4);
-      ctx.lineTo(0, 2);
-      ctx.lineTo(-4, 4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+      if (s.kind === "laser") {
+        // Bright, high-contrast beam — easy to read as it streaks down
+        ctx.save();
+        ctx.shadowColor = "#ff2e6a";
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = "#ff5a3a";
+        ctx.fillRect(s.x - 3, s.y - 13, 6, 26);
+        ctx.fillStyle = "#fff3b0";           // hot white-yellow core
+        ctx.fillRect(s.x - 1.5, s.y - 13, 3, 26);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.spin);
+        ctx.shadowColor = "#ff2e6a";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = "#ffbcd0";
+        ctx.beginPath();
+        ctx.moveTo(0, -6);
+        ctx.lineTo(4, 4);
+        ctx.lineTo(0, 2);
+        ctx.lineTo(-4, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
     }
   }
 
@@ -1186,6 +1207,8 @@
         startMission();
         setState("playing");
       },
+      lives(n) { game.lives = n; },
+      state() { return { state: game.state, lives: game.lives, enemies: enemies.length, eshots: eshots.length }; },
     };
   }
 
