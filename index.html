@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#05010f" />
+  <title>GORF — Reforged</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="frame">
+    <div id="stage">
+      <canvas id="game" width="600" height="800"></canvas>
+
+      <!-- Scanline / CRT overlay -->
+      <div id="crt"></div>
+
+      <!-- Touch controls (mobile) -->
+      <div id="touch" class="hidden">
+        <div class="pad">
+          <button class="tbtn" data-key="ArrowLeft">◀</button>
+          <button class="tbtn" data-key="ArrowUp">▲</button>
+          <button class="tbtn" data-key="ArrowDown">▼</button>
+          <button class="tbtn" data-key="ArrowRight">▶</button>
+        </div>
+        <button class="tbtn fire" data-key="Space">FIRE</button>
+      </div>
+    </div>
+
+    <p id="hint">
+      Move: <kbd>← ↑ ↓ →</kbd> / <kbd>WASD</kbd> &nbsp;•&nbsp;
+      Fire: <kbd>Space</kbd> &nbsp;•&nbsp; Pause: <kbd>P</kbd> &nbsp;•&nbsp; Mute: <kbd>M</kbd>
+    </p>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
