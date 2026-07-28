@@ -1,0 +1,11 @@
+# Secrets and runtime state — never commit these.
+.env
+
+# MeshCentral runtime data (database, TLS certs, generated agent installers, backups).
+meshcentral/data/
+meshcentral/user_files/
+meshcentral/backups/
+
+# Cloudflare Tunnel credentials for the locally-managed (config.yml) option.
+cloudflared/*.json
+cloudflared/config.yml

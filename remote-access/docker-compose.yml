@@ -1,0 +1,44 @@
+services:
+  # MeshCentral — self-hosted remote management hub (ScreenConnect / TeamViewer alternative).
+  # Manage all your machines (home lab + family) from one web console reachable anywhere.
+  # No host ports are published: MeshCentral is ONLY reachable through the cloudflared
+  # container on the internal docker network, so nothing is exposed to the LAN or internet
+  # except via the authenticated Cloudflare Tunnel.
+  meshcentral:
+    image: ghcr.io/ylianst/meshcentral:latest
+    container_name: meshcentral
+    hostname: meshcentral
+    restart: unless-stopped
+    volumes:
+      # The data dir holds the database, TLS certs and generated agent installers.
+      - ./meshcentral/data:/opt/meshcentral/meshcentral-data
+      # Layer our config.json on top of the data dir (mounted second so it wins).
+      - ./meshcentral/config.json:/opt/meshcentral/meshcentral-data/config.json
+      - ./meshcentral/user_files:/opt/meshcentral/meshcentral-files
+      - ./meshcentral/backups:/opt/meshcentral/meshcentral-backups
+    networks:
+      - remote-access
+
+  # cloudflared — outbound-only Cloudflare Tunnel. Dials out to Cloudflare's edge, so you
+  # never open an inbound port or expose your home IP. Public hostname -> this tunnel ->
+  # https://meshcentral:4430 on the internal network.
+  #
+  # Default: dashboard-managed tunnel using a token (set CLOUDFLARE_TUNNEL_TOKEN in .env).
+  # Configure the public hostname -> service mapping in the Zero Trust dashboard
+  # (see remote-access/cloudflared/README.md). For the locally-managed config.yml
+  # alternative, see that same README.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - meshcentral
+    networks:
+      - remote-access
+
+networks:
+  remote-access:
+    driver: bridge

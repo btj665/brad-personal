@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Ylianst/MeshCentral/master/meshcentral-config-schema.json",
+  "settings": {
+    "_comment": "cert MUST be the public hostname you route through Cloudflare (e.g. mesh.example.com). MeshCentral bakes it into the agent connection URLs.",
+    "cert": "REPLACE_WITH_YOUR_DOMAIN",
+    "WANonly": true,
+    "_ports": "MeshCentral listens on 4430 internally; cloudflared connects there. aliasPort tells it to advertise the public 443 to agents/browsers.",
+    "port": 4430,
+    "aliasPort": 443,
+    "redirPort": 8080,
+    "TlsOffload": false,
+    "AgentPong": 300,
+    "maxInvalidLogin": { "time": 10, "count": 5, "coolofftime": 30 }
+  },
+  "domains": {
+    "": {
+      "title": "Home Lab Remote Access",
+      "title2": "Personal use only",
+      "_newAccounts": "Leave true ONLY until you have created your first account (it auto-becomes site admin). Then set to false and restart to lock down registration.",
+      "newAccounts": true,
+      "userNameIsEmail": false,
+      "passwordRequirements": { "min": 12, "force2factor": true }
+    }
+  }
+}

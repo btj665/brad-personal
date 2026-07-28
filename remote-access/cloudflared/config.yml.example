@@ -1,0 +1,20 @@
+# OPTIONAL — locally-managed tunnel (config file + credentials) instead of the
+# default token method. If you use this, see cloudflared/README.md for the
+# docker-compose command change and how to generate the credentials file.
+#
+# Copy to config.yml (gitignored) and fill in your tunnel ID and hostname.
+
+tunnel: REPLACE_WITH_TUNNEL_ID
+credentials-file: /etc/cloudflared/REPLACE_WITH_TUNNEL_ID.json
+
+ingress:
+  # Web console + agent connections all ride this one hostname over 443/websockets.
+  - hostname: REPLACE_WITH_YOUR_DOMAIN
+    service: https://meshcentral:4430
+    originRequest:
+      # MeshCentral serves its own self-signed cert on the internal network;
+      # Cloudflare re-encrypts to the edge. Safe because only cloudflared can
+      # reach this origin over the private docker network.
+      noTLSVerify: true
+  # Everything else gets a 404.
+  - service: http_status:404
