@@ -22,6 +22,7 @@
   // ---------------------------------------------------------------------------
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false; // keep pixel-art sprites crisp when scaled
   const W = canvas.width;   // 600 logical px
   const H = canvas.height;  // 800 logical px
 
@@ -49,6 +50,168 @@
     { key: "warp",    name: "Space Warp" },
     { key: "flag",    name: "Flag Ship" },
   ];
+
+  // ---------------------------------------------------------------------------
+  // Pixel-art sprites — chunky, 2-frame animated bitmaps in the arcade tradition.
+  //   'X' = main (tinted) body   'o' = accent/eye   'd' = dark detail
+  //   '.' / ' ' = transparent
+  // Rendered to cached offscreen canvases and blitted (pixels stay crisp).
+  // ---------------------------------------------------------------------------
+  const rle = (runs) => runs.map(([c, n]) => c.repeat(n)).join("");
+
+  const SPRITES = {
+    // Gorfian invader (Astro Battles) — classic Space-Invaders-style marcher
+    astro: [
+      [
+        "..o.....o..",
+        "...o...o...",
+        "..XXXXXXX..",
+        ".XX.XXX.XX.",
+        "XXXXXXXXXXX",
+        "X.XXXXXXX.X",
+        "X.X.....X.X",
+        "...XX.XX...",
+      ],
+      [
+        "..o.....o..",
+        "o..o...o..o",
+        "o.XXXXXXX.o",
+        "XXX.XXX.XXX",
+        "XXXXXXXXXXX",
+        ".XXXXXXXXX.",
+        "..X.....X..",
+        ".X.......X.",
+      ],
+    ],
+    // Laser Attack — winged gunship formation
+    laser: [
+      [
+        ".....o.....",
+        "....XXX....",
+        "X...XXX...X",
+        "XX.XXXXX.XX",
+        "XXXXXXXXXXX",
+        "XXXXXXXXXXX",
+        ".XX.....XX.",
+        "X..X...X..X",
+      ],
+      [
+        ".....o.....",
+        "....XXX....",
+        "....XXX....",
+        "XX.XXXXX.XX",
+        "XXXXXXXXXXX",
+        "XXXXXXXXXXX",
+        "X.XX...XX.X",
+        ".X.......X.",
+      ],
+    ],
+    // Galaxians — flapping alien bird that peels off to dive
+    galax: [
+      [
+        "....ooo....",
+        "X...XXX...X",
+        "XX.XXXXX.XX",
+        "XXXXXXXXXXX",
+        ".XXXXXXXXX.",
+        "..XXXXXXX..",
+        "..X.....X..",
+        ".X.......X.",
+      ],
+      [
+        "..o.....o..",
+        "..X.XXX.X..",
+        "X.XXXXXXX.X",
+        "XXXXXXXXXXX",
+        ".XXXXXXXXX.",
+        "..XXXXXXX..",
+        ".XX.....XX.",
+        "X.........X",
+      ],
+    ],
+    // Player fighter
+    player: [
+      ".....X.....",
+      ".....X.....",
+      "....XoX....",
+      "....XXX....",
+      "...XXXXX...",
+      "..XXXXXXX..",
+      ".XXXXXXXXX.",
+      "XXXX.X.XXXX",
+      "XX.......XX",
+    ],
+    // Flag Ship boss — wide dreadnought with a hollow center for its core
+    boss: [
+      rle([[".", 8], ["o", 9], [".", 8]]),
+      rle([[".", 6], ["X", 13], [".", 6]]),
+      rle([[".", 4], ["X", 17], [".", 4]]),
+      rle([[".", 2], ["X", 21], [".", 2]]),
+      rle([["X", 10], [".", 5], ["X", 10]]),
+      rle([["X", 9], [".", 7], ["X", 9]]),
+      rle([["X", 10], [".", 5], ["X", 10]]),
+      rle([[".", 2], ["X", 21], [".", 2]]),
+      rle([[".", 4], ["X", 6], ["d", 5], ["X", 6], [".", 4]]),
+      rle([[".", 5], ["o", 4], [".", 7], ["o", 4], [".", 5]]),
+      rle([[".", 1], ["X", 3], [".", 17], ["X", 3], [".", 1]]),
+    ],
+  };
+  // Space Warp reuses the Gorfian invader, tumbling out of the vortex.
+  SPRITES.warp = SPRITES.astro;
+
+  // Dev sanity: every row of a sprite frame must share the same width.
+  (function validateSprites() {
+    const check = (id, grid) => {
+      const w = grid[0].length;
+      grid.forEach((row, i) => {
+        if (row.length !== w) console.warn(`SPRITE ${id} row ${i}: ${row.length} != ${w}`);
+      });
+    };
+    for (const [id, val] of Object.entries(SPRITES)) {
+      if (Array.isArray(val[0])) val.forEach((g, f) => check(id + f, g));
+      else check(id, val);
+    }
+  })();
+
+  // Offscreen-canvas cache, keyed by sprite id + pixel size + color.
+  const spriteCache = new Map();
+  const colorKey = (c) => String(c).replace(/[^a-z0-9]/gi, "");
+
+  function getSprite(id, grid, px, colors) {
+    const key = id + "|" + px + "|" + colorKey(colors.X) + colorKey(colors.o || "") + colorKey(colors.d || "");
+    let cv = spriteCache.get(key);
+    if (cv) return cv;
+    const rows = grid.length, cols = grid[0].length;
+    cv = document.createElement("canvas");
+    cv.width = cols * px;
+    cv.height = rows * px;
+    const g = cv.getContext("2d");
+    for (let r = 0; r < rows; r++) {
+      const line = grid[r];
+      for (let c = 0; c < cols; c++) {
+        const ch = line[c];
+        if (ch === "." || ch === " ") continue;
+        g.fillStyle = colors[ch] || colors.X;
+        g.fillRect(c * px, r * px, px, px);
+      }
+    }
+    spriteCache.set(key, cv);
+    return cv;
+  }
+
+  // Blit a cached sprite centered at (cx, cy), with optional glow/scale/rotation.
+  function blit(cv, cx, cy, glowColor, glow = 0, scale = 1, rot = 0) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (rot) ctx.rotate(rot);
+    if (scale !== 1) ctx.scale(scale, scale);
+    if (glow) { ctx.shadowColor = glowColor; ctx.shadowBlur = glow; }
+    ctx.drawImage(cv, -cv.width / 2, -cv.height / 2);
+    ctx.restore();
+  }
+
+  // Slow "marching" frame toggle shared by formation enemies.
+  const marchFrame = () => Math.floor(performance.now() / 340) % 2;
 
   // ---------------------------------------------------------------------------
   // Audio — synthesized SFX + a robotic "voice" for Gorf's taunts
@@ -352,47 +515,30 @@
     }
   }
 
+  const PLAYER_SPRITE = () =>
+    getSprite("player", SPRITES.player, 3, { X: "#e8fbff", o: "#ff2e6a" });
+
   function drawPlayer() {
     if (!player.alive) return;
     // Blink while invulnerable
     if (player.invuln > 0 && Math.floor(player.invuln * 12) % 2 === 0) return;
     const { x, y } = player;
+
+    // Engine flare (drawn behind the hull sprite)
+    const flare = 6 + Math.sin(performance.now() / 40) * 3;
     ctx.save();
     ctx.translate(x, y);
-    ctx.shadowColor = "#35f0ff";
-    ctx.shadowBlur = 14;
-
-    // Engine flare
-    const flare = 6 + Math.sin(performance.now() / 40) * 3;
+    ctx.shadowColor = "#ff9a3a";
+    ctx.shadowBlur = 10;
     ctx.fillStyle = "#ff9a3a";
     ctx.beginPath();
-    ctx.moveTo(-6, 14);
-    ctx.lineTo(0, 14 + flare);
-    ctx.lineTo(6, 14);
-    ctx.fill();
-
-    // Hull
-    ctx.fillStyle = "#e8fbff";
-    ctx.strokeStyle = "#35f0ff";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -18);
-    ctx.lineTo(16, 12);
-    ctx.lineTo(6, 8);
-    ctx.lineTo(0, 14);
-    ctx.lineTo(-6, 8);
-    ctx.lineTo(-16, 12);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Cockpit
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "#ff2e6a";
-    ctx.beginPath();
-    ctx.arc(0, -2, 3.4, 0, Math.PI * 2);
+    ctx.moveTo(-5, 13);
+    ctx.lineTo(0, 13 + flare);
+    ctx.lineTo(5, 13);
     ctx.fill();
     ctx.restore();
+
+    blit(PLAYER_SPRITE(), x, y, "#35f0ff", 12);
   }
 
   function damagePlayer() {
@@ -475,76 +621,33 @@
     }, opts);
   }
 
-  // ---- Enemy drawing routines -----------------------------------------------
-  function shipShadow(color) { ctx.shadowColor = color; ctx.shadowBlur = 12; }
-
+  // ---- Enemy drawing routines (pixel-art sprites) ---------------------------
+  // Astro Battles / Space Warp invader
   function drawGrunt(e) {
-    ctx.save();
-    ctx.translate(e.x, e.y);
-    shipShadow(e.color);
-    ctx.fillStyle = e.color;
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 1.2;
-    // Insectoid invader body
-    ctx.beginPath();
-    ctx.moveTo(0, -10);
-    ctx.lineTo(12, 0);
-    ctx.lineTo(8, 10);
-    ctx.lineTo(-8, 10);
-    ctx.lineTo(-12, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    // Eyes
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(-5, -2, 3, 3);
-    ctx.fillRect(2, -2, 3, 3);
-    ctx.restore();
+    const f = marchFrame();
+    const cv = getSprite("astro" + f, SPRITES.astro[f], 3, { X: e.color, o: "#ffffff" });
+    blit(cv, e.x, e.y, e.color, 8);
   }
 
+  // Laser Attack gunship
+  function drawLaserShip(e) {
+    const f = marchFrame();
+    const cv = getSprite("laser" + f, SPRITES.laser[f], 3, { X: e.color, o: "#ffffff" });
+    blit(cv, e.x, e.y, e.color, 8);
+  }
+
+  // Galaxians diver — flaps faster, banks with its dive angle
   function drawDiver(e) {
-    ctx.save();
-    ctx.translate(e.x, e.y);
-    ctx.rotate(e.angle || 0);
-    shipShadow(e.color);
-    ctx.fillStyle = e.color;
-    ctx.beginPath();
-    ctx.moveTo(0, 12);
-    ctx.lineTo(11, -8);
-    ctx.lineTo(0, -3);
-    ctx.lineTo(-11, -8);
-    ctx.closePath();
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "#fff7c2";
-    ctx.beginPath();
-    ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    const f = Math.floor((e.t || 0) * 6) % 2;
+    const cv = getSprite("galax" + f, SPRITES.galax[f], 3, { X: e.color, o: "#fff7c2" });
+    blit(cv, e.x, e.y, e.color, 8, 1, e.angle || 0);
   }
 
+  // Space Warp — tumbles and grows as it spirals out of the vortex
   function drawWarper(e) {
-    const s = e.scale || 1;
-    ctx.save();
-    ctx.translate(e.x, e.y);
-    ctx.rotate(e.t * 3);
-    ctx.scale(s, s);
-    shipShadow(e.color);
-    ctx.strokeStyle = e.color;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * Math.PI * 2;
-      ctx.moveTo(0, 0);
-      ctx.lineTo(Math.cos(a) * 11, Math.sin(a) * 11);
-    }
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    const f = marchFrame();
+    const cv = getSprite("warp" + f, SPRITES.warp[f], 3, { X: e.color, o: "#ffffff" });
+    blit(cv, e.x, e.y, e.color, 10, clamp(e.scale || 1, 0.3, 1.6), (e.t || 0) * 2);
   }
 
   // ---------------------------------------------------------------------------
@@ -624,33 +727,12 @@
     },
     draw() {
       if (!this.active) return;
+      // Pixel-art hull (25x11 sprite cached at px=8, scaled to the boss size)
+      const cv = getSprite("boss", SPRITES.boss, 8, { X: "#6a2bd6", o: "#c39bff", d: "#2a0f66" });
+      blit(cv, this.x, this.y, "#8f4bff", 16, this.w / cv.width);
+
       ctx.save();
       ctx.translate(this.x, this.y);
-      shipShadow("#8f4bff");
-      // Hull
-      const g = ctx.createLinearGradient(0, -this.h / 2, 0, this.h / 2);
-      g.addColorStop(0, "#6a2bd6");
-      g.addColorStop(1, "#2a0f66");
-      ctx.fillStyle = g;
-      ctx.strokeStyle = "#c39bff";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-this.w / 2, 0);
-      ctx.lineTo(-this.w / 2 + 40, -this.h / 2);
-      ctx.lineTo(this.w / 2 - 40, -this.h / 2);
-      ctx.lineTo(this.w / 2, 0);
-      ctx.lineTo(this.w / 2 - 30, this.h / 2);
-      ctx.lineTo(-this.w / 2 + 30, this.h / 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // Wing pods
-      ctx.fillStyle = "#3d1a80";
-      ctx.fillRect(-this.w / 2 - 6, -10, 16, 20);
-      ctx.fillRect(this.w / 2 - 10, -10, 16, 20);
-
       // Core
       const c = this.coreRect();
       const flash = this.coreHitFlash > 0;
@@ -724,7 +806,7 @@
       shield.build();
       buildFormation(4, 8, { fireMul: 0.8 });
     } else if (m.key === "laser") {
-      buildFormation(4, 9, { fireMul: 2.2 });
+      buildFormation(4, 9, { fireMul: 2.2, enemy: { draw: drawLaserShip } });
     } else if (m.key === "galax") {
       buildFormation(3, 8, { fireMul: 1.2, enemy: { draw: drawDiver } });
     } else if (m.key === "warp") {
