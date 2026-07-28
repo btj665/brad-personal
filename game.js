@@ -465,11 +465,18 @@
     bullets.push({ x, y, vy: -640, r: 4 });
     Audio.sfx.shoot();
   }
+  const LASER_LEN = 150; // length of a Laser Attack beam line
   function enemyFire(x, y, vx = 0, vy = 260, kind = "bolt") {
-    // Each shot carries its own hitbox half-extents (hw, hh) so tall laser
-    // beams collide fairly and small bolts stay tight.
-    const dims = kind === "laser" ? { hw: 3, hh: 13 } : { hw: 4, hh: 6 };
-    eshots.push({ x, y, vx, vy, kind, spin: 0, hw: dims.hw, hh: dims.hh });
+    // Laser Attack fires a long vertical beam line (like the arcade original):
+    // (x, y) is treated as the muzzle, and the beam hangs below it.
+    if (kind === "laser") {
+      eshots.push({
+        x, y: y + LASER_LEN / 2, vx, vy, kind, spin: 0,
+        len: LASER_LEN, hw: 3, hh: LASER_LEN / 2,
+      });
+    } else {
+      eshots.push({ x, y, vx, vy, kind, spin: 0, hw: 4, hh: 6 });
+    }
     Audio.sfx.enemyShoot();
   }
 
@@ -661,18 +668,27 @@
   const boss = {
     active: false,
     x: W / 2, y: 150,
-    w: 220, h: 90,
-    hp: 0, maxHp: 0,
+    w: 220, h: 96,
+    // Two-phase health: chip away the armor plating, then destroy the core.
+    armor: 0, armorMax: 0,
+    core: 0, coreMax: 0,
+    exposed: false,
     t: 0,
     dir: 1,
     fireTimer: 0,
     coreHitFlash: 0,
+    hullFlash: 0,
+    exposeT: 0,
     spawn(tour) {
       this.active = true;
       this.x = W / 2; this.y = 150; this.t = 0; this.dir = 1;
-      this.maxHp = this.hp = 60 + tour * 30;
-      this.fireTimer = 1.2;
+      this.armorMax = this.armor = 30 + tour * 12;
+      this.coreMax = this.core = 10 + tour * 5;
+      this.exposed = false;
+      this.exposeT = 0;
+      this.fireTimer = 1.4;
       this.coreHitFlash = 0;
+      this.hullFlash = 0;
     },
     update(dt) {
       if (!this.active) return;
@@ -682,6 +698,8 @@
       if (this.x > W - this.w / 2 - 20) { this.x = W - this.w / 2 - 20; this.dir = -1; }
       this.y = 150 + Math.sin(this.t * 1.4) * 28;
       if (this.coreHitFlash > 0) this.coreHitFlash -= dt;
+      if (this.hullFlash > 0) this.hullFlash -= dt;
+      if (this.exposed) this.exposeT += dt;
 
       this.fireTimer -= dt;
       if (this.fireTimer <= 0) {
@@ -696,23 +714,43 @@
       }
     },
     coreRect() {
-      // Central vulnerable core
-      return { x: this.x - 16, y: this.y - 12, w: 32, h: 28 };
+      // Central vulnerable core (widened once exposed so it's aimable)
+      const s = this.exposed ? 1 : 0.7;
+      const w = 44 * s, h = 40 * s;
+      return { x: this.x - w / 2, y: this.y - 2 - h / 2, w, h };
+    },
+    inHull(bx, by) {
+      return Math.abs(bx - this.x) < this.w / 2 && Math.abs(by - this.y) < this.h / 2;
     },
     hit(bx, by) {
-      const c = this.coreRect();
-      if (bx > c.x && bx < c.x + c.w && by > c.y && by < c.y + c.h) {
-        this.hp--;
-        this.coreHitFlash = 0.12;
+      if (!this.inHull(bx, by)) return false;
+
+      // Phase 1: any hit on the ship chips away the armor plating.
+      if (!this.exposed) {
+        this.armor--;
+        this.hullFlash = 0.08;
         Audio.sfx.hit();
-        burst(bx, by, "#ffcf3a", 6, 120);
-        if (this.hp <= 0) this.destroy();
+        burst(bx, by, "#c39bff", 6, 140);
+        if (this.armor <= 0) {
+          this.exposed = true;
+          this.exposeT = 0;
+          shake(14, 0.4);
+          Audio.sfx.powerup();
+          taunt("MY ARMOR! STRIKE THE CORE... IF YOU CAN!");
+        }
         return true;
       }
-      // Armor plating: bullet absorbed, no damage
-      if (Math.abs(bx - this.x) < this.w / 2 && Math.abs(by - this.y) < this.h / 2) {
-        burst(bx, by, "#5f74b8", 5, 100);
-        Audio.sfx.shield();
+
+      // Phase 2: armor gone. Only the exposed core takes damage; shots that
+      // miss it pass THROUGH the wrecked frame (return false) so the player
+      // can keep firing up into the core instead of being absorbed.
+      const c = this.coreRect();
+      if (bx > c.x && bx < c.x + c.w && by > c.y && by < c.y + c.h) {
+        this.core--;
+        this.coreHitFlash = 0.12;
+        Audio.sfx.hit();
+        burst(bx, by, "#ffcf3a", 8, 160);
+        if (this.core <= 0) this.destroy();
         return true;
       }
       return false;
@@ -732,36 +770,59 @@
     },
     draw() {
       if (!this.active) return;
-      // Pixel-art hull (25x11 sprite cached at px=8, scaled to the boss size)
-      const cv = getSprite("boss", SPRITES.boss, 8, { X: "#6a2bd6", o: "#c39bff", d: "#2a0f66" });
-      blit(cv, this.x, this.y, "#8f4bff", 16, this.w / cv.width);
+      // Hull palette dims and reddens once the armor is stripped away.
+      const hullHit = this.hullFlash > 0;
+      const pal = this.exposed
+        ? { X: "#3a1a5c", o: "#7a5a9c", d: "#1a0a33" }         // wrecked, darkened
+        : hullHit
+          ? { X: "#b07bff", o: "#ffffff", d: "#5a2fb0" }       // flash on hit
+          : { X: "#6a2bd6", o: "#c39bff", d: "#2a0f66" };      // intact
+      const cv = getSprite("boss", SPRITES.boss, 8, pal);
+      const glow = this.exposed ? "#ff2e6a" : "#8f4bff";
+      blit(cv, this.x, this.y, glow, this.exposed ? 22 : 16, this.w / cv.width);
 
       ctx.save();
       ctx.translate(this.x, this.y);
-      // Core
-      const c = this.coreRect();
+      // Core — shielded/blue in phase 1, large pulsing red once exposed
       const flash = this.coreHitFlash > 0;
-      ctx.shadowColor = flash ? "#ffffff" : "#ff2e6a";
-      ctx.shadowBlur = 16;
-      ctx.fillStyle = flash ? "#ffffff" : "#ff2e6a";
-      ctx.beginPath();
-      ctx.arc(0, 2, 14 + Math.sin(this.t * 6) * 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = "#2a0033";
-      ctx.beginPath();
-      ctx.arc(0, 2, 6, 0, Math.PI * 2);
-      ctx.fill();
+      if (this.exposed) {
+        const r = 20 + Math.sin(this.t * 8) * 3;
+        ctx.shadowColor = flash ? "#ffffff" : "#ff2e6a";
+        ctx.shadowBlur = 24;
+        ctx.fillStyle = flash ? "#ffffff" : "#ff3a5a";
+        ctx.beginPath(); ctx.arc(0, -2, r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#ffcf3a";
+        ctx.beginPath(); ctx.arc(0, -2, r * 0.5, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#2a0033";
+        ctx.beginPath(); ctx.arc(0, -2, r * 0.22, 0, Math.PI * 2); ctx.fill();
+      } else {
+        // Sealed core behind the plating
+        ctx.shadowColor = "#35a0ff";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = "#2b6fb0";
+        ctx.beginPath(); ctx.arc(0, 2, 11, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#0a1a33";
+        ctx.beginPath(); ctx.arc(0, 2, 5, 0, Math.PI * 2); ctx.fill();
+      }
       ctx.restore();
 
-      // Boss HP bar
+      // Health bar: armor (purple) in phase 1, core (red) in phase 2
       const bw = 260, bx = W / 2 - bw / 2, by = 40;
+      const frac = this.exposed
+        ? clamp(this.core / this.coreMax, 0, 1)
+        : clamp(this.armor / this.armorMax, 0, 1);
       ctx.fillStyle = "rgba(0,0,0,0.4)";
       ctx.fillRect(bx - 2, by - 2, bw + 4, 12);
-      ctx.fillStyle = "#3a0f2a";
+      ctx.fillStyle = "#22103a";
       ctx.fillRect(bx, by, bw, 8);
-      ctx.fillStyle = "#ff2e6a";
-      ctx.fillRect(bx, by, bw * clamp(this.hp / this.maxHp, 0, 1), 8);
+      ctx.fillStyle = this.exposed ? "#ff2e6a" : "#8f4bff";
+      ctx.fillRect(bx, by, bw * frac, 8);
+      ctx.textAlign = "center";
+      ctx.font = "bold 11px 'Segoe UI', sans-serif";
+      ctx.fillStyle = this.exposed ? "#ff8fb0" : "#c39bff";
+      ctx.fillText(this.exposed ? "CORE EXPOSED — FIRE!" : "ARMOR", W / 2, by - 5);
     },
   };
 
@@ -811,7 +872,7 @@
       shield.build();
       buildFormation(4, 8, { fireMul: 0.8 });
     } else if (m.key === "laser") {
-      buildFormation(4, 9, { fireMul: 2.2, enemy: { draw: drawLaserShip } });
+      buildFormation(4, 9, { fireMul: 1.0, enemy: { draw: drawLaserShip } });
     } else if (m.key === "galax") {
       buildFormation(3, 8, { fireMul: 1.2, enemy: { draw: drawDiver } });
     } else if (m.key === "warp") {
@@ -886,7 +947,7 @@
         // Formation fire
         if (Math.random() < e.fireChance) {
           if (m.key === "laser") {
-            enemyFire(e.x, e.y + 14, 0, 300, "laser");
+            enemyFire(e.x, e.y + 14, 0, 240, "laser");
           } else {
             const aim = Math.atan2(player.y - e.y, player.x - e.x);
             enemyFire(e.x, e.y + 12, Math.cos(aim) * 150, Math.abs(Math.sin(aim)) * 150 + 160);
@@ -1046,7 +1107,11 @@
       s.x += s.vx * dt;
       s.y += s.vy * dt;
       s.spin += dt * 10;
-      if (s.y > H + 10 || s.y < -10 || s.x < -10 || s.x > W + 10) eshots.splice(i, 1);
+      // Remove once fully off-screen (account for a long beam's half-length).
+      const half = s.hh || 6;
+      if (s.y - half > H + 10 || s.y + half < -10 || s.x < -20 || s.x > W + 20) {
+        eshots.splice(i, 1);
+      }
     }
   }
 
@@ -1063,14 +1128,22 @@
     // Enemy fire
     for (const s of eshots) {
       if (s.kind === "laser") {
-        // Bright, high-contrast beam — easy to read as it streaks down
+        // Long continuous laser line streaking down the column (arcade-style)
+        const L = s.len || 150;
+        const top = s.y - L / 2;
         ctx.save();
-        ctx.shadowColor = "#ff2e6a";
-        ctx.shadowBlur = 14;
-        ctx.fillStyle = "#ff5a3a";
-        ctx.fillRect(s.x - 3, s.y - 13, 6, 26);
-        ctx.fillStyle = "#fff3b0";           // hot white-yellow core
-        ctx.fillRect(s.x - 1.5, s.y - 13, 3, 26);
+        ctx.shadowColor = "#ffcf3a";
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = "#ff8a1e";           // amber outer beam
+        ctx.fillRect(s.x - 3, top, 6, L);
+        ctx.fillStyle = "#ffe45e";           // bright yellow body
+        ctx.fillRect(s.x - 1.5, top, 3, L);
+        ctx.fillStyle = "#fffdf0";           // hot white core
+        ctx.fillRect(s.x - 0.5, top, 1, L);
+        // Muzzle spark at the top of the beam
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = "#fff3b0";
+        ctx.fillRect(s.x - 4, top - 2, 8, 5);
         ctx.restore();
       } else {
         ctx.save();
@@ -1209,6 +1282,8 @@
       },
       lives(n) { game.lives = n; },
       state() { return { state: game.state, lives: game.lives, enemies: enemies.length, eshots: eshots.length }; },
+      boss() { return { active: boss.active, x: boss.x, armor: boss.armor, core: boss.core, exposed: boss.exposed, cleared: game.missionCleared }; },
+      aimX(px) { player.x = clamp(px, player.w / 2, W - player.w / 2); },
     };
   }
 
