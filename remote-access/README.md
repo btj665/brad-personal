@@ -25,11 +25,21 @@ remote-access/
 ├── .env.example                # -> copy to .env, add your tunnel token
 ├── meshcentral/config.json     # MeshCentral config (set your domain + lock down after setup)
 ├── cloudflared/                # Tunnel setup (token method + config.yml alternative)
+├── rustdesk/                   # OPTIONAL AnyDesk-style relay (separate stack — see note below)
 └── docs/
     ├── resolution.md           # HOW to control screen resolution (read this)
     ├── security.md             # 2FA, lockdown, do-not-expose-RDP, hardening
     └── family-machines.md      # Unattended access + console mirroring for family
 ```
+
+## Optional: RustDesk relay for the simplest family experience
+
+[`rustdesk/`](rustdesk/README.md) is an opt-in second stack with an AnyDesk/TeamViewer feel —
+often the friendliest for non-technical family. **Heads up on the tradeoff:** RustDesk's native
+clients use raw TCP/UDP, which Cloudflare's *free* Tunnel can't proxy, so it needs a public-IP
+host (a cheap VPS) or forwarded router ports — i.e. it does not get the "zero open ports"
+property that MeshCentral does. Full explanation and setup in
+[`rustdesk/README.md`](rustdesk/README.md). Running both side by side is fine.
 
 ## Quick start
 

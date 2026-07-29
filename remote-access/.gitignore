@@ -9,3 +9,6 @@ meshcentral/backups/
 # Cloudflare Tunnel credentials for the locally-managed (config.yml) option.
 cloudflared/*.json
 cloudflared/config.yml
+
+# RustDesk relay runtime data (includes the server key pair).
+rustdesk/data/
