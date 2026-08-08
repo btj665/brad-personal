@@ -64,8 +64,9 @@ poker-hand evaluators, and one deck of hand-drawn SVG cards.
 
 ```bash
 npm run dev          # play them            → http://localhost:5173
-npm test             # 1,142 engine tests
+npm test             # 1,145 engine tests
 npm run build
+npm run package      # a zip a coworker can unzip and double-click to play
 
 npm run edges         # every game's validation, one sweep
 
@@ -461,6 +462,39 @@ The other twelve are played solo against the house. Several of them have a
 **Coach** that shows what correct play would be: video poker solves the hold
 exactly, and three card poker, let it ride, mississippi stud and caribbean stud
 highlight what their published charts say.
+
+---
+
+## Sharing it
+
+`npm run package` builds `the-tables.zip` — one file to hand a coworker. They
+unzip it and double-click the launcher for their machine:
+
+```
+Windows    Start The Tables (Windows).bat
+Mac        Start The Tables (Mac).command
+Linux      ./start-linux.sh
+```
+
+A small window opens and the game opens in their browser. Everything runs
+locally — the whole app is client-side, so the package is the built site plus a
+40-line zero-dependency static server (`packaging/serve.mjs`) that hands it to
+the browser and finds a free port. There is no telemetry, no network call, and
+nothing to configure.
+
+The one thing the machine needs is **Node.js**, and the launchers handle that:
+on Windows the launcher installs it through `winget` and asks you to click once
+more; on a Mac with Homebrew it installs it, otherwise it opens the download
+page; on Linux it prints the exact one-line install command for the distro's
+package manager. After that first time it just runs.
+
+Bundling a Node runtime into the zip would remove even that step, at the cost of
+~50 MB per platform and a per-OS build — not worth it for an internal share, so
+the package leans on the launcher instead. The whole thing is verified the way
+everything else here is: `make-package.mjs` builds the zip, and the release is
+checked by unzipping it into a clean folder, starting the packaged server, and
+loading every screen in a headless browser with zero 4xx and zero console
+errors.
 
 ---
 

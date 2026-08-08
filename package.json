@@ -30,7 +30,8 @@
     "keno:return": "tsx scripts/keno-return.ts",
     "edges": "tsx scripts/all-edges.ts",
     "slots:rtp": "tsx scripts/slots-rtp.ts",
-    "sol:solve": "tsx scripts/sol-solve.ts"
+    "sol:solve": "tsx scripts/sol-solve.ts",
+    "package": "node scripts/make-package.mjs"
   },
   "dependencies": {
     "react": "^19.2.7",
