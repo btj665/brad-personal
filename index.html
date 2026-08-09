@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemquest — Match-3 Card Battle</title>
+<style>
+  :root{
+    --bg:#12101c; --panel:#1d1930; --panel2:#262040; --ink:#ece8ff; --muted:#a99fd0;
+    --gold:#f5c542; --hp:#e8496b; --shield:#5bc8ff; --good:#57d98a; --bad:#ff6b6b;
+    --rage:#ff5a4d; --arcane:#5b8dff; --vigor:#5fd97a; --holy:#ffd24d; --shadow:#b06bff; --skull:#c9c6de;
+    --edge:#3a3358;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:radial-gradient(1200px 800px at 50% -10%,#241f3d,#0c0a14);color:var(--ink);
+    font-family:"Trebuchet MS",Verdana,system-ui,sans-serif;-webkit-user-select:none;user-select:none;}
+  #app{max-width:1120px;margin:0 auto;padding:14px;}
+  h1{font-size:34px;margin:6px 0 2px;letter-spacing:1px;text-align:center;
+    background:linear-gradient(90deg,#f5c542,#ff7ac1,#7aa8ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{text-align:center;color:var(--muted);margin-bottom:14px;font-size:14px;}
+  .btn{cursor:pointer;border:1px solid var(--edge);background:var(--panel2);color:var(--ink);
+    padding:10px 16px;border-radius:10px;font-size:15px;font-weight:bold;transition:.12s;}
+  .btn:hover{background:#332a55;transform:translateY(-1px);}
+  .btn.primary{background:linear-gradient(180deg,#f5c542,#e0a92c);color:#241a02;border-color:#f5c542;}
+  .btn.primary:hover{filter:brightness(1.08);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  .hidden{display:none!important;}
+
+  /* Class select */
+  .classGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:10px 0;}
+  .classCard{background:var(--panel);border:2px solid var(--edge);border-radius:14px;padding:14px;cursor:pointer;transition:.15s;}
+  .classCard:hover{border-color:var(--gold);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .classCard.sel{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset;}
+  .classCard .emoji{font-size:44px;}
+  .classCard h3{margin:6px 0 4px;}
+  .classCard .role{color:var(--muted);font-size:13px;min-height:34px;}
+  .classCard .stats{font-size:12px;margin-top:8px;color:var(--muted);}
+  .aff{display:inline-block;padding:1px 6px;border-radius:6px;font-size:11px;margin:2px 2px 0 0;background:var(--panel2);}
+
+  /* Battle layout */
+  #battle{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:start;}
+  @media(max-width:900px){#battle{grid-template-columns:1fr;}}
+  .side{background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:12px;}
+  .side.active{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold);}
+  .whoRow{display:flex;align-items:center;gap:10px;}
+  .whoRow .em{font-size:34px;}
+  .whoRow .nm{font-weight:bold;font-size:17px;}
+  .whoRow .lvl{color:var(--muted);font-size:12px;}
+  .bar{height:16px;border-radius:8px;background:#3a2030;overflow:hidden;margin-top:4px;position:relative;border:1px solid #52273a;}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#ff4d6d,#ff8a5b);transition:width .35s;}
+  .bar span{position:absolute;inset:0;text-align:center;font-size:11px;line-height:16px;color:#fff;text-shadow:0 1px 2px #000;}
+  .shieldTag{color:var(--shield);font-size:13px;font-weight:bold;margin-top:3px;min-height:16px;}
+  .effs{font-size:12px;color:var(--muted);margin-top:3px;min-height:16px;}
+
+  .manaRow{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  .mana{display:flex;align-items:center;gap:3px;background:var(--panel2);border:1px solid var(--edge);
+    border-radius:8px;padding:3px 7px;font-size:13px;font-weight:bold;}
+  .mana .dot{font-size:15px;}
+
+  /* Board */
+  #boardWrap{display:flex;flex-direction:column;align-items:center;}
+  #board{display:grid;gap:4px;background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:8px;
+    touch-action:none;}
+  .cell{width:44px;height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-size:26px;cursor:pointer;background:var(--panel2);transition:transform .12s, box-shadow .12s;position:relative;}
+  .cell:hover{box-shadow:0 0 0 2px var(--muted) inset;}
+  .cell.sel{box-shadow:0 0 0 3px var(--gold) inset;transform:scale(1.06);}
+  .cell.clear{animation:pop .28s ease forwards;}
+  .cell.fall{animation:fall .2s ease;}
+  @keyframes pop{0%{transform:scale(1);}60%{transform:scale(1.3);filter:brightness(1.6);}100%{transform:scale(0);opacity:0;}}
+  @keyframes fall{0%{transform:translateY(-14px);opacity:.4;}100%{transform:translateY(0);opacity:1;}}
+  .turnTag{margin:10px 0 4px;font-weight:bold;font-size:15px;text-align:center;min-height:22px;}
+  .hint{color:var(--muted);font-size:12px;text-align:center;margin-top:2px;}
+
+  /* Cards / hand */
+  .handTitle{font-weight:bold;margin:6px 0 6px;font-size:14px;color:var(--muted);}
+  .hand{display:flex;flex-direction:column;gap:8px;}
+  .gcard{background:linear-gradient(180deg,#2a2445,#211c38);border:1px solid var(--edge);border-radius:11px;
+    padding:9px 10px;cursor:pointer;transition:.12s;position:relative;}
+  .gcard:hover{border-color:var(--gold);transform:translateX(-2px);}
+  .gcard.dis{opacity:.5;cursor:not-allowed;}
+  .gcard.dis:hover{border-color:var(--edge);transform:none;}
+  .gcard .top{display:flex;justify-content:space-between;align-items:center;gap:6px;}
+  .gcard .nm{font-weight:bold;font-size:14px;}
+  .gcard .ic{font-size:20px;}
+  .gcard .desc{font-size:12px;color:var(--muted);margin-top:3px;}
+  .gcard .cost{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;}
+  .costChip{font-size:12px;background:var(--panel2);border:1px solid var(--edge);border-radius:6px;padding:1px 5px;font-weight:bold;}
+  .weaponTag{position:absolute;top:-8px;right:8px;background:var(--gold);color:#241a02;font-size:10px;
+    font-weight:bold;padding:1px 6px;border-radius:6px;}
+
+  /* Log & float */
+  #log{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:10px;margin-top:12px;
+    height:120px;overflow-y:auto;font-size:13px;line-height:1.5;}
+  #log .p{color:var(--good);} #log .e{color:var(--bad);} #log .s{color:var(--muted);}
+  .float{position:fixed;pointer-events:none;font-weight:bold;font-size:22px;z-index:50;
+    text-shadow:0 2px 4px #000;animation:floatUp 1s ease forwards;}
+  @keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(.8);}20%{transform:translateY(-6px) scale(1.15);}
+    100%{opacity:0;transform:translateY(-46px) scale(1);}}
+
+  /* Overlay */
+  #overlay{position:fixed;inset:0;background:rgba(8,6,16,.82);display:flex;align-items:center;justify-content:center;z-index:60;}
+  .modal{background:var(--panel);border:2px solid var(--gold);border-radius:16px;padding:26px;max-width:520px;text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,.6);}
+  .modal h2{margin:4px 0 8px;font-size:28px;}
+  .modal p{color:var(--muted);line-height:1.6;}
+  .ladder{display:flex;gap:6px;justify-content:center;margin:14px 0;flex-wrap:wrap;}
+  .rung{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:20px;background:var(--panel2);border:1px solid var(--edge);}
+  .rung.done{background:#26402e;border-color:var(--good);}
+  .rung.cur{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);}
+  .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:16px;}
+  .kbd{background:var(--panel2);border:1px solid var(--edge);border-radius:5px;padding:0 5px;font-size:11px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>⚔️ GEMQUEST ✦ Match-3 Card Battle</h1>
+  <div class="sub">Match gems to bank mana, smash skulls for direct damage, then unleash your class cards for <b>absolute domination</b>.</div>
+
+  <!-- SELECT SCREEN -->
+  <div id="select">
+    <div class="classGrid" id="classGrid"></div>
+    <div style="text-align:center;margin-top:8px;">
+      <button class="btn primary" id="startBtn" disabled>Begin the Gauntlet →</button>
+    </div>
+    <div class="foot">
+      Gems bank mana of 5 schools. 💀 Skulls deal direct damage. Match 4+ for an <b>extra turn</b>.
+      Spend mana on cards &amp; your signature weapon. Defeat all foes on the ladder to win.
+    </div>
+  </div>
+
+  <!-- BATTLE SCREEN -->
+  <div id="battle" class="hidden">
+    <div class="side" id="foeSide"></div>
+    <div id="boardWrap">
+      <div class="turnTag" id="turnTag"></div>
+      <div id="board"></div>
+      <div class="hint" id="boardHint">Click a gem, then a neighbor to swap.</div>
+    </div>
+    <div class="side" id="playerSide"></div>
+  </div>
+  <div id="log" class="hidden"></div>
+</div>
+
+<div id="overlay" class="hidden"><div class="modal" id="modal"></div></div>
+
+<script>
+"use strict";
+/* ============================ DATA ============================ */
+// Gem/mana schools. Skull is special (direct damage, no mana).
+const GEMS = {
+  rage:   {icon:"🔴", name:"Rage",   color:"var(--rage)"},
+  arcane: {icon:"🔵", name:"Arcane", color:"var(--arcane)"},
+  vigor:  {icon:"🟢", name:"Vigor",  color:"var(--vigor)"},
+  holy:   {icon:"🟡", name:"Holy",   color:"var(--holy)"},
+  shadow: {icon:"🟣", name:"Shadow", color:"var(--shadow)"},
+};
+const SCHOOLS = Object.keys(GEMS);          // 5 mana schools
+const TILE_TYPES = [...SCHOOLS, "skull"];   // 6 tiles total
+const TILE_ICON = {...Object.fromEntries(SCHOOLS.map(s=>[s,GEMS[s].icon])), skull:"💀"};
+
+// Card effect vocabulary: damage, heal, shield, poison(dot), buff(next-attack), stun(skip), drain, extraTurn
+function card(o){ return Object.assign({cost:{}}, o); }
+
+const CLASSES = {
+  fighter: {
+    name:"Fighter", emoji:"🛡️", hp:150,
+    role:"Bruiser. Heaps of HP and raw physical burst fueled by Rage.",
+    aff:["rage"],
+    deck:[
+      card({id:"greatsword", name:"Greatsword", weapon:true, icon:"⚔️",
+        desc:"Strike for 16 damage.", cost:{rage:4}, dmg:16}),
+      card({id:"cleave", name:"Cleave", icon:"🪓",
+        desc:"18 damage; ignores 5 shield.", cost:{rage:6}, dmg:18, pierce:5}),
+      card({id:"shieldbash", name:"Shield Bash", icon:"🛡️",
+        desc:"10 damage and stun the foe's next turn.", cost:{rage:5}, dmg:10, stun:1}),
+      card({id:"berserk", name:"Berserk", icon:"🔥",
+        desc:"Buff: your next weapon/attack hits +14.", cost:{rage:5}, buff:14}),
+      card({id:"secondwind", name:"Second Wind", icon:"❤️‍🩹",
+        desc:"Heal 22 HP.", cost:{vigor:5}, heal:22}),
+    ],
+  },
+  mage: {
+    name:"Mage", emoji:"🧙", hp:95,
+    role:"Glass cannon. Low HP, devastating Arcane burst and control.",
+    aff:["arcane"],
+    deck:[
+      card({id:"staff", name:"Arcane Staff", weapon:true, icon:"🪄",
+        desc:"Strike for 13 damage.", cost:{arcane:3}, dmg:13}),
+      card({id:"fireball", name:"Fireball", icon:"☄️",
+        desc:"26 damage.", cost:{arcane:7}, dmg:26}),
+      card({id:"frostnova", name:"Frost Nova", icon:"❄️",
+        desc:"12 damage and stun the foe's next turn.", cost:{arcane:5}, dmg:12, stun:1}),
+      card({id:"missiles", name:"Arcane Missiles", icon:"✨",
+        desc:"9 damage and grants an extra turn.", cost:{arcane:4}, dmg:9, extraTurn:true}),
+      card({id:"manashield", name:"Mana Shield", icon:"🔷",
+        desc:"Gain 20 shield.", cost:{arcane:4}, shield:20}),
+    ],
+  },
+  cleric: {
+    name:"Cleric", emoji:"⛪", hp:120,
+    role:"Sustain. Outlasts foes with Holy healing, shields and Smite.",
+    aff:["holy","vigor"],
+    deck:[
+      card({id:"mace", name:"Blessed Mace", weapon:true, icon:"🔨",
+        desc:"Strike for 12 damage.", cost:{holy:3}, dmg:12}),
+      card({id:"smite", name:"Smite", icon:"🌟",
+        desc:"20 damage.", cost:{holy:6}, dmg:20}),
+      card({id:"heal", name:"Greater Heal", icon:"💚",
+        desc:"Heal 30 HP.", cost:{vigor:6}, heal:30}),
+      card({id:"sanctuary", name:"Sanctuary", icon:"⛨",
+        desc:"Gain 24 shield.", cost:{holy:5}, shield:24}),
+      card({id:"drainlife", name:"Drain Life", icon:"🩸",
+        desc:"14 damage; heal for the damage dealt.", cost:{shadow:6}, dmg:14, drain:true}),
+    ],
+  },
+  rogue: {
+    name:"Rogue", emoji:"🗡️", hp:105,
+    role:"Combo. Shadow poison, extra turns and armor-piercing daggers.",
+    aff:["shadow"],
+    deck:[
+      card({id:"daggers", name:"Twin Daggers", weapon:true, icon:"🗡️",
+        desc:"11 damage; ignores 4 shield.", cost:{shadow:3}, dmg:11, pierce:4}),
+      card({id:"backstab", name:"Backstab", icon:"🔪",
+        desc:"22 damage; ignores all shield.", cost:{shadow:7}, dmg:22, pierce:99}),
+      card({id:"poison", name:"Deadly Poison", icon:"🧪",
+        desc:"Poison: 6 damage per turn for 4 turns.", cost:{shadow:5}, poison:{dmg:6,turns:4}}),
+      card({id:"shadowstep", name:"Shadowstep", icon:"💨",
+        desc:"8 damage and grants an extra turn.", cost:{shadow:4}, dmg:8, extraTurn:true}),
+      card({id:"evasion", name:"Evasion", icon:"🌀",
+        desc:"Gain 16 shield.", cost:{arcane:4}, shield:16}),
+    ],
+  },
+  paladin: {
+    name:"Paladin", emoji:"✝️", hp:140,
+    role:"Balanced tank. Holy + Rage: shields, healing and heavy strikes.",
+    aff:["holy","rage"],
+    deck:[
+      card({id:"warhammer", name:"Warhammer", weapon:true, icon:"🔨",
+        desc:"Strike for 15 damage.", cost:{rage:4}, dmg:15}),
+      card({id:"holystrike", name:"Holy Strike", icon:"⚡",
+        desc:"19 damage; heal 8.", cost:{holy:6}, dmg:19, heal:8}),
+      card({id:"layon", name:"Lay on Hands", icon:"🙏",
+        desc:"Heal 26 HP.", cost:{holy:5}, heal:26}),
+      card({id:"divineshield", name:"Divine Shield", icon:"✨",
+        desc:"Gain 26 shield.", cost:{holy:5}, shield:26}),
+      card({id:"consecrate", name:"Consecrate", icon:"🔆",
+        desc:"12 damage and buff next attack +10.", cost:{rage:5}, dmg:12, buff:10}),
+    ],
+  },
+};
+
+// Ladder of foes (progressive difficulty). Each reuses a class deck but scales HP/skill/aggression.
+const LADDER = [
+  {cls:"rogue",   name:"Grik the Cutpurse", hpMul:0.75, skill:0.35, dmgMul:0.85, desc:"A twitchy back-alley thief."},
+  {cls:"fighter", name:"Bron Ironjaw",       hpMul:0.9,  skill:0.5,  dmgMul:0.95, desc:"A brutish sellsword."},
+  {cls:"mage",    name:"Vessa the Ember",    hpMul:0.9,  skill:0.6,  dmgMul:1.0,  desc:"An unstable pyromancer."},
+  {cls:"cleric",  name:"Abbot Mortis",       hpMul:1.15, skill:0.7,  dmgMul:1.0,  desc:"A heretic who will not die."},
+  {cls:"paladin", name:"Sir Kaine, Betrayer",hpMul:1.15, skill:0.82, dmgMul:1.1,  desc:"A fallen champion."},
+  {cls:"mage",    name:"Xar'Voth, the Overlord", hpMul:1.3, skill:0.95, dmgMul:1.2, desc:"Absolute domination or death.", boss:true},
+];
+
+const BOARD_N = 8;
+
+/* ============================ STATE ============================ */
+let G = null; // game state
+
+function freshFighter(clsKey, name, hp, aff, dmgMul, skill){
+  const cls = CLASSES[clsKey];
+  return {
+    clsKey, name, emoji:cls.emoji, aff,
+    maxHp:hp, hp, shield:0,
+    mana:Object.fromEntries(SCHOOLS.map(s=>[s,0])),
+    deck:cls.deck.map(c=>({...c})),
+    buff:0, stun:0, poison:0, poisonDmg:0,
+    dmgMul:dmgMul||1, skill:skill||1,
+  };
+}
+
+/* ============================ SETUP UI ============================ */
+const $ = sel=>document.querySelector(sel);
+let chosenClass = null;
+
+function renderSelect(){
+  const grid = $("#classGrid");
+  grid.innerHTML = "";
+  Object.entries(CLASSES).forEach(([key,c])=>{
+    const affTags = c.aff.map(a=>`<span class="aff" style="color:${GEMS[a].color}">${GEMS[a].icon} ${GEMS[a].name}</span>`).join("");
+    const el = document.createElement("div");
+    el.className = "classCard";
+    el.dataset.key = key;
+    el.innerHTML = `
+      <div class="emoji">${c.emoji}</div>
+      <h3>${c.name}</h3>
+      <div class="role">${c.role}</div>
+      <div class="stats">❤️ ${c.hp} HP &nbsp;•&nbsp; ${c.deck.length} cards<br>${affTags}</div>`;
+    el.onclick = ()=>{
+      chosenClass = key;
+      document.querySelectorAll(".classCard").forEach(n=>n.classList.toggle("sel", n.dataset.key===key));
+      $("#startBtn").disabled = false;
+    };
+    grid.appendChild(el);
+  });
+}
+$("#startBtn").onclick = ()=> startGauntlet();
+
+/* ============================ GAUNTLET / BATTLE ============================ */
+function startGauntlet(){
+  const cls = CLASSES[chosenClass];
+  G = {
+    rung: 0,
+    player: freshFighter(chosenClass, "You ("+cls.name+")", cls.hp, cls.aff, 1, 1),
+    foe: null, board: [], sel:null, turn:"player", busy:false, over:false,
+  };
+  $("#select").classList.add("hidden");
+  $("#battle").classList.remove("hidden");
+  $("#log").classList.remove("hidden");
+  loadRung();
+}
+
+function loadRung(){
+  const spec = LADDER[G.rung];
+  const cls = CLASSES[spec.cls];
+  const hp = Math.round(cls.hp * spec.hpMul);
+  G.foe = freshFighter(spec.cls, spec.name, hp, cls.aff, spec.dmgMul, spec.skill);
+  G.foe.desc = spec.desc; G.foe.boss = spec.boss;
+  // reset player transient state, keep HP carried over but top up a little between fights
+  const p = G.player;
+  p.shield = 0; p.buff=0; p.stun=0; p.poison=0; p.poisonDmg=0;
+  SCHOOLS.forEach(s=> p.mana[s]=0);
+  if(G.rung>0){ p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp*0.35)); } // heal 35% between rungs
+  G.turn = "player"; G.over=false; G.busy=false; G.sel=null;
+  makeBoard();
+  renderAll();
+  log(`— Rung ${G.rung+1}/${LADDER.length}: <b>${G.foe.name}</b> — ${spec.desc}`, "s");
+  if(spec.boss) log("The Overlord radiates absolute power…","e");
+}
+
+/* ---------- Board generation (no starting matches, must have a move) ---------- */
+function randTile(){ return TILE_TYPES[Math.floor(Math.random()*TILE_TYPES.length)]; }
+function idx(r,c){ return r*BOARD_N+c; }
+function inb(r,c){ return r>=0&&r<BOARD_N&&c>=0&&c<BOARD_N; }
+
+function makeBoard(){
+  do {
+    G.board = [];
+    for(let r=0;r<BOARD_N;r++) for(let c=0;c<BOARD_N;c++){
+      let t;
+      do { t = randTile(); }
+      while(
+        (c>=2 && G.board[idx(r,c-1)]===t && G.board[idx(r,c-2)]===t) ||
+        (r>=2 && G.board[idx(r-1,c)]===t && G.board[idx(r-2,c)]===t)
+      );
+      G.board[idx(r,c)] = t;
+    }
+  } while(!hasAnyMove());
+}
+
+function findMatches(board){
+  const marks = new Set();
+  for(let r=0;r<BOARD_N;r++){
+    let run=1;
+    for(let c=1;c<=BOARD_N;c++){
+      if(c<BOARD_N && board[idx(r,c)]===board[idx(r,c-1)]) run++;
+      else { if(run>=3) for(let k=1;k<=run;k++) marks.add(idx(r,c-k)); run=1; }
+    }
+  }
+  for(let c=0;c<BOARD_N;c++){
+    let run=1;
+    for(let r=1;r<=BOARD_N;r++){
+      if(r<BOARD_N && board[idx(r,c)]===board[idx(r-1,c)]) run++;
+      else { if(run>=3) for(let k=1;k<=run;k++) marks.add(idx(r-k,c)); run=1; }
+    }
+  }
+  return marks;
+}
+function swapArr(board,a,b){ const t=board[a]; board[a]=board[b]; board[b]=t; }
+function wouldMatch(a,b){
+  const t=G.board.slice(); swapArr(t,a,b);
+  return findMatches(t).size>0;
+}
+function hasAnyMove(){
+  for(let r=0;r<BOARD_N;r++) for(let c=0;c<BOARD_N;c++){
+    if(c<BOARD_N-1 && wouldMatch(idx(r,c),idx(r,c+1))) return true;
+    if(r<BOARD_N-1 && wouldMatch(idx(r,c),idx(r+1,c))) return true;
+  }
+  return false;
+}
+
+/* ---------- Rendering ---------- */
+function renderAll(){ renderBoard(); renderSides(); renderTurn(); }
+
+function renderTurn(){
+  const t = $("#turnTag");
+  if(G.over){ t.textContent=""; return; }
+  t.innerHTML = G.turn==="player"
+    ? "🟢 <b>Your turn</b> — swap a gem"
+    : `🔴 <b>${G.foe.name}</b> is thinking…`;
+  $("#foeSide").classList.toggle("active", G.turn==="foe");
+  $("#playerSide").classList.toggle("active", G.turn==="player");
+  $("#boardHint").textContent = G.turn==="player"
+    ? "Click a gem, then an adjacent gem to swap. Match 4+ = extra turn."
+    : "Opponent acting…";
+}
+
+function renderBoard(){
+  const b = $("#board");
+  b.style.gridTemplateColumns = `repeat(${BOARD_N},44px)`;
+  b.innerHTML = "";
+  for(let i=0;i<G.board.length;i++){
+    const cell = document.createElement("div");
+    cell.className = "cell" + (G.sel===i ? " sel":"");
+    cell.textContent = TILE_ICON[G.board[i]];
+    cell.dataset.i = i;
+    cell.onclick = ()=> onCell(i);
+    b.appendChild(cell);
+  }
+}
+
+function manaChips(f){
+  return SCHOOLS.map(s=>{
+    const hot = f.aff.includes(s);
+    return `<div class="mana" title="${GEMS[s].name}" style="${hot?'border-color:'+GEMS[s].color:''}">
+      <span class="dot">${GEMS[s].icon}</span>${f.mana[s]}</div>`;
+  }).join("");
+}
+function fighterHTML(f, isPlayer){
+  const pct = Math.max(0, (f.hp/f.maxHp)*100);
+  const effs = [];
+  if(f.poison>0) effs.push(`🧪 poison ${f.poisonDmg}/t (${f.poison})`);
+  if(f.buff>0)   effs.push(`🔥 +${f.buff} next hit`);
+  if(f.stun>0)   effs.push(`💫 stunned`);
+  const lvl = isPlayer ? "Champion" : (f.boss?"★ BOSS":"Rung "+(G.rung+1));
+  return `
+    <div class="whoRow"><div class="em">${f.emoji}</div>
+      <div><div class="nm">${f.name}</div><div class="lvl">${lvl}</div></div></div>
+    <div class="bar"><i style="width:${pct}%"></i><span>${Math.max(0,f.hp)} / ${f.maxHp}</span></div>
+    <div class="shieldTag">${f.shield>0?("🛡️ "+f.shield+" shield"):""}</div>
+    <div class="effs">${effs.join(" · ")}</div>
+    <div class="manaRow">${manaChips(f)}</div>`;
+}
+
+function renderSides(){
+  const p=G.player, f=G.foe;
+  $("#foeSide").innerHTML = fighterHTML(f,false);
+  $("#playerSide").innerHTML = fighterHTML(p,true) + renderHand(p);
+  // wire card clicks
+  document.querySelectorAll("#playerSide .gcard").forEach(el=>{
+    el.onclick = ()=>{ if(!el.classList.contains("dis")) playCard(G.player,G.foe, el.dataset.card, true); };
+  });
+}
+
+function canAfford(f,c){ return Object.entries(c.cost).every(([k,v])=> f.mana[k]>=v); }
+function renderHand(f){
+  const rows = f.deck.map(c=>{
+    const ok = canAfford(f,c) && G.turn==="player" && !G.over && !G.busy;
+    const chips = Object.entries(c.cost).map(([k,v])=>
+      `<span class="costChip" style="color:${GEMS[k].color}">${GEMS[k].icon}${v}</span>`).join("");
+    return `<div class="gcard ${ok?"":"dis"}" data-card="${c.id}">
+      ${c.weapon?'<span class="weaponTag">WEAPON</span>':''}
+      <div class="top"><span class="nm">${c.name}</span><span class="ic">${c.icon}</span></div>
+      <div class="desc">${c.desc}</div>
+      <div class="cost">${chips}</div>
+    </div>`;
+  }).join("");
+  return `<div class="handTitle">🃏 Your cards — spend mana to cast</div><div class="hand">${rows}</div>`;
+}
+
+/* ---------- Resolve cascades: score, grant mana / skull damage, gravity, refill ---------- */
+function resolveBoard(actor, done){
+  let anyExtra = {v:false};
+  step();
+  function step(){
+    if(G.over){ done && done(anyExtra.v); return; } // stop cascading once someone dies
+    const marks = findMatches(G.board);
+    if(marks.size===0){
+      // ensure a move exists; if not, reshuffle
+      if(!hasAnyMove()){ log("No moves left — the board reshuffles.","s"); makeBoard(); renderBoard(); }
+      done && done(anyExtra.v); return;
+    }
+    // tally by type
+    const gained = {}; let skulls=0;
+    marks.forEach(i=>{ const t=G.board[i]; if(t==="skull") skulls++; else gained[t]=(gained[t]||0)+1; });
+    // big matches → extra turn (4+ in any single clear wave)
+    if(marks.size>=4) anyExtra.v = true;
+    // apply mana
+    const foe = actor===G.player? G.foe : G.player;
+    Object.entries(gained).forEach(([t,n])=>{
+      actor.mana[t]=(actor.mana[t]||0)+n;
+    });
+    if(skulls>0){
+      const dmg = Math.round(skulls*3 * actor.dmgMul);
+      dealDamage(actor, foe, dmg, {pierce:0});
+      floatText($("#board"), `💀 ${dmg}`, "var(--skull)");
+    }
+    // animate clear
+    marks.forEach(i=>{ const el=$(`#board .cell[data-i="${i}"]`); if(el) el.classList.add("clear"); });
+    renderSides();
+    setTimeout(()=>{
+      // remove & gravity
+      marks.forEach(i=>{ G.board[i]=null; });
+      for(let c=0;c<BOARD_N;c++){
+        let write=BOARD_N-1;
+        for(let r=BOARD_N-1;r>=0;r--){
+          if(G.board[idx(r,c)]!==null){ G.board[idx(write,c)]=G.board[idx(r,c)]; if(write!==r) G.board[idx(r,c)]=null; write--; }
+        }
+        for(let r=write;r>=0;r--) G.board[idx(r,c)]=randTile();
+      }
+      renderBoard();
+      document.querySelectorAll("#board .cell").forEach(el=>el.classList.add("fall"));
+      setTimeout(step, 200);
+    }, 260);
+  }
+}
+
+/* ---------- Combat resolution ---------- */
+function dealDamage(src, tgt, amount, opt={}){
+  opt.pierce = opt.pierce||0;
+  let dmg = amount;
+  // apply attacker buff only to card attacks (not incidental skull damage)
+  if(opt.applyBuff && src.buff>0){ dmg += src.buff; src.buff=0; }
+  let absorbed=0;
+  if(tgt.shield>0){
+    const effShield = Math.max(0, tgt.shield - opt.pierce);
+    absorbed = Math.min(effShield, dmg);
+    tgt.shield -= absorbed;
+    dmg -= absorbed;
+  }
+  tgt.hp -= dmg;
+  if(src.drain && dmg>0){ src.hp = Math.min(src.maxHp, src.hp + dmg); }
+  checkDeath();
+  return dmg;
+}
+
+function playCard(actor, foe, cardId, isPlayer){
+  if(G.over || G.busy) return;
+  if(isPlayer && G.turn!=="player") return;
+  const c = actor.deck.find(x=>x.id===cardId);
+  if(!c || !canAfford(actor,c)) return;
+  Object.entries(c.cost).forEach(([k,v])=> actor.mana[k]-=v);
+
+  const tag = isPlayer? "p":"e";
+  let msg = `${actor.emoji} <b>${c.name}</b>`;
+  const sideEl = isPlayer? $("#playerSide") : $("#foeSide");
+  const foeEl  = isPlayer? $("#foeSide") : $("#playerSide");
+
+  if(c.dmg){
+    const raw = Math.round(c.dmg * actor.dmgMul);
+    const dealt = dealDamage(actor, foe, raw, {pierce:c.pierce||0, applyBuff:true});
+    msg += ` → ${dealt} damage`;
+    floatText(foeEl, `-${dealt}`, "var(--hp)");
+  }
+  if(c.heal){ const h=Math.min(c.heal, actor.maxHp-actor.hp); actor.hp+=h; msg+=` (+${h} HP)`; floatText(sideEl,`+${h}`,"var(--good)"); }
+  if(c.shield){ actor.shield+=c.shield; msg+=` (+${c.shield} 🛡️)`; floatText(sideEl,`+${c.shield}🛡️`,"var(--shield)"); }
+  if(c.buff){ actor.buff+=c.buff; msg+=` (next hit +${c.buff})`; }
+  if(c.stun){ foe.stun=Math.max(foe.stun,c.stun); msg+=` — 💫 stun`; }
+  if(c.poison){ foe.poison=c.poison.turns; foe.poisonDmg=c.poison.dmg; msg+=` — 🧪 poisoned`; }
+  if(c.drain){ msg+=` 🩸`; }
+
+  log(msg, tag);
+  renderSides();
+  if(G.over) return;
+
+  if(c.extraTurn && isPlayer){ log("Extra turn from the spell!","p"); renderSides(); return; }
+  if(c.extraTurn && !isPlayer){ return; } // foe AI handles its own chaining
+  // Playing a card does NOT auto-end the turn for the player (can play multiple if mana allows) —
+  // player ends by making a move. But to keep flow snappy, casting a damage/attack card ends turn:
+  if(isPlayer && !c.extraTurn){ G.busy=true; setTimeout(()=>{ G.busy=false; endTurnMaybe("player"); }, 350); }
+}
+
+/* ---------- Turn flow ---------- */
+function endTurnMaybe(who, forceExtra){
+  if(G.over) return;
+  // poison ticks at end of the OWNER-of-poison's opponent turn — simpler: tick both at handoff
+  // We tick the *incoming* player's poison at the start of their turn instead (below).
+  if(who==="player"){
+    if(pendingExtra){ pendingExtra=false; log("⭐ Extra turn!","p"); renderTurn(); renderSides(); return; }
+    beginTurn("foe");
+  } else {
+    if(pendingExtra){ pendingExtra=false; log("⭐ The foe takes an extra turn!","e"); setTimeout(foeAct,500); return; }
+    beginTurn("player");
+  }
+}
+
+let pendingExtra = false;
+
+function beginTurn(who){
+  G.turn=who;
+  const f = who==="player"? G.player : G.foe;
+  // poison tick
+  if(f.poison>0){
+    const d = f.poisonDmg;
+    f.hp -= d; f.poison--;
+    log(`${f.emoji} takes ${d} poison damage (${f.poison} left).`, who==="player"?"e":"p");
+    floatText(who==="player"?$("#playerSide"):$("#foeSide"), `-${d}`, "var(--shadow)");
+    checkDeath();
+    if(G.over) return;
+  }
+  // stun skips the turn
+  if(f.stun>0){
+    f.stun--;
+    log(`${f.emoji} is stunned and loses the turn! 💫`, who==="player"?"e":"p");
+    renderAll();
+    setTimeout(()=>{ if(!G.over) beginTurn(who==="player"?"foe":"player"); }, 700);
+    return;
+  }
+  renderAll();
+  if(who==="foe") setTimeout(foeAct, 650);
+}
+
+/* ---------- AI opponent ---------- */
+function bestMove(){
+  // Evaluate every legal swap; score = clear size, weighted by need.
+  let best=null, bestScore=-1;
+  const f=G.foe;
+  const need = {}; // schools the foe needs to afford its best unaffordable card
+  f.deck.forEach(c=> Object.entries(c.cost).forEach(([k,v])=>{ need[k]=(need[k]||0)+ (f.mana[k]<v?1:0); }));
+  for(let r=0;r<BOARD_N;r++) for(let c=0;c<BOARD_N;c++){
+    const tries=[];
+    if(c<BOARD_N-1) tries.push([idx(r,c),idx(r,c+1)]);
+    if(r<BOARD_N-1) tries.push([idx(r,c),idx(r+1,c)]);
+    for(const [a,b] of tries){
+      const t=G.board.slice(); swapArr(t,a,b);
+      const m=findMatches(t);
+      if(m.size===0) continue;
+      let score = m.size;
+      let skulls=0; m.forEach(i=>{ const tt=t[i]; if(tt==="skull") skulls++; else if(need[tt]) score+=1.5; });
+      score += skulls*2.2;                 // value direct damage
+      if(m.size>=4) score += 4;            // value extra turns
+      // add a little noise so lower-skill foes are imperfect
+      score += Math.random()* (1-f.skill) * 6;
+      if(score>bestScore){ bestScore=score; best=[a,b]; }
+    }
+  }
+  return best;
+}
+
+function foeAct(){
+  if(G.over) return;
+  const f=G.foe;
+  // Decide: cast affordable high-value cards first (skill-gated), then make a match.
+  const affordable = f.deck.filter(c=> canAfford(f,c));
+  if(affordable.length && Math.random() < f.skill){
+    // choose a card: prioritize lethal, then heal-if-low, then best damage
+    let choice=null;
+    const lethal = affordable.find(c=> c.dmg && Math.round(c.dmg*f.dmgMul) >= G.player.hp - Math.max(0,G.player.shield-(c.pierce||0)));
+    const lowHp = f.hp < f.maxHp*0.4;
+    const healCard = affordable.find(c=> c.heal);
+    const shieldCard = affordable.find(c=> c.shield);
+    if(lethal) choice=lethal;
+    else if(lowHp && healCard && Math.random()<0.8) choice=healCard;
+    else {
+      // pick highest "value": prefer dmg, then utility
+      const scored = affordable.map(c=>({c, v:(c.dmg?Math.round(c.dmg*f.dmgMul):0) + (c.poison?14:0) + (c.stun?8:0) + (c.buff?6:0) + (c.extraTurn?7:0)}));
+      scored.sort((a,b)=>b.v-a.v);
+      // sometimes shield up if it has one and player has buff/big mana — keep simple
+      choice = scored[0].v>0 ? scored[0].c : (shieldCard||scored[0].c);
+    }
+    const extra = !!choice.extraTurn;
+    playCard(f, G.player, choice.id, false);
+    renderSides();
+    if(G.over) return;
+    if(extra){ setTimeout(foeAct, 600); return; } // chain extra-turn cards
+    // casting is the foe's action for the turn (mirrors the player) — end turn
+    setTimeout(()=>{ pendingExtra=false; endTurnMaybe("foe"); }, 550);
+    return;
+  }
+  foeMove();
+}
+
+function foeMove(){
+  if(G.over) return;
+  const mv = bestMove();
+  if(!mv){ log("Foe finds no move; board reshuffles.","s"); makeBoard(); renderBoard(); beginTurn("player"); return; }
+  const [a,b]=mv;
+  // show selection briefly
+  G.sel=a; renderBoard();
+  setTimeout(()=>{
+    G.sel=null; swapArr(G.board,a,b); G.busy=true; renderBoard();
+    resolveBoard(G.foe, (extra)=>{
+      pendingExtra=!!extra; G.busy=false;
+      endTurnMaybe("foe");
+    });
+  }, 420);
+}
+
+/* ---------- Player input: swap a gem ---------- */
+function onCell(i){
+  if(G.turn!=="player" || G.busy || G.over) return;
+  if(G.sel===null){ G.sel=i; renderBoard(); return; }
+  if(G.sel===i){ G.sel=null; renderBoard(); return; }
+  const r1=Math.floor(G.sel/BOARD_N),c1=G.sel%BOARD_N,r2=Math.floor(i/BOARD_N),c2=i%BOARD_N;
+  const adj = Math.abs(r1-r2)+Math.abs(c1-c2)===1;
+  if(!adj){ G.sel=i; renderBoard(); return; }
+  const a=G.sel, bpos=i; G.sel=null;
+  if(!wouldMatch(a,bpos)){
+    swapArr(G.board,a,bpos); renderBoard();
+    setTimeout(()=>{ swapArr(G.board,a,bpos); renderBoard(); },160);
+    log("No match there — swap reverted.","s"); return;
+  }
+  swapArr(G.board,a,bpos);
+  G.busy=true; renderBoard();
+  resolveBoard(G.player, (extra)=>{
+    pendingExtra=!!extra; G.busy=false; endTurnMaybe("player");
+  });
+}
+
+/* ---------- Death / progression ---------- */
+function checkDeath(){
+  if(G.over) return;
+  if(G.foe.hp<=0){ G.foe.hp=0; G.over=true; renderSides(); setTimeout(onFoeDefeated, 400); }
+  else if(G.player.hp<=0){ G.player.hp=0; G.over=true; renderSides(); setTimeout(onPlayerDefeated, 400); }
+}
+
+function onFoeDefeated(){
+  log(`✔ ${G.foe.name} is defeated!`, "p");
+  if(G.rung >= LADDER.length-1){ showVictory(); return; }
+  showRungCleared();
+}
+function onPlayerDefeated(){ showDefeat(); }
+
+/* ---------- Overlays ---------- */
+function ladderHTML(){
+  return `<div class="ladder">${LADDER.map((l,i)=>{
+    const st = i<G.rung? "done" : (i===G.rung?"cur":"");
+    return `<div class="rung ${st}" title="${l.name}">${CLASSES[l.cls].emoji}${l.boss?"👑":""}</div>`;
+  }).join("")}</div>`;
+}
+function overlay(html){ $("#modal").innerHTML=html; $("#overlay").classList.remove("hidden"); }
+function closeOverlay(){ $("#overlay").classList.add("hidden"); }
+
+function showRungCleared(){
+  overlay(`
+    <h2>🏆 Victory!</h2>
+    <p>You bested <b>${G.foe.name}</b>. You recover some strength before the next challenger.</p>
+    ${ladderHTML()}
+    <p>Next: <b>${LADDER[G.rung+1].name}</b> — ${LADDER[G.rung+1].desc}</p>
+    <button class="btn primary" id="nextBtn">Next Battle →</button>`);
+  $("#nextBtn").onclick = ()=>{ closeOverlay(); G.rung++; loadRung(); };
+}
+function showVictory(){
+  overlay(`
+    <h2>👑 ABSOLUTE DOMINATION</h2>
+    <p>You conquered the entire gauntlet as the <b>${CLASSES[G.player.clsKey].name}</b> and cast down the Overlord. The realm is yours.</p>
+    ${ladderHTML()}
+    <button class="btn primary" id="againBtn">Play Again</button>`);
+  $("#againBtn").onclick = ()=> location.reload();
+}
+function showDefeat(){
+  overlay(`
+    <h2 style="color:var(--hp)">💀 You have fallen</h2>
+    <p>${G.foe.name} proved too strong. You reached rung <b>${G.rung+1}</b> of ${LADDER.length}.</p>
+    ${ladderHTML()}
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:6px;">
+      <button class="btn" id="retryBtn">Retry This Foe</button>
+      <button class="btn primary" id="restartBtn">New Run</button>
+    </div>`);
+  $("#retryBtn").onclick = ()=>{ closeOverlay(); const cls=CLASSES[G.player.clsKey]; G.player=freshFighter(G.player.clsKey,"You ("+cls.name+")",cls.hp,cls.aff,1,1); loadRung(); };
+  $("#restartBtn").onclick = ()=> location.reload();
+}
+
+/* ---------- Log & floaters ---------- */
+function log(msg, cls){
+  const l=$("#log"); const d=document.createElement("div");
+  d.className="line "+(cls||""); d.innerHTML=msg; l.appendChild(d); l.scrollTop=l.scrollHeight;
+  while(l.children.length>60) l.removeChild(l.firstChild);
+}
+function floatText(anchorEl, text, color){
+  const r=anchorEl.getBoundingClientRect();
+  const f=document.createElement("div"); f.className="float"; f.textContent=text; f.style.color=color||"#fff";
+  f.style.left=(r.left+r.width/2-14)+"px"; f.style.top=(r.top+20)+"px";
+  document.body.appendChild(f); setTimeout(()=>f.remove(),1000);
+}
+
+/* ============================ BOOT ============================ */
+renderSelect();
+</script>
+</body>
+</html>
