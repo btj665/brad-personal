@@ -48,8 +48,9 @@ Docker Compose, and a domain on Cloudflare (free plan is fine).
 
 1. **Get the files onto your host** and `cd remote-access`.
 2. **Create the Cloudflare Tunnel** and grab its token — follow
-   [`cloudflared/README.md`](cloudflared/README.md). Add a public hostname of type `HTTPS`
-   pointing at `meshcentral:4430` with **No TLS Verify** on.
+   [`cloudflared/README.md`](cloudflared/README.md). Add a public hostname of type `HTTP`
+   pointing at `meshcentral:4430`. (HTTP, not HTTPS — MeshCentral runs with TLS offload and
+   Cloudflare provides the edge TLS; this is required for agents to connect.)
 3. **Configure secrets:**
    ```
    cp .env.example .env          # then paste your CLOUDFLARE_TUNNEL_TOKEN
@@ -68,6 +69,25 @@ Docker Compose, and a domain on Cloudflare (free plan is fine).
 8. **Add machines:** create device groups and install the agent per machine —
    see [`docs/family-machines.md`](docs/family-machines.md) for the family workflow and
    [`docs/resolution.md`](docs/resolution.md) for lab machines + resolution control.
+
+## Troubleshooting
+
+Two issues you're likely to hit, both from getting the TLS/proxy interaction slightly wrong:
+
+- **"Server disconnected. Click to reconnect." right after login.** The web page loads (Cloudflare
+  serves valid TLS at the edge) but the WebSocket control channel drops because MeshCentral
+  validates the connection's host against its configured `cert`. Fix: set `cert` in
+  `meshcentral/config.json` to the **exact** public hostname you browse to (not a placeholder),
+  then `docker compose restart meshcentral`. Also confirm **WebSockets** are enabled for your
+  zone (Cloudflare dashboard → your domain → Network → WebSockets → On).
+
+- **Agent installed and "running" but the device never appears; logs show
+  `Agent bad web cert hash (... != ...), holding connection`.** Through the tunnel the agent
+  sees *Cloudflare's* certificate, not MeshCentral's, so TLS cert pinning fails. Fix: set
+  `"TlsOffload": true` in `meshcentral/config.json` **and** make the Cloudflare public hostname
+  an **HTTP** origin (`http://meshcentral:4430`, no "No TLS Verify"). Restart MeshCentral, then
+  **reinstall the agent** so its config reflects offload mode. Changing `cert` also regenerates
+  the server certs, so any agent installed beforehand must be reinstalled regardless.
 
 ## Notes
 

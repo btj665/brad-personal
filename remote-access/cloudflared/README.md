@@ -3,7 +3,14 @@
 The tunnel is what lets you reach MeshCentral **from anywhere with no VPN and no open
 inbound ports**. The `cloudflared` container dials *out* to Cloudflare's edge and keeps a
 persistent connection; your public hostname resolves to Cloudflare, which forwards traffic
-down the tunnel to `https://meshcentral:4430` on the private docker network.
+down the tunnel to `http://meshcentral:4430` on the private docker network.
+
+> **Important — the origin is HTTP, not HTTPS.** MeshCentral runs with `"TlsOffload": true`
+> and serves plain HTTP internally; Cloudflare terminates TLS at the edge. This is required
+> for MeshAgents: through the tunnel an agent sees *Cloudflare's* certificate, so if you use
+> an `https://` re-encrypt origin, agents fail with `bad web cert hash, holding connection`
+> and never appear as devices. With TLS offload, agents authenticate via the server's agent
+> certificate instead of pinning the TLS cert, which is stable across Cloudflare cert rotation.
 
 You need a domain on Cloudflare (any cheap domain works; move its nameservers to Cloudflare —
 free plan is fine).
@@ -19,11 +26,10 @@ This is what `docker-compose.yml` is wired for.
    (You do NOT run the shown install command — the `cloudflared` container uses the token.)
 4. In the tunnel's **Public Hostname** tab, add a public hostname:
    - **Subdomain/Domain**: e.g. `mesh` / `example.com` (this is your `REPLACE_WITH_YOUR_DOMAIN`).
-   - **Type**: `HTTPS`
+   - **Type**: `HTTP`  (not HTTPS — see the TLS-offload note above)
    - **URL**: `meshcentral:4430`
-   - Expand **Additional application settings -> TLS** and turn on **No TLS Verify**
-     (MeshCentral serves a self-signed cert internally; Cloudflare still encrypts to the edge).
-5. Make sure this same hostname is set as `cert` in `meshcentral/config.json`.
+5. Make sure this same hostname is set as `cert` in `meshcentral/config.json`, and that
+   `"TlsOffload": true` is set there.
 6. `docker compose up -d` and browse to `https://mesh.example.com`.
 
 WebSockets (which MeshCentral's remote desktop and agents rely on) work through Cloudflare

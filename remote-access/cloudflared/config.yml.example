@@ -9,12 +9,11 @@ credentials-file: /etc/cloudflared/REPLACE_WITH_TUNNEL_ID.json
 
 ingress:
   # Web console + agent connections all ride this one hostname over 443/websockets.
+  # Origin is HTTP: MeshCentral runs with "TlsOffload": true and serves plain HTTP on 4430;
+  # Cloudflare provides the TLS at the edge. This is REQUIRED for MeshAgents to connect
+  # (with a re-encrypt https origin, agents see Cloudflare's cert and fail the web cert hash
+  # check with "bad web cert hash, holding connection").
   - hostname: REPLACE_WITH_YOUR_DOMAIN
-    service: https://meshcentral:4430
-    originRequest:
-      # MeshCentral serves its own self-signed cert on the internal network;
-      # Cloudflare re-encrypts to the edge. Safe because only cloudflared can
-      # reach this origin over the private docker network.
-      noTLSVerify: true
+    service: http://meshcentral:4430
   # Everything else gets a 404.
   - service: http_status:404

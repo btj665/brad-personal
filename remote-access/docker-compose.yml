@@ -21,7 +21,8 @@ services:
 
   # cloudflared — outbound-only Cloudflare Tunnel. Dials out to Cloudflare's edge, so you
   # never open an inbound port or expose your home IP. Public hostname -> this tunnel ->
-  # https://meshcentral:4430 on the internal network.
+  # http://meshcentral:4430 on the internal network. Origin is HTTP because MeshCentral runs
+  # with TLS offload (Cloudflare provides the edge TLS); this is required for agents to connect.
   #
   # Default: dashboard-managed tunnel using a token (set CLOUDFLARE_TUNNEL_TOKEN in .env).
   # Configure the public hostname -> service mapping in the Zero Trust dashboard
