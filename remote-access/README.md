@@ -29,7 +29,8 @@ remote-access/
 └── docs/
     ├── resolution.md           # HOW to control screen resolution (read this)
     ├── security.md             # 2FA, lockdown, do-not-expose-RDP, hardening
-    └── family-machines.md      # Unattended access + console mirroring for family
+    ├── family-machines.md      # Unattended access + console mirroring for family
+    └── collaborative-sessions.md  # Shared screen with the local user, no console lockout
 ```
 
 ## Optional: RustDesk relay for the simplest family experience

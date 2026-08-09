@@ -22,9 +22,14 @@ you can actually help.
 - Use **Chat**/**Notify** to tell them what you're doing, and the **Files** and **Terminal**
   tabs for behind-the-scenes fixes.
 
-## Consent / privacy
+## Collaboration & consent
 
-MeshCentral can show a **connection notification / prompt** so they know when you connect. For
-family machines that's usually the polite default. Configure it per device group in the group's
-settings (notification and/or user-consent prompt). This is strictly your own personal use
-across your own household, which is exactly what MeshCentral is built for.
+The Desktop tab is a **shared** session by nature — you both see and control the same screen,
+and they're never logged out. To make it consensual, set the device group's **User Consent /
+Notification** options (notify on connect, prompt for consent, show a connection bar). For
+family, prompt-for-consent + the connection bar is the polite default. Full details, including
+multi-viewer sessions and the view-only toggle, are in
+[`collaborative-sessions.md`](collaborative-sessions.md).
+
+This is strictly your own personal use across your own household, which is exactly what
+MeshCentral is built for.
