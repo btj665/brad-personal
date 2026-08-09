@@ -83,11 +83,17 @@ Two issues you're likely to hit, both from getting the TLS/proxy interaction sli
 
 - **Agent installed and "running" but the device never appears; logs show
   `Agent bad web cert hash (... != ...), holding connection`.** Through the tunnel the agent
-  sees *Cloudflare's* certificate, not MeshCentral's, so TLS cert pinning fails. Fix: set
-  `"TlsOffload": true` in `meshcentral/config.json` **and** make the Cloudflare public hostname
-  an **HTTP** origin (`http://meshcentral:4430`, no "No TLS Verify"). Restart MeshCentral, then
-  **reinstall the agent** so its config reflects offload mode. Changing `cert` also regenerates
-  the server certs, so any agent installed beforehand must be reinstalled regardless.
+  sees *Cloudflare's* certificate, not MeshCentral's, so the agent web-cert-hash check fails.
+  The reported `Agent:` hash is Cloudflare's edge cert. Fix, in `meshcentral/config.json`:
+  1. `"TlsOffload": true` in `settings` (and the Cloudflare public hostname is an **HTTP**
+     origin, `http://meshcentral:4430`) — this is what makes the web console work.
+  2. **`"certUrl": "https://your.host"` in the `domains` `""` block** — this is what fixes the
+     agents. MeshCentral fetches the cert presented at that public URL (Cloudflare's) and then
+     accepts agents that report it. This is the key setting; without it agents keep getting held.
+
+  Restart MeshCentral after the change. The fix is server-side, so agents already installed will
+  connect on their next retry — no reinstall needed. (Note: changing `cert` regenerates the
+  server certs, which *does* require reinstalling any agent installed before that change.)
 
 ## Notes
 
