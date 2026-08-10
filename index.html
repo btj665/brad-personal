@@ -71,6 +71,10 @@
   .cell.bomb{background:#161226;}
   .cell.bomb::after{content:"";position:absolute;inset:5px;border-radius:6px;
     background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.18),transparent 60%);}
+  .cell.line{background:#161226;animation:linepulse 1.1s ease-in-out infinite;}
+  @keyframes linepulse{0%,100%{filter:brightness(1);}50%{filter:brightness(1.5);}}
+  .relics{margin-top:8px;font-size:19px;letter-spacing:3px;line-height:1.1;}
+  .relics span{cursor:help;}
   @keyframes pop{0%{transform:scale(1);}60%{transform:scale(1.3);filter:brightness(1.6);}100%{transform:scale(0);opacity:0;}}
   @keyframes fall{0%{transform:translateY(-14px);opacity:.4;}100%{transform:translateY(0);opacity:1;}}
   .turnTag{margin:10px 0 4px;font-weight:bold;font-size:15px;text-align:center;min-height:22px;}
@@ -142,7 +146,7 @@
       <div class="turnTag" id="turnTag"></div>
       <div id="board"></div>
       <div class="hint" id="boardHint">Drag a gem into a neighbor to swap.</div>
-      <div class="hint">🌈 wildcard matches any color · 💣 bomb clears a 3×3 blast</div>
+      <div class="hint">🌈 wildcard matches any color · 💣 bomb clears a 3×3 blast · ⚡ lightning clears its row + column</div>
     </div>
     <div class="side" id="playerSide"></div>
   </div>
@@ -277,9 +281,29 @@ const BONUS_CARDS = [
   {id:"rend",       name:"Rend",        icon:"🩸", desc:"Poison 5 dmg/turn for 3 turns.",  make:a=>({poison:{dmg:5,turns:3}, cost:{[a]:5}})},
   {id:"execute",    name:"Execute",     icon:"🎯", desc:"20 damage; ignores all shield.",  make:a=>({dmg:20, pierce:99, cost:{[a]:7}})},
 ];
+// Elite cards: a rarer, stronger reward tier.
+const ELITE_CARDS = [
+  {id:"cataclysm", name:"Cataclysm",  icon:"🌋", desc:"38 damage.",                                 elite:true, make:a=>({dmg:38, cost:{[a]:11}})},
+  {id:"radiance",  name:"Radiance",   icon:"🌅", desc:"Heal 30 and gain 20 shield.",                 elite:true, make:a=>({heal:30, shield:20, cost:{[a]:9}})},
+  {id:"soulreap",  name:"Soul Reap",  icon:"☠️", desc:"24 damage, ignores shield, heals you for it.", elite:true, make:a=>({dmg:24, pierce:99, drain:true, cost:{[a]:10}})},
+  {id:"tempest",   name:"Tempest",    icon:"🌩️", desc:"14 damage, stun the foe, and an extra turn.",  elite:true, make:a=>({dmg:14, stun:1, extraTurn:true, cost:{[a]:8}})},
+];
 function instantiateBonus(t,a){
-  return card(Object.assign({id:t.id, name:t.name, icon:t.icon, desc:t.desc+" "+GEMS[a].icon}, t.make(a)));
+  const label = t.desc + (t.elite?" ⭐":"") + " " + GEMS[a].icon;
+  return card(Object.assign({id:t.id, name:t.name, icon:t.icon, desc:label, elite:!!t.elite}, t.make(a)));
 }
+
+// Relics: persistent passive loot that carries across the whole run.
+const RELICS = [
+  {id:"aegis",     name:"Aegis Charm",     icon:"🔱",  desc:"Start each battle with 15 shield.",         stats:{startShield:15}},
+  {id:"whetstone", name:"Runed Whetstone", icon:"⚒️",  desc:"+4 damage to all your attacks.",            stats:{dmgBonus:4}},
+  {id:"vampfang",  name:"Vampiric Fang",   icon:"🧛",  desc:"Heal 25% of the damage your cards deal.",   stats:{lifesteal:0.25}},
+  {id:"emberheart",name:"Ember Heart",     icon:"🔥",  desc:"Regenerate 4 HP at the start of your turn.",stats:{regen:4}},
+  {id:"thornmail", name:"Thornmail",       icon:"🌵",  desc:"Reflect 5 damage whenever you are struck.", stats:{thorns:5}},
+  {id:"manaprism", name:"Mana Prism",      icon:"🔮",  desc:"+1 bonus mana of your school each match.",  stats:{manaBonus:1}},
+  {id:"giantbelt", name:"Giant's Belt",    icon:"🎗️",  desc:"+25 max HP (applied now).",                 stats:{maxHp:25}},
+];
+function relicSum(f, field){ return (f.relics||[]).reduce((s,r)=> s+(r.stats[field]||0), 0); }
 
 const BOARD_N = 8;
 
@@ -289,11 +313,13 @@ const BOARD_N = 8;
 function colorOf(t){
   if(t==="wild") return null;                                   // flexible
   if(typeof t==="string" && t.startsWith("bomb:")) return t.slice(5);
+  if(typeof t==="string" && t.startsWith("line:")) return t.slice(5);
   return t;                                                     // base color or "skull"
 }
 function isWild(t){ return t==="wild"; }
 function isBomb(t){ return typeof t==="string" && t.startsWith("bomb:"); }
-function iconOf(t){ if(isWild(t)) return "🌈"; if(isBomb(t)) return "💣"; return TILE_ICON[t]; }
+function isLine(t){ return typeof t==="string" && t.startsWith("line:"); } // clears its row + column
+function iconOf(t){ if(isWild(t)) return "🌈"; if(isBomb(t)) return "💣"; if(isLine(t)) return "⚡"; return TILE_ICON[t]; }
 
 /* ============================ STATE ============================ */
 let G = null; // game state
@@ -307,7 +333,7 @@ function freshFighter(clsKey, name, hp, aff, dmgMul, skill){
     deck:cls.deck.map(c=>({...c})),
     buff:0, stun:0, poison:0, poisonDmg:0,
     dmgMul:dmgMul||1, skill:skill||1,
-    level:1, startBonus:{},   // progression: level counter + per-fight starting mana
+    level:1, startBonus:{}, relics:[],   // progression: level, per-fight starting mana, passive loot
   };
 }
 
@@ -363,6 +389,7 @@ function loadRung(){
   p.shield = 0; p.buff=0; p.stun=0; p.poison=0; p.poisonDmg=0;
   SCHOOLS.forEach(s=> p.mana[s]=0);
   Object.entries(p.startBonus).forEach(([k,v])=> p.mana[k]=(p.mana[k]||0)+v); // Attunement reward
+  p.shield += relicSum(p,"startShield");                                      // Aegis Charm relic
   if(G.rung>0){ p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp*0.35)); } // heal 35% between rungs
   G.turn = "player"; G.over=false; G.busy=false; G.sel=null;
   makeBoard();
@@ -376,8 +403,10 @@ function randTile(){ return TILE_TYPES[Math.floor(Math.random()*TILE_TYPES.lengt
 // Refill tiles can occasionally be special gems (initial board never spawns them).
 function randRefill(){
   const x=Math.random();
-  if(x<0.03) return "wild";                                             // ~3% wildcard
-  if(x<0.09) return "bomb:"+SCHOOLS[Math.floor(Math.random()*SCHOOLS.length)]; // ~6% colored bomb
+  const col = ()=> SCHOOLS[Math.floor(Math.random()*SCHOOLS.length)];
+  if(x<0.03) return "wild";              // ~3% wildcard
+  if(x<0.09) return "bomb:"+col();       // ~6% colored bomb (3x3 blast)
+  if(x<0.12) return "line:"+col();       // ~3% lightning (row + column)
   return randTile();
 }
 function idx(r,c){ return r*BOARD_N+c; }
@@ -456,9 +485,9 @@ function renderBoard(){
   for(let i=0;i<G.board.length;i++){
     const t = G.board[i];
     const cell = document.createElement("div");
-    cell.className = "cell" + (G.sel===i ? " sel":"") + (isWild(t)?" wild":"") + (isBomb(t)?" bomb":"");
+    cell.className = "cell" + (G.sel===i ? " sel":"") + (isWild(t)?" wild":"") + (isBomb(t)?" bomb":"") + (isLine(t)?" line":"");
     cell.textContent = iconOf(t);
-    if(isBomb(t)) cell.style.boxShadow = "0 0 0 3px "+GEMS[colorOf(t)].color+" inset";
+    if(isBomb(t) || isLine(t)) cell.style.boxShadow = "0 0 0 3px "+GEMS[colorOf(t)].color+" inset";
     cell.dataset.i = i;
     cell.onpointerdown = (e)=>{ e.preventDefault(); onCellDown(i, e.clientX, e.clientY); };
     b.appendChild(cell);
@@ -485,7 +514,8 @@ function fighterHTML(f, isPlayer){
     <div class="bar"><i style="width:${pct}%"></i><span>${Math.max(0,f.hp)} / ${f.maxHp}</span></div>
     <div class="shieldTag">${f.shield>0?("🛡️ "+f.shield+" shield"):""}</div>
     <div class="effs">${effs.join(" · ")}</div>
-    <div class="manaRow">${manaChips(f)}</div>`;
+    <div class="manaRow">${manaChips(f)}</div>
+    ${(isPlayer && f.relics && f.relics.length) ? `<div class="relics">${f.relics.map(r=>`<span title="${r.name}: ${r.desc}">${r.icon}</span>`).join("")}</div>` : ""}`;
 }
 
 function renderSides(){
@@ -528,12 +558,15 @@ function resolveBoard(actor, done){
     }
     // big matches → extra turn (4+ gems in a single clear wave)
     if(baseMarks.size>=4) anyExtra.v = true;
-    // detonate any matched bombs: add their 3x3 blast to the cleared set
+    // detonate matched special gems: bombs clear a 3x3 blast, lightning clears its row + column
     const marks = new Set(baseMarks);
-    let bombs=0;
+    let bombs=0, lines=0;
     baseMarks.forEach(i=>{
-      if(isBomb(G.board[i])){ bombs++; const r=Math.floor(i/BOARD_N),c=i%BOARD_N;
+      const t=G.board[i], r=Math.floor(i/BOARD_N), c=i%BOARD_N;
+      if(isBomb(t)){ bombs++;
         for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++) if(inb(r+dr,c+dc)) marks.add(idx(r+dr,c+dc)); }
+      else if(isLine(t)){ lines++;
+        for(let k=0;k<BOARD_N;k++){ marks.add(idx(r,k)); marks.add(idx(k,c)); } }
     });
     // tally cleared tiles → mana / skull damage / wildcard bonus
     const gained = {}; let skulls=0, wilds=0;
@@ -544,11 +577,14 @@ function resolveBoard(actor, done){
     const foe = actor===G.player? G.foe : G.player;
     Object.entries(gained).forEach(([t,n])=>{ actor.mana[t]=(actor.mana[t]||0)+n; });
     if(wilds>0){ const a=actor.aff[0]; actor.mana[a]=(actor.mana[a]||0)+wilds*2; } // wildcard → primary mana
-    let direct=0; if(skulls>0) direct+=skulls*3; if(bombs>0) direct+=bombs*6;    // bombs hit hard
+    const mb = relicSum(actor,"manaBonus");                                        // Mana Prism relic
+    if(mb>0 && (Object.keys(gained).length||wilds)){ actor.mana[actor.aff[0]]+=mb; }
+    let direct=0; if(skulls>0) direct+=skulls*3; if(bombs>0) direct+=bombs*6; if(lines>0) direct+=lines*5; // bombs & lightning hit hard
     if(direct>0){
       const dmg = Math.round(direct * actor.dmgMul);
       dealDamage(actor, foe, dmg, {});
-      floatText($("#board"), `${bombs>0?"💥":"💀"} ${dmg}`, "var(--skull)");
+      const sym = bombs>0?"💥":(lines>0?"⚡":"💀");
+      floatText($("#board"), `${sym} ${dmg}`, "var(--skull)");
     }
     // animate clear
     marks.forEach(i=>{ const el=$(`#board .cell[data-i="${i}"]`); if(el) el.classList.add("clear"); });
@@ -585,6 +621,9 @@ function dealDamage(src, tgt, amount, opt={}){
   }
   tgt.hp -= dmg;
   if(src.drain && dmg>0){ src.hp = Math.min(src.maxHp, src.hp + dmg); }
+  // Thornmail relic: reflect damage back at the attacker when the player is struck
+  const th = relicSum(tgt,"thorns");
+  if(th>0 && dmg>0 && src!==tgt){ src.hp -= th; floatText($("#foeSide"), `-${th}`, "var(--good)"); }
   checkDeath();
   return dmg;
 }
@@ -602,10 +641,12 @@ function playCard(actor, foe, cardId, isPlayer){
   const foeEl  = isPlayer? $("#foeSide") : $("#playerSide");
 
   if(c.dmg){
-    const raw = Math.round(c.dmg * actor.dmgMul);
+    const raw = Math.round(c.dmg * actor.dmgMul) + relicSum(actor,"dmgBonus"); // Runed Whetstone
     const dealt = dealDamage(actor, foe, raw, {pierce:c.pierce||0, applyBuff:true});
     msg += ` → ${dealt} damage`;
     floatText(foeEl, `-${dealt}`, "var(--hp)");
+    const ls = relicSum(actor,"lifesteal");                                    // Vampiric Fang
+    if(ls>0 && dealt>0 && !c.drain){ const h=Math.round(dealt*ls); actor.hp=Math.min(actor.maxHp,actor.hp+h); if(h>0){ msg+=` (🧛 +${h})`; floatText(sideEl,`+${h}`,"var(--good)"); } }
   }
   if(c.heal){ const h=Math.min(c.heal, actor.maxHp-actor.hp); actor.hp+=h; msg+=` (+${h} HP)`; floatText(sideEl,`+${h}`,"var(--good)"); }
   if(c.shield){ actor.shield+=c.shield; msg+=` (+${c.shield} 🛡️)`; floatText(sideEl,`+${c.shield}🛡️`,"var(--shield)"); }
@@ -644,6 +685,11 @@ let pendingExtra = false;
 function beginTurn(who){
   G.turn=who;
   const f = who==="player"? G.player : G.foe;
+  // Ember Heart relic: regenerate HP at the start of your turn
+  if(who==="player"){
+    const rg=relicSum(f,"regen");
+    if(rg>0 && f.hp<f.maxHp){ const h=Math.min(rg,f.maxHp-f.hp); f.hp+=h; if(h>0) floatText($("#playerSide"),`+${h}`,"var(--good)"); }
+  }
   // poison tick
   if(f.poison>0){
     const d = f.poisonDmg;
@@ -820,13 +866,23 @@ function buildRewards(){
       if(!/upgraded/.test(c.desc)) c.desc += " ⭐";
     }});
   }
-  // learn a new bonus card (class-castable, paid in primary affinity)
+  // learn a new card (35% chance it's from the stronger Elite tier)
   const owned = new Set(p.deck.map(c=>c.id));
-  const learnable = BONUS_CARDS.filter(t=> !owned.has(t.id));
+  const useElite = Math.random()<0.35 && ELITE_CARDS.some(t=>!owned.has(t.id));
+  const cardList = useElite ? ELITE_CARDS : BONUS_CARDS;
+  const learnable = cardList.filter(t=> !owned.has(t.id));
   if(learnable.length){
     const t = learnable[Math.floor(Math.random()*learnable.length)];
-    pool.push({label:`🃏 Learn ${t.name}`, desc:`${t.desc} — costs ${GEMS[aff].icon}.`,
+    pool.push({label:`${t.elite?"⭐ ELITE — ":"🃏 "}Learn ${t.name}`, desc:`${t.desc} — costs ${GEMS[aff].icon}.`,
       apply:()=>{ p.deck.push(instantiateBonus(t,aff)); }});
+  }
+  // relic loot drop (persistent passive)
+  const ownedRelics = new Set((p.relics||[]).map(r=>r.id));
+  const relicPool = RELICS.filter(r=> !ownedRelics.has(r.id));
+  if(relicPool.length){
+    const r = relicPool[Math.floor(Math.random()*relicPool.length)];
+    pool.push({label:`${r.icon} Relic — ${r.name}`, desc:r.desc,
+      apply:()=>{ p.relics.push(r); if(r.stats.maxHp){ p.maxHp+=r.stats.maxHp; p.hp+=r.stats.maxHp; } }});
   }
   return shuffle(pool).slice(0,3);
 }

@@ -12,10 +12,11 @@ Open `index.html` in any modern browser. No build step, no dependencies.
 - **Controls:** drag a gem into a neighbor to swap (works with mouse or touch), or tap two adjacent gems.
 - **Gems → mana:** each colored gem banks mana of one of five schools — 🔴 Rage, 🔵 Arcane, 🟢 Vigor, 🟡 Holy, 🟣 Shadow.
 - **💀 Skulls → direct damage:** matching skulls damages your opponent regardless of class.
-- **🌈 Wildcards** match any color; **💣 bombs** are colored gems that also clear a 3×3 blast and deal extra damage when matched. Both spawn from refills.
+- **Special gems** spawn from refills: **🌈 wildcards** match any color; **💣 bombs** clear a 3×3 blast; **⚡ lightning** clears its entire row and column. Bombs and lightning also deal bonus damage.
 - **Match 4+ = extra turn.**
 - **Cards:** spend banked mana to cast your class's spells, attacks, and signature weapon. Damage, heal, shield, poison, stun, drain, buff, armor-pierce, and extra-turn effects.
-- **Level up between fights:** each victory lets you pick a reward — +20 max HP, an **Attunement** (permanent starting mana), an **upgrade** to a card (~+30%), or **learn a new card**. Your progression carries across the ladder (and through retries).
+- **Level up between fights:** each victory lets you pick one reward from a choice of three — +20 max HP, an **Attunement** (permanent starting mana), an **upgrade** to a card (~+30%), **learn a new card** (with a chance at a stronger **⭐ Elite** card), or a **relic** loot drop. Your progression carries across the ladder (and through retries).
+- **Relics** are persistent passive loot: start-of-battle shield, +damage, lifesteal, HP regen, thorns, bonus mana, or extra max HP. Collect them across a run.
 - **Gauntlet:** defeat all six challengers on a smoothed difficulty curve — ending with the Overlord boss — to win. Foes scale in HP, damage, and AI skill; you also heal 35% between fights.
 
 ## Classes
