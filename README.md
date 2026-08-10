@@ -17,6 +17,8 @@ Open `index.html` in any modern browser. No build step, no dependencies.
 - **Cards:** spend banked mana to cast your class's spells, attacks, and signature weapon. Damage, heal, shield, poison, stun, drain, buff, armor-pierce, and extra-turn effects.
 - **Level up between fights:** each victory lets you pick one reward from a choice of three — +20 max HP, an **Attunement** (permanent starting mana), an **upgrade** to a card (~+30%), **learn a new card** (with a chance at a stronger **⭐ Elite** card), or a **relic** loot drop. Your progression carries across the ladder (and through retries).
 - **Relics** are persistent passive loot: start-of-battle shield, +damage, lifesteal, HP regen, thorns, bonus mana, or extra max HP. Collect them across a run.
+- **Build viewer:** the **📖 Deck & Relics** button opens a read-only summary of your full deck and relics at any time.
+- **Save & resume:** your run is checkpointed to the browser (localStorage) at the start of every fight. Reload the page and a **▶ Continue Run** button restores your class, level, deck, and relics. Starting a new game or winning the run clears the save.
 - **Gauntlet:** defeat all six challengers on a smoothed difficulty curve — ending with the Overlord boss — to win. Foes scale in HP, damage, and AI skill; you also heal 35% between fights.
 
 ## Classes

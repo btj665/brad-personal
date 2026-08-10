@@ -128,6 +128,7 @@
 
   <!-- SELECT SCREEN -->
   <div id="select">
+    <div id="continueBar" class="hidden" style="text-align:center;margin-bottom:14px;"></div>
     <div class="classGrid" id="classGrid"></div>
     <div style="text-align:center;margin-top:8px;">
       <button class="btn primary" id="startBtn" disabled>Begin the Gauntlet →</button>
@@ -147,6 +148,7 @@
       <div id="board"></div>
       <div class="hint" id="boardHint">Drag a gem into a neighbor to swap.</div>
       <div class="hint">🌈 wildcard matches any color · 💣 bomb clears a 3×3 blast · ⚡ lightning clears its row + column</div>
+      <button class="btn" id="buildBtn" style="margin-top:10px;font-size:13px;padding:7px 12px;">📖 Deck &amp; Relics</button>
     </div>
     <div class="side" id="playerSide"></div>
   </div>
@@ -337,6 +339,28 @@ function freshFighter(clsKey, name, hp, aff, dmgMul, skill){
   };
 }
 
+/* ============================ SAVE / RESUME ============================ */
+const SAVE_KEY = "gemquest_run_v1";
+function serializePlayer(p){
+  return {clsKey:p.clsKey, name:p.name, aff:p.aff, maxHp:p.maxHp, hp:p.hp, level:p.level,
+    startBonus:p.startBonus, relics:p.relics, deck:p.deck, dmgMul:p.dmgMul, skill:p.skill};
+}
+function saveRun(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({rung:G.rung, player:serializePlayer(G.player)})); }catch(e){} }
+function clearRun(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
+function loadSaved(){ try{ const s=localStorage.getItem(SAVE_KEY); return s? JSON.parse(s): null; }catch(e){ return null; } }
+function continueRun(){
+  const s = loadSaved(); if(!s) return;
+  const sp = s.player, cls = CLASSES[sp.clsKey];
+  const p = freshFighter(sp.clsKey, sp.name || ("You ("+cls.name+")"), sp.maxHp, sp.aff, 1, 1);
+  p.maxHp=sp.maxHp; p.hp=sp.hp; p.level=sp.level||1;
+  p.startBonus=sp.startBonus||{}; p.relics=sp.relics||[]; p.deck=(sp.deck||[]).map(c=>({...c}));
+  G = {rung:s.rung||0, player:p, foe:null, board:[], sel:null, turn:"player", busy:false, over:false};
+  $("#select").classList.add("hidden");
+  $("#battle").classList.remove("hidden");
+  $("#log").classList.remove("hidden");
+  loadRung();
+}
+
 /* ============================ SETUP UI ============================ */
 const $ = sel=>document.querySelector(sel);
 let chosenClass = null;
@@ -366,6 +390,7 @@ $("#startBtn").onclick = ()=> startGauntlet();
 
 /* ============================ GAUNTLET / BATTLE ============================ */
 function startGauntlet(){
+  clearRun();                       // starting a new game ends any saved run
   const cls = CLASSES[chosenClass];
   G = {
     rung: 0,
@@ -394,6 +419,7 @@ function loadRung(){
   G.turn = "player"; G.over=false; G.busy=false; G.sel=null;
   makeBoard();
   renderAll();
+  saveRun();   // checkpoint at the start of every fight (build is already leveled up here)
   log(`— Rung ${G.rung+1}/${LADDER.length}: <b>${G.foe.name}</b> — ${spec.desc}`, "s");
   if(spec.boss) log("The Overlord radiates absolute power…","e");
 }
@@ -918,7 +944,33 @@ function ladderHTML(){
 function overlay(html){ $("#modal").innerHTML=html; $("#overlay").classList.remove("hidden"); }
 function closeOverlay(){ $("#overlay").classList.add("hidden"); }
 
+/* ---------- Deck & relics build viewer (read-only, openable mid-battle) ---------- */
+function showBuild(){
+  if(!G || !G.player) return;
+  const p = G.player;
+  const cards = p.deck.map(c=>{
+    const chips = Object.entries(c.cost).map(([k,v])=>`<span style="color:${GEMS[k].color}">${GEMS[k].icon}${v}</span>`).join(" ");
+    const tags = (c.weapon?' <span style="color:var(--gold)">⚔ weapon</span>':'') + (c.elite?' <span style="color:var(--gold)">⭐ elite</span>':'');
+    return `<div style="text-align:left;border-bottom:1px solid var(--edge);padding:6px 2px;">
+      <b>${c.icon} ${c.name}</b>${tags}<span style="float:right">${chips}</span>
+      <br><span style="color:var(--muted);font-size:12px">${c.desc}</span></div>`;
+  }).join("");
+  const relics = p.relics.length
+    ? p.relics.map(r=>`<div style="text-align:left;padding:5px 2px;"><b>${r.icon} ${r.name}</b> — <span style="color:var(--muted);font-size:12px">${r.desc}</span></div>`).join("")
+    : `<div style="color:var(--muted);text-align:left;padding:5px 2px;">No relics yet — win fights to earn loot.</div>`;
+  overlay(`
+    <h2 style="font-size:22px">📖 Your Build — Level ${p.level}</h2>
+    <p style="margin:0 0 6px">❤️ ${Math.max(0,p.hp)}/${p.maxHp} HP · ${p.aff.map(a=>GEMS[a].icon).join("")} affinity</p>
+    <div style="max-height:52vh;overflow-y:auto;margin:8px 0;">
+      <div class="handTitle" style="text-align:left">🃏 Cards (${p.deck.length})</div>${cards}
+      <div class="handTitle" style="text-align:left;margin-top:12px">🎁 Relics (${p.relics.length})</div>${relics}
+    </div>
+    <button class="btn primary" id="buildClose">Close</button>`);
+  $("#buildClose").onclick = closeOverlay;
+}
+
 function showVictory(){
+  clearRun();   // run complete — clear the save
   overlay(`
     <h2>👑 ABSOLUTE DOMINATION</h2>
     <p>You conquered the entire gauntlet as the <b>${CLASSES[G.player.clsKey].name}</b> and cast down the Overlord. The realm is yours.</p>
@@ -937,7 +989,7 @@ function showDefeat(){
     </div>`);
   // Retry keeps your level, upgrades and learned cards — just fully heal and refight.
   $("#retryBtn").onclick = ()=>{ closeOverlay(); G.player.hp=G.player.maxHp; loadRung(); };
-  $("#restartBtn").onclick = ()=> location.reload();
+  $("#restartBtn").onclick = ()=>{ clearRun(); location.reload(); };
 }
 
 /* ---------- Log & floaters ---------- */
@@ -955,6 +1007,20 @@ function floatText(anchorEl, text, color){
 
 /* ============================ BOOT ============================ */
 renderSelect();
+$("#buildBtn").onclick = showBuild;
+(function initContinue(){
+  const saved = loadSaved();
+  if(!saved) return;
+  const cls = CLASSES[saved.player.clsKey];
+  const bar = $("#continueBar");
+  bar.classList.remove("hidden");
+  bar.innerHTML = `
+    <button class="btn primary" id="continueBtn" style="font-size:16px;">
+      ▶ Continue Run — ${cls.emoji} ${cls.name}, Level ${saved.player.level||1}, Rung ${(saved.rung||0)+1}/${LADDER.length}
+    </button>
+    <div class="hint" style="margin-top:6px;">…or pick a class below to start fresh (this ends your saved run).</div>`;
+  $("#continueBtn").onclick = continueRun;
+})();
 </script>
 </body>
 </html>
