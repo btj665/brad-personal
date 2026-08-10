@@ -62,7 +62,8 @@
   #board{display:grid;gap:4px;background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:8px;
     touch-action:none;}
   .cell{width:44px;height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;
-    font-size:26px;cursor:pointer;background:var(--panel2);transition:transform .12s, box-shadow .12s;position:relative;}
+    font-size:26px;cursor:pointer;background:var(--panel2);transition:transform .12s ease, box-shadow .12s;position:relative;
+    will-change:transform;touch-action:none;}
   .cell:hover{box-shadow:0 0 0 2px var(--muted) inset;}
   .cell.sel{box-shadow:0 0 0 3px var(--gold) inset;transform:scale(1.06);}
   .cell.clear{animation:pop .28s ease forwards;}
@@ -82,6 +83,16 @@
     60%{transform:translate(-3px,-2px);}80%{transform:translate(3px,2px);}}
   .side.hit{animation:hitflash .3s ease;}
   @keyframes hitflash{0%{box-shadow:0 0 0 2px var(--hp);}100%{box-shadow:none;}}
+  .side.casting{animation:casting .48s ease;}
+  @keyframes casting{0%{box-shadow:0 0 0 0 rgba(245,197,66,0);}35%{box-shadow:0 0 18px 2px var(--gold);}100%{box-shadow:0 0 0 0 rgba(245,197,66,0);}}
+  /* opponent move telegraph */
+  .cell.aipick{z-index:4;box-shadow:0 0 0 3px var(--hp), 0 0 16px 2px var(--hp) !important;animation:aipulse .55s ease-in-out infinite;}
+  @keyframes aipulse{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
+  .aimark{position:fixed;pointer-events:none;z-index:70;font-size:22px;filter:drop-shadow(0 2px 3px #000);
+    animation:aihop .7s ease;}
+  @keyframes aihop{0%{transform:translateY(-6px);opacity:0;}20%{opacity:1;}50%{transform:translateY(2px);}100%{transform:translateY(-3px);opacity:.9;}}
+  .turnTag.foe{color:var(--bad);animation:turnpulse 1s ease-in-out infinite;}
+  @keyframes turnpulse{0%,100%{opacity:.75;}50%{opacity:1;}}
   .relics{margin-top:8px;font-size:19px;letter-spacing:3px;line-height:1.1;}
   .relics span{cursor:help;}
   @keyframes pop{0%{transform:scale(1);}60%{transform:scale(1.3);filter:brightness(1.6);}100%{transform:scale(0);opacity:0;}}
@@ -441,6 +452,7 @@ function beep(freq,dur,type,vol){
 }
 function sfx(kind){
   switch(kind){
+    case "swap":   beep(440,0.06,"sine",0.04); break;
     case "match":  beep(520,0.10,"triangle"); break;
     case "cascade":beep(700,0.10,"triangle"); break;
     case "cast":   beep(320,0.16,"sawtooth",0.05); break;
@@ -604,7 +616,8 @@ function renderTurn(){
   if(G.over){ t.textContent=""; return; }
   t.innerHTML = G.turn==="player"
     ? "🟢 <b>Your turn</b> — swap a gem"
-    : `🔴 <b>${G.foe.name}</b> is thinking…`;
+    : `🔴 <b>${G.foe.name}</b> is moving…`;
+  t.classList.toggle("foe", G.turn==="foe");
   $("#foeSide").classList.toggle("active", G.turn==="foe");
   $("#playerSide").classList.toggle("active", G.turn==="player");
   $("#boardHint").textContent = G.turn==="player"
@@ -612,22 +625,47 @@ function renderTurn(){
     : "Opponent acting…";
 }
 
-function renderBoard(){
+// Persistent cell elements so gems can animate (no full DOM rebuild per update).
+let cellEls = [];
+const PITCH = 48; // 44px cell + 4px gap
+function ensureBoardCells(){
   const b = $("#board");
   b.style.gridTemplateColumns = `repeat(${BOARD_N},44px)`;
-  b.innerHTML = "";
-  for(let i=0;i<G.board.length;i++){
-    const t = G.board[i];
-    const locked = isLocked(t);
-    const cell = document.createElement("div");
-    cell.className = "cell" + (G.sel===i ? " sel":"") + (isWild(t)?" wild":"") + (isBomb(t)?" bomb":"") + (isLine(t)?" line":"") + (locked?" locked":"");
-    cell.textContent = iconOf(t);
-    if((isBomb(t) || isLine(t)) && !locked) cell.style.boxShadow = "0 0 0 3px "+GEMS[colorOf(t)].color+" inset";
-    if(locked){ const n=lockLayers(t); cell.innerHTML = `${iconOf(t)}<span class="lockbadge">🔒${n>1?n:""}</span>`; }
-    cell.dataset.i = i;
-    cell.onpointerdown = (e)=>{ e.preventDefault(); onCellDown(i, e.clientX, e.clientY); };
-    b.appendChild(cell);
+  if(cellEls.length===BOARD_N*BOARD_N && b.children.length===cellEls.length) return;
+  b.innerHTML=""; cellEls=[];
+  for(let i=0;i<BOARD_N*BOARD_N;i++){
+    const cell=document.createElement("div");
+    cell.className="cell"; cell.dataset.i=i;
+    cell.onpointerdown=(e)=>{ e.preventDefault(); onCellDown(i, e.clientX, e.clientY); };
+    b.appendChild(cell); cellEls.push(cell);
   }
+}
+function paintCell(i){
+  const t=G.board[i], el=cellEls[i]; if(!el) return;
+  const locked=isLocked(t);
+  el.className="cell"+(G.sel===i?" sel":"")+(isWild(t)?" wild":"")+(isBomb(t)?" bomb":"")+(isLine(t)?" line":"")+(locked?" locked":"");
+  if(locked){ const n=lockLayers(t); el.innerHTML=`${iconOf(t)}<span class="lockbadge">🔒${n>1?n:""}</span>`; }
+  else el.textContent=iconOf(t);
+  el.style.boxShadow = ((isBomb(t)||isLine(t)) && !locked) ? "0 0 0 3px "+GEMS[colorOf(t)].color+" inset" : "";
+}
+function renderBoard(){ ensureBoardCells(); for(let i=0;i<G.board.length;i++) paintCell(i); }
+
+/* ---- swap/animation helpers on persistent cells ---- */
+function cellOffset(a,b){ const r1=(a/BOARD_N)|0,c1=a%BOARD_N,r2=(b/BOARD_N)|0,c2=b%BOARD_N; return {ox:(c2-c1)*PITCH, oy:(r2-r1)*PITCH}; }
+function setT(el,x,y,trans){ if(!el) return; el.style.transition=trans||""; el.style.transform=(x||y)?`translate(${x}px,${y}px)`:""; }
+function slideSwap(a,b,cb){                       // animate two gems trading places, then run cb
+  const ea=cellEls[a], eb=cellEls[b], {ox,oy}=cellOffset(a,b);
+  ea.style.zIndex="6";
+  setT(ea,ox,oy,"transform .18s cubic-bezier(.2,.75,.3,1)");
+  setT(eb,-ox,-oy,"transform .18s cubic-bezier(.2,.75,.3,1)");
+  setTimeout(()=>{ ea.style.zIndex=""; setT(ea,0,0,""); setT(eb,0,0,""); cb&&cb(); }, 185);
+}
+function nudgeSwap(a,b,cb){                       // invalid attempt: lean toward, spring back
+  const ea=cellEls[a], eb=cellEls[b], {ox,oy}=cellOffset(a,b);
+  ea.style.zIndex="6";
+  setT(ea,ox*0.42,oy*0.42,"transform .11s ease-out"); setT(eb,-ox*0.42,-oy*0.42,"transform .11s ease-out");
+  setTimeout(()=>{ setT(ea,0,0,"transform .16s cubic-bezier(.3,1.4,.5,1)"); setT(eb,0,0,"transform .16s cubic-bezier(.3,1.4,.5,1)");
+    setTimeout(()=>{ ea.style.zIndex=""; setT(ea,0,0,""); setT(eb,0,0,""); cb&&cb(); },170); },120);
 }
 
 function manaChips(f){
@@ -724,8 +762,8 @@ function resolveBoard(actor, done){
       floatText($("#board"), `${sym} ${dmg}`, "var(--skull)");
     }
     if(bombs>0 || lines>0){ sfx("bomb"); shakeBoard(); } else { sfx("match"); }
-    // animate clear
-    marks.forEach(i=>{ const el=$(`#board .cell[data-i="${i}"]`); if(el) el.classList.add("clear"); });
+    // animate clear (pop) on the persistent cells
+    marks.forEach(i=>{ const el=cellEls[i]; if(el) el.classList.add("clear"); });
     renderSides();
     setTimeout(()=>{
       // free locked gems orthogonally adjacent to any cleared tile (reduce one lock layer)
@@ -734,19 +772,25 @@ function resolveBoard(actor, done){
         [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>{ if(inb(r+dr,c+dc)){ const j=idx(r+dr,c+dc);
           if(isLocked(G.board[j]) && !marks.has(j)) toUnlock.add(j); } }); });
       toUnlock.forEach(j=>{ G.board[j]=reduceLock(G.board[j]); });
-      // remove & gravity
+      // remove & gravity, tracking how far each gem fell so we can animate it
       marks.forEach(i=>{ G.board[i]=null; });
+      const drop = new Array(BOARD_N*BOARD_N).fill(0);
       for(let c=0;c<BOARD_N;c++){
         let write=BOARD_N-1;
         for(let r=BOARD_N-1;r>=0;r--){
-          if(G.board[idx(r,c)]!==null){ G.board[idx(write,c)]=G.board[idx(r,c)]; if(write!==r) G.board[idx(r,c)]=null; write--; }
+          if(G.board[idx(r,c)]!==null){ if(write!==r){ G.board[idx(write,c)]=G.board[idx(r,c)]; G.board[idx(r,c)]=null; drop[idx(write,c)]=write-r; } write--; }
         }
-        for(let r=write;r>=0;r--) G.board[idx(r,c)]=randRefill();
+        const fills=write+1;
+        for(let r=write;r>=0;r--){ G.board[idx(r,c)]=randRefill(); drop[idx(r,c)]=fills; } // new gems fall in from above
       }
       renderBoard();
-      document.querySelectorAll("#board .cell").forEach(el=>el.classList.add("fall"));
-      setTimeout(step, 200);
-    }, 260);
+      // start moved/new gems at their old height, then settle to rest
+      for(let i=0;i<drop.length;i++){ if(drop[i]>0) setT(cellEls[i],0,-drop[i]*PITCH,"none"); }
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        for(let i=0;i<drop.length;i++){ if(drop[i]>0) setT(cellEls[i],0,0,"transform .22s cubic-bezier(.22,.6,.3,1)"); }
+      }));
+      setTimeout(()=>{ for(let i=0;i<drop.length;i++){ if(drop[i]>0){ cellEls[i].style.transition=""; cellEls[i].style.transform=""; } } step(); }, 250);
+    }, 250);
   }
 }
 
@@ -811,6 +855,8 @@ function playCard(actor, foe, cardId, isPlayer){
   if(c.manaBurn){ let burned=0; SCHOOLS.forEach(s=>{ const b=Math.min(foe.mana[s],c.manaBurn); foe.mana[s]-=b; burned+=b; }); msg+=` — 🌀 burned ${burned} mana`; }
 
   sfx(c.dmg? "cast" : (c.heal? "heal" : (c.shield? "shield" : "cast")));
+  if(sideEl){ sideEl.classList.add("casting"); setTimeout(()=>sideEl.classList.remove("casting"),480); }
+  floatText(sideEl, `${c.icon} ${c.name}`, isPlayer? "var(--good)" : "var(--gold)");
   log(msg, tag);
   renderSides();
   if(G.over) return;
@@ -933,61 +979,111 @@ function foeMove(){
   const mv = bestMove();
   if(!mv){ log("Foe finds no move; board reshuffles.","s"); makeBoard(); renderBoard(); beginTurn("player"); return; }
   const [a,b]=mv;
-  // show selection briefly
-  G.sel=a; renderBoard();
+  G.busy=true;
+  // Telegraph the opponent's move: highlight both gems, show a marker, then slide.
+  cellEls[a].classList.add("aipick"); cellEls[b].classList.add("aipick");
+  aiMarker(a);
+  sfx("swap");
   setTimeout(()=>{
-    G.sel=null; swapArr(G.board,a,b); G.busy=true; renderBoard();
-    resolveBoard(G.foe, (extra)=>{
-      pendingExtra=!!extra; G.busy=false;
-      endTurnMaybe("foe");
+    cellEls[a].classList.remove("aipick"); cellEls[b].classList.remove("aipick");
+    slideSwap(a,b,()=>{
+      swapArr(G.board,a,b); renderBoard();
+      resolveBoard(G.foe, (extra)=>{ pendingExtra=!!extra; G.busy=false; endTurnMaybe("foe"); });
     });
-  }, 420);
+  }, 680);
+}
+// A small marker that hops onto the gem the opponent is about to move.
+function aiMarker(i){
+  const el=cellEls[i]; if(!el) return;
+  const r=el.getBoundingClientRect();
+  const m=document.createElement("div"); m.className="aimark"; m.textContent="👉";
+  m.style.left=(r.left+r.width/2-13)+"px"; m.style.top=(r.top-8)+"px";
+  document.body.appendChild(m); setTimeout(()=>m.remove(),720);
 }
 
 /* ---------- Player input: drag/slide to swap (mouse + touch), tap-tap fallback ---------- */
-let press = null;            // {idx,x,y} active pointer press
-const DRAG_THRESHOLD = 14;   // px before a press becomes a slide
+let press = null;            // {idx,x,y,axis,partner,frac} active pointer drag
 function adjacent(a,b){
   const r1=Math.floor(a/BOARD_N),c1=a%BOARD_N,r2=Math.floor(b/BOARD_N),c2=b%BOARD_N;
   return Math.abs(r1-r2)+Math.abs(c1-c2)===1;
 }
-function attemptSwap(a,bpos){
+// Resolve a swap the player has committed to: slide if it matches, spring back if not.
+function playerSwap(a,b){
   if(G.turn!=="player" || G.busy || G.over) return;
-  if(!adjacent(a,bpos)) return;
-  if(isLocked(G.board[a]) || isLocked(G.board[bpos])){ log("That gem is locked — clear gems next to it to free it.","s"); G.sel=null; renderBoard(); return; }
-  if(!wouldMatch(a,bpos)){
-    swapArr(G.board,a,bpos); renderBoard();
-    setTimeout(()=>{ swapArr(G.board,a,bpos); renderBoard(); },160);
-    log("No match there — swap reverted.","s"); return;
+  if(!adjacent(a,b)) return;
+  if(isLocked(G.board[a]) || isLocked(G.board[b])){ log("That gem is locked — clear gems next to it to free it.","s"); G.sel=null; renderBoard(); return; }
+  G.busy=true;
+  if(wouldMatch(a,b)){
+    slideSwap(a,b,()=>{
+      swapArr(G.board,a,b); renderBoard(); sfx("swap");
+      resolveBoard(G.player,(extra)=>{ pendingExtra=!!extra; G.busy=false; endTurnMaybe("player"); });
+    });
+  } else {
+    nudgeSwap(a,b,()=>{ G.busy=false; log("No match there.","s"); });
   }
-  swapArr(G.board,a,bpos);
-  G.busy=true; renderBoard();
-  resolveBoard(G.player, (extra)=>{
-    pendingExtra=!!extra; G.busy=false; endTurnMaybe("player");
-  });
+}
+function clearDragT(){                          // reset any live drag transforms
+  if(!press) return;
+  setT(cellEls[press.idx],0,0,"transform .14s ease");
+  if(press.partner!=null) setT(cellEls[press.partner],0,0,"transform .14s ease");
+  const a=press.idx, p=press.partner;
+  setTimeout(()=>{ setT(cellEls[a],0,0,""); if(p!=null) setT(cellEls[p],0,0,""); },150);
 }
 function onCellDown(i,x,y){
   if(G.turn!=="player" || G.busy || G.over) return;
   if(isLocked(G.board[i])){ log("That gem is locked — clear gems next to it to free it.","s"); return; }
-  // tap-tap fallback: if a gem is already selected and this is a neighbor, swap
+  // tap-tap: second tap on an adjacent gem commits the swap
   if(G.sel!==null && G.sel!==i && adjacent(G.sel,i)){
-    const a=G.sel; G.sel=null; press=null; attemptSwap(a,i); return;
+    const a=G.sel; G.sel=null; press=null; paintCell(a); playerSwap(a,i); return;
   }
-  press={idx:i,x,y};
-  G.sel=i; renderBoard();
+  if(G.sel===i){ G.sel=null; press=null; paintCell(i); return; } // tap again to deselect
+  press={idx:i,x,y,axis:null,partner:null,frac:0};
+  G.sel=i; paintCell(i);
 }
 function onDocMove(e){
   if(!press) return;
   const dx=e.clientX-press.x, dy=e.clientY-press.y;
-  if(Math.max(Math.abs(dx),Math.abs(dy)) < DRAG_THRESHOLD) return;
-  // commit a slide in the dominant direction
-  let r=Math.floor(press.idx/BOARD_N), c=press.idx%BOARD_N, tr=r, tc=c;
-  if(Math.abs(dx)>Math.abs(dy)) tc += dx>0?1:-1; else tr += dy>0?1:-1;
-  const a=press.idx; press=null;
-  if(inb(tr,tc)){ G.sel=null; attemptSwap(a, idx(tr,tc)); }
-  else { G.sel=null; renderBoard(); }
+  if(!press.axis){
+    if(Math.max(Math.abs(dx),Math.abs(dy)) < 5) return;   // small deadzone before committing to an axis
+    press.axis = Math.abs(dx)>Math.abs(dy) ? "h" : "v";
+    cellEls[press.idx].style.zIndex="6";
+  }
+  const r=(press.idx/BOARD_N)|0, c=press.idx%BOARD_N;
+  let tr=r, tc=c, raw;
+  if(press.axis==="h"){ raw=dx; tc = c + (dx>0?1:-1); } else { raw=dy; tr = r + (dy>0?1:-1); }
+  const valid = inb(tr,tc) && !isLocked(G.board[idx(tr,tc)]) && !isLocked(G.board[press.idx]);
+  const newPartner = valid ? idx(tr,tc) : null;
+  // if the partner changed (crossed the origin), release the previous partner
+  if(press.partner!=null && press.partner!==newPartner){ setT(cellEls[press.partner],0,0,""); }
+  press.partner = newPartner;
+  // follow the pointer up to one cell; resist past the edge / into invalid targets
+  let frac = raw/PITCH;
+  frac = Math.max(-1, Math.min(1, frac));
+  if(!valid) frac = Math.max(-0.16, Math.min(0.16, frac));
+  press.frac = frac;
+  const main = cellEls[press.idx];
+  if(press.axis==="h"){ setT(main, frac*PITCH, 0, "none"); if(press.partner!=null) setT(cellEls[press.partner], -frac*PITCH, 0, "none"); }
+  else               { setT(main, 0, frac*PITCH, "none"); if(press.partner!=null) setT(cellEls[press.partner], 0, -frac*PITCH, "none"); }
 }
-function onDocUp(){ press=null; } // pure tap: selection stays for tap-tap fallback
+function onDocUp(){
+  if(!press) return;
+  const p=press; press=null;
+  const main=cellEls[p.idx];
+  if(p.axis && p.partner!=null && Math.abs(p.frac) >= 0.5){
+    // committed drag: hand off to playerSwap, which animates from the current position
+    main.style.zIndex=""; G.sel=null; paintCell(p.idx);
+    setT(main,0,0,""); if(p.partner!=null) setT(cellEls[p.partner],0,0,"");
+    playerSwap(p.idx, p.partner);
+  } else if(p.axis){
+    // released short — spring back and drop the selection
+    main.style.zIndex="";
+    setT(main,0,0,"transform .15s cubic-bezier(.3,1.3,.5,1)");
+    if(p.partner!=null) setT(cellEls[p.partner],0,0,"transform .15s cubic-bezier(.3,1.3,.5,1)");
+    G.sel=null;
+    setTimeout(()=>{ setT(main,0,0,""); if(p.partner!=null) setT(cellEls[p.partner],0,0,""); paintCell(p.idx); },160);
+  }
+  // pure tap (no axis): keep G.sel for the tap-tap fallback
+}
 document.addEventListener("pointermove", onDocMove);
 document.addEventListener("pointerup", onDocUp);
 document.addEventListener("pointercancel", onDocUp);

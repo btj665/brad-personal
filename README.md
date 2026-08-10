@@ -20,6 +20,7 @@ Open `index.html` in any modern browser. No build step, no dependencies.
 - **Relics** are persistent passive loot: start-of-battle shield, +damage, lifesteal, HP regen, thorns, bonus mana, or extra max HP. Collect them across a run.
 - **Equipment:** swappable **⚔️ weapon** and **🛡️ armor** slots, distinct from relics. Drops go to your inventory; the **🛡️ Equipment** button lets you equip/swap gear between fights.
 - **Run summary & stats:** the victory/defeat screens show foes beaten, total damage dealt/taken, and a full build recap.
+- **Polished animation:** gems follow your finger/cursor while dragging and either slide into place or spring back on release; matches pop and new gems fall in. The opponent's move is telegraphed — the target gems pulse with a 👉 marker before a smooth slide — and card casts flash the caster's panel.
 - **Audio & feedback:** synthesized sound effects (toggle with **🔊**) plus screen shake and hit flashes for bombs, damage, and clears.
 - **Build viewer:** the **📖 Deck & Relics** button opens a read-only summary of your full deck and relics at any time.
 - **Save & resume:** your run is checkpointed to the browser (localStorage) at the start of every fight. Reload the page and a **▶ Continue Run** button restores your class, level, deck, relics, equipment, and stats. Starting a new game or winning the run clears the save.
