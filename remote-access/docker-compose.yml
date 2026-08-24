@@ -14,6 +14,8 @@ services:
       - ./meshcentral/data:/opt/meshcentral/meshcentral-data
       # Layer our config.json on top of the data dir (mounted second so it wins).
       - ./meshcentral/config.json:/opt/meshcentral/meshcentral-data/config.json
+      # Custom UI theme (custom.css/js) — overrides the default look, upgrade-safe. See docs/appearance.md.
+      - ./meshcentral/web:/opt/meshcentral/meshcentral-web
       - ./meshcentral/user_files:/opt/meshcentral/meshcentral-files
       - ./meshcentral/backups:/opt/meshcentral/meshcentral-backups
     networks:

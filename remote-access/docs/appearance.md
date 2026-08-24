@@ -16,49 +16,38 @@ Then `docker compose restart meshcentral` and hard-refresh the browser (**Ctrl+S
 Individual users can also switch styles under **My Account → interface/theme**; `siteStyle`
 just sets the default for everyone. This is already set in this repo's `config.json`.
 
-## 2. Custom CSS override (optional, deeper reskin)
+## 2. Custom CSS theme (included in this repo)
 
-For system fonts, flatter colors, custom icons, and tighter spacing, MeshCentral supports an
-**upgrade-safe** CSS override: a `custom.css` that loads last on every page. It lives in a
-`meshcentral-web/` folder, which is separate from your data, so upgrades don't touch it.
+This repo ships a hand-written theme at **`meshcentral/web/public/styles/custom.css`** — a system
+font, flat surfaces, a slate + blue palette, rounded controls, and readable tables, replacing the
+beveled Windows-3.1 chrome. It's an **upgrade-safe** override: `custom.css` loads last on every
+page and lives in `meshcentral-web/`, which is separate from your data, so MeshCentral upgrades
+never touch it.
 
-### Folder structure (on the host)
+### How it's wired
+`docker-compose.yml` already mounts the theme folder into the container:
+```yaml
+      - ./meshcentral/web:/opt/meshcentral/meshcentral-web
+```
+Folder layout:
 ```
 remote-access/meshcentral/web/public/
-├── images/            # optional icon/logo overrides
-├── scripts/custom.js  # optional (can be empty)
-└── styles/custom.css  # your overrides
+├── scripts/custom.js  # loaded last (empty; theme is pure CSS)
+└── styles/custom.css  # the theme
+```
+It only takes effect on the **Modern UI** (`siteStyle: 3`, already set). After changing the CSS,
+recreate the container and hard-refresh:
+```bash
+docker compose up -d          # picks up the volume / restarts
+# then Ctrl+Shift+R in the browser
 ```
 
-### Mount it into the container
-In `docker-compose.yml`, add one volume to the `meshcentral` service — the override folder maps
-to `meshcentral-web` alongside the data dir:
-```yaml
-    volumes:
-      - ./meshcentral/data:/opt/meshcentral/meshcentral-data
-      - ./meshcentral/config.json:/opt/meshcentral/meshcentral-data/config.json
-      - ./meshcentral/web:/opt/meshcentral/meshcentral-web   # <-- add this
-      - ./meshcentral/user_files:/opt/meshcentral/meshcentral-files
-      - ./meshcentral/backups:/opt/meshcentral/meshcentral-backups
-```
-Then restart, make sure you're on the Modern UI (siteStyle 3), and hard-refresh.
-
-### Starter custom.css
-A conservative starting point — modern system font and flatter chrome, without fighting the
-layout:
-```css
-:root { --nav: #1f2937; --accent: #2563eb; }
-
-body, #page, .menu, table, input, select, button {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-}
-
-/* Flatten the beveled/3D chrome */
-#topbar, #masthead, .style2, td.style2 { background: var(--nav) !important; color: #fff !important; }
-* { border-style: solid !important; }
-button, .button { border-radius: 6px !important; }
-```
-Tune from there. Keep changes in `custom.css` only so upgrades stay clean.
+### Tuning it
+All colors, radii, and the font stack are CSS variables at the top of `custom.css` (`--accent`,
+`--nav`, `--bg`, `--radius`, …) — change those first. MeshCentral hard-codes a lot of inline
+styles, so the file uses `!important` deliberately. If a specific screen still looks off, note the
+element and it can be targeted. Enabling MeshCentral's built-in **dark mode** will clash with the
+light palette — ask for a dark variant if you want it.
 
 ### Community theme (shortcut)
 The [MeshCentral-Stylish-UI](https://github.com/Melo-Professional/MeshCentral-Stylish-UI) project
