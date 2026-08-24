@@ -242,6 +242,23 @@
       el.addEventListener('click', () => showStory(clusters[Number(el.dataset.i)])));
   }
 
+  // Coverage-balance strip: which side of the political spectrum the outlets
+  // covering this story are rated on (outlets counted once each).
+  function balanceStrip(balance) {
+    if (!balance) return '';
+    const total = balance.left + balance.center + balance.right;
+    if (!total) return '';
+    const seg = (n, cls, label) => n
+      ? `<span class="bal-seg bal-${cls}" style="flex:${n}" title="${n} ${label} outlet${n === 1 ? '' : 's'}"></span>`
+      : '';
+    return `
+      <div class="bal-strip" title="Political lean of the outlets covering this story (news-desk ratings)">
+        <span class="bal-label">Coverage</span>
+        <span class="bal-bar">${seg(balance.left, 'left', 'left-rated')}${seg(balance.center, 'center', 'center-rated')}${seg(balance.right, 'right', 'right-rated')}</span>
+        <span class="bal-counts">L ${balance.left} · C ${balance.center} · R ${balance.right}${balance.unrated ? ` · ? ${balance.unrated}` : ''}</span>
+      </div>`;
+  }
+
   // ---------- story view ----------
   function showStory(cluster) {
     pushNav();
@@ -253,6 +270,7 @@
         <h2 style="line-height:1.3">${esc(cluster.title)}</h2>
         <p class="muted">${cluster.items.length} article${cluster.items.length === 1 ? '' : 's'} from
           ${esc(cluster.sources.join(', ') || 'various sources')}</p>
+        ${balanceStrip(cluster.balance)}
         ${cluster.items.map((a, i) => `
           <div class="article-row" data-i="${i}" title="${isGoogleRedirect(a.link) ? 'Opens at the original source in a new tab' : ''}">
             ${a.image ? `<img src="${esc(a.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
@@ -679,10 +697,12 @@
     if (!sources.length) {
       list.innerHTML = '<p class="muted">No sources loaded yet — open a section with stories first.</p>';
     } else {
+      const LEAN_TAG = { left: ['L', 'Rated left-leaning'], center: ['C', 'Rated center'], right: ['R', 'Rated right-leaning'] };
       list.innerHTML = sources.map((s, i) => `
         <label class="source-row">
           <input type="checkbox" data-name="${esc(s.name)}" ${state.excluded.has(s.name) ? '' : 'checked'}>
           <span class="source-name">${esc(s.name)}</span>
+          ${LEAN_TAG[s.lean] ? `<span class="lean-tag lean-${s.lean}" title="${LEAN_TAG[s.lean][1]} (news desk)">${LEAN_TAG[s.lean][0]}</span>` : ''}
           <span class="source-count">${s.count}</span>
         </label>`).join('');
     }

@@ -274,7 +274,7 @@ code { background: var(--bg-hover); padding: 1px 5px; border-radius: 4px; font-s
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .story-card:hover, .article-row:hover { border-color: var(--accent); background: var(--bg-hover); }
-.story-card img, .article-row img {
+.story-card > img, .article-row > img {
   width: 88px; height: 66px;
   object-fit: cover;
   border-radius: 8px;
@@ -542,3 +542,37 @@ dialog input:focus { outline: none; border-color: var(--accent); }
 .wx-day-emoji { font-size: 1.25rem; }
 .wx-day-temps { font-weight: 600; }
 .wx-day-precip { font-size: 0.68rem; color: #6fc3e8; min-height: 1em; }
+
+/* ---------- coverage balance / lean tags ---------- */
+.bal-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 16px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.bal-label { text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; font-size: 0.68rem; }
+.bal-bar {
+  display: flex;
+  width: 160px;
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-hover);
+}
+.bal-seg { height: 100%; }
+.bal-seg + .bal-seg { border-left: 1.5px solid var(--bg); }
+.bal-left { background: #5a8fd8; }
+.bal-center { background: #9aa5b1; }
+.bal-right { background: #d86a5a; }
+.lean-tag {
+  font-size: 0.66rem;
+  font-weight: 700;
+  border-radius: 5px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+.lean-tag.lean-left { background: rgba(90, 143, 216, 0.18); color: #8db4e8; }
+.lean-tag.lean-center { background: rgba(154, 165, 177, 0.18); color: #b3bdc9; }
+.lean-tag.lean-right { background: rgba(216, 106, 90, 0.18); color: #e39a8d; }

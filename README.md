@@ -11,9 +11,16 @@ general.
 
 - **Four sections** — World, U.S., Regional, and Local. Regional/local news is gathered
   for your area from your browser location or a ZIP code.
-- **Credible, hard-news sources** — BBC, NPR, The Guardian, PBS NewsHour, and Google
-  News topic feeds (which aggregate AP, Reuters, and other wire coverage). Opinion,
-  editorial, commentary, analysis, and column pieces are filtered out.
+- **Credible, hard-news sources across the spectrum** — the default roster
+  deliberately spans left-, center-, and right-rated outlets (BBC, NPR, The Guardian,
+  PBS NewsHour, Fox News, Wall Street Journal, UPI, Washington Times, Christian
+  Science Monitor, The Hill, plus Google News topic feeds that aggregate AP, Reuters,
+  and others). Opinion, editorial, commentary, analysis, and column pieces are
+  filtered out; any outlet can be toggled off in the Sources panel.
+- **Coverage-balance indicators** — each story shows a Left / Center / Right strip of
+  the outlets covering it (news-desk bias ratings), sources are lean-tagged in the
+  Sources panel, and story headlines prefer a center-rated outlet's wording when one
+  is covering the story.
 - **Thought-bubble view** — related headlines from different outlets are clustered into
   one story; bubble size reflects how many sources are covering it. A list view is
   available too (☰ toggle).

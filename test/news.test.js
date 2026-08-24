@@ -148,3 +148,32 @@ test('cluster weight favors fresher stories', () => {
   assert.ok(fresh.weight > stale.weight * 2, `expected ${fresh.weight} > 2x ${stale.weight}`);
   assert.equal(clusters[0], fresh); // fresh story ranks first despite equal coverage
 });
+
+test('outlet lean ratings and balance counts', async () => {
+  const { leanBucket, balanceCounts } = await import('../lib/lean.js');
+  assert.equal(leanBucket('Fox News'), 'right');
+  assert.equal(leanBucket('The Guardian'), 'left');
+  assert.equal(leanBucket('NPR'), 'left');
+  assert.equal(leanBucket('UPI'), 'center');
+  assert.equal(leanBucket('Wall Street Journal'), 'right');
+  assert.equal(leanBucket('Associated Press'), 'center');
+  assert.equal(leanBucket('Some Local Gazette'), 'unrated');
+  const counts = balanceCounts([
+    { sourceName: 'Fox News' }, { sourceName: 'NPR' }, { sourceName: 'UPI' },
+    { sourceName: 'Fox News' }, // same outlet counted once
+  ]);
+  assert.deepEqual(counts, { left: 1, center: 1, right: 1, unrated: 0 });
+});
+
+test('cluster title prefers a center-rated outlet headline', () => {
+  const now = Date.now();
+  const items = [
+    { title: 'Senate slams controversial border bill in chaotic vote', link: 'a', sourceName: 'The Guardian', timestamp: now, description: '', image: '', categories: [] },
+    { title: 'Senate rejects border bill 52-48', link: 'b', sourceName: 'UPI', timestamp: now - 1000, description: '', image: '', categories: [] },
+    { title: 'Border bill fails in Senate showdown vote', link: 'c', sourceName: 'Fox News', timestamp: now - 2000, description: '', image: '', categories: [] },
+  ];
+  const clusters = clusterItems(items);
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].title, 'Senate rejects border bill 52-48');
+  assert.deepEqual(clusters[0].balance, { left: 1, center: 1, right: 1, unrated: 0 });
+});
