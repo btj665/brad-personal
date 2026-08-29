@@ -4,3 +4,4 @@ dist
 .DS_Store
 packaging/build
 the-tables.zip
+.vite

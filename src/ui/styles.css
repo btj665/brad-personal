@@ -9601,3 +9601,125 @@ main.main {
     animation: none;
   }
 }
+
+/* ================================================================ mobile
+
+   Phones, portrait. The felts and boards already squeeze to width — a roulette
+   layout, a solitaire tableau, the slot reels all measure themselves — so what
+   was actually breaking at 390px was uniform: the header rows and a couple of
+   bet rows sat in one non-wrapping flex line and pushed a button or a meter off
+   the right edge. This block wraps those, tightens the frame, and makes the
+   touch targets big enough to hit with a thumb. It is deliberately last in the
+   file so it wins on equal specificity. */
+
+/* A drag on a card must not be read as a page scroll. This is the one rule that
+   is about touch rather than width, so it sits outside the query — it costs a
+   mouse nothing. */
+.sol-card {
+  touch-action: none;
+}
+
+@media (max-width: 640px) {
+  /* Belt and suspenders: nothing may scroll the page sideways. `clip` rather
+     than `hidden` so it can't turn an ancestor into a scroll container and
+     break the sticky header. */
+  .app {
+    overflow-x: clip;
+  }
+
+  /* The header, on every game. It is one flex row of a dropdown, the bankroll
+     and a few buttons; let it wrap onto as many lines as it needs instead of
+     running off the edge. */
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding: 10px 12px;
+  }
+  .topbar-left,
+  .topbar-right {
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+  }
+  /* A picker or a note that wants the whole width takes it, so the meters and
+     buttons drop cleanly to the next line rather than being crushed. */
+  .vp-variant,
+  .sl-picker,
+  .sol-picker {
+    max-width: 100%;
+  }
+
+  /* Solitaire's header is the other space-between row that didn't wrap. */
+  .sol-top {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  /* Give the boards the full width — a fifth of it was frame padding. */
+  .main {
+    padding: 12px 8px 20px;
+    gap: 12px;
+  }
+
+  /* Big Six lays its seven bet spots in a forced seven-column grid; on a phone
+     that can't shrink below its text, so let them flow into as many rows as fit
+     and drop the smallest print. */
+  .bs6-layout {
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  }
+  /* Drop the smallest print (the "1/54 · 24.07%" line) so a wrapped spot stays
+     compact; its odds are on the pay screen and in the note below the wheel. */
+  .bs6-spot-math {
+    display: none;
+  }
+
+  /* Thumb-sized controls. The primary action buttons and the denomination
+     selectors were 26–35px; 42px is the floor for a reliable tap. */
+  .btn,
+  .sl-spin {
+    min-height: 42px;
+  }
+  /* Every denomination selector across the games — the small round chips you
+     pick a bet size with. Listed by their real classes so the rule actually
+     lands. */
+  .chip-button,
+  .vp-coin,
+  .sl-coin,
+  .slb-coin,
+  .bw-coin,
+  .rl-chip,
+  .rl2-chip,
+  .sb-chip,
+  .cr-chip,
+  .bac-chip,
+  .tcp-chip,
+  .bs6-chip,
+  .box-chip,
+  .spot-chip,
+  .vpm-hand {
+    min-width: 42px;
+    min-height: 42px;
+  }
+  /* The little mode selectors — hand-count, autoplay, bet-unit — are wide enough
+     already but were only 26–28px tall, under the thumb floor. Raise the height
+     and leave the width. */
+  .sl-auto,
+  .lir-unit {
+    min-height: 42px;
+  }
+  /* Keno's 80-number grid is the one place a 42px target would overflow (ten
+     columns), so its cells stay compact — a dense pad, tapped like a keypad. A
+     touch of extra height without widening keeps them square-ish and reachable. */
+  .kn-cell {
+    min-height: 34px;
+  }
+
+  /* The lobby is a lot of tabs on a small screen; tighten it so it doesn't eat
+     half the height before a game is even chosen. */
+  .gamenav {
+    padding: 8px 10px;
+  }
+  .gamenav-tab {
+    padding: 5px 8px;
+  }
+}
