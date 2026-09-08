@@ -1,0 +1,200 @@
+/* =====================================================================
+   Home Lab — MeshCentral custom theme
+   ---------------------------------------------------------------------
+   Hand-written, dependency-free restyle for MeshCentral's Modern UI
+   (config.json -> domains -> "" -> "siteStyle": 3). Loads last on every
+   page, so it overrides the defaults and survives MeshCentral upgrades.
+
+   Design goals: kill the Windows-3.1 beveled chrome, use a modern system
+   font, flat surfaces, a calm slate + blue palette, rounded flat controls,
+   and readable tables. Tune everything from the variables below.
+
+   NOTE: MeshCentral hard-codes many colors/borders inline, so !important
+   is used deliberately throughout. If you enable MeshCentral's built-in
+   dark mode and colors clash, ask for a dark variant.
+   ===================================================================== */
+
+:root {
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+          "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+
+  --bg:          #f4f6f8;   /* app background        */
+  --surface:     #ffffff;   /* panels, tables, dialogs */
+  --surface-2:   #eef1f5;   /* subtle fills, zebra   */
+  --border:      #d7dde5;   /* hairline borders      */
+  --border-strong:#c2cad4;
+
+  --ink:         #1f2937;   /* primary text          */
+  --ink-soft:    #55606e;   /* secondary text        */
+
+  --nav:         #1f2a37;   /* top bar / masthead     */
+  --nav-ink:     #f8fafc;   /* text on the nav        */
+
+  --accent:      #2563eb;   /* links, focus, primary  */
+  --accent-ink:  #ffffff;
+  --accent-soft: #e8f0fe;   /* selected row / hover   */
+
+  --radius:      7px;
+  --radius-sm:   5px;
+  --shadow:      0 1px 2px rgba(16,24,40,.06), 0 4px 12px rgba(16,24,40,.08);
+}
+
+/* ---- Global typography ------------------------------------------------ */
+html, body, input, select, textarea, button, table, td, th, div, span, a, p {
+  font-family: var(--font) !important;
+}
+body {
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- Flatten the 3D / beveled chrome (the big one) -------------------- */
+/* MeshCentral leans on outset/inset/ridge/groove borders everywhere. */
+[style*="outset"], [style*="inset"], [style*="ridge"], [style*="groove"],
+table[border], td, th, fieldset, .style1, .style2, .style3, .style8 {
+  border-style: solid !important;
+  border-color: var(--border) !important;
+}
+
+/* ---- Top bar / masthead ---------------------------------------------- */
+#masthead, #topbar, #tabViewport, .style2, td.style2 {
+  background: var(--nav) !important;
+  color: var(--nav-ink) !important;
+  border: none !important;
+}
+#masthead *, #topbar * { color: var(--nav-ink) !important; }
+#logoutControl a, #topbar a { color: var(--nav-ink) !important; opacity: .9; }
+#logoutControl a:hover, #topbar a:hover { opacity: 1; }
+
+/* ---- Main content surfaces ------------------------------------------- */
+#page, #column_l, #column_r, #centralize, #devices, .areaHead, .panel {
+  background: var(--bg) !important;
+}
+.areaHead, #p1 .areaHead, #p2 .areaHead {
+  color: var(--ink) !important;
+  font-weight: 600 !important;
+  letter-spacing: .1px;
+}
+
+/* Cards / boxed regions */
+fieldset, .deviceGroupBox, .deviceBox, .panel, .dialog, #dialog, #idx_dlgButtonBar {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow);
+}
+
+/* ---- Buttons ---------------------------------------------------------- */
+input[type=button], input[type=submit], button, .button, .disabledButton {
+  font-weight: 600 !important;
+  color: var(--ink) !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 6px 12px !important;
+  box-shadow: none !important;
+  transition: background .12s ease, border-color .12s ease;
+}
+input[type=button]:hover, input[type=submit]:hover, button:hover, .button:hover {
+  background: var(--surface-2) !important;
+  border-color: var(--accent) !important;
+}
+/* Primary-looking actions (submit) */
+input[type=submit], .primaryButton {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+}
+input[type=submit]:hover { filter: brightness(1.05); }
+
+/* ---- Inputs / selects ------------------------------------------------- */
+input[type=text], input[type=password], input[type=email], input[type=search],
+input[type=number], select, textarea {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 5px 8px !important;
+  outline: none !important;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
+}
+
+/* ---- Links ------------------------------------------------------------ */
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---- Tables (device lists, event logs, etc.) ------------------------- */
+table { border-collapse: separate !important; border-spacing: 0 !important; }
+td, th {
+  border-color: var(--border) !important;
+  padding: 6px 9px !important;
+}
+th, .tableHeader, tr.style1 > td:first-child {
+  background: var(--surface-2) !important;
+  color: var(--ink-soft) !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+}
+/* Zebra + hover on list rows */
+.DeviceSummary:nth-child(even), tr:nth-child(even) > td { background: var(--surface); }
+.DeviceSummary:hover, tr:hover > td { background: var(--accent-soft) !important; }
+/* Selected device / row */
+.DeviceSelected, .selected, tr.selected > td { background: var(--accent-soft) !important; }
+
+/* ---- Tabs ------------------------------------------------------------- */
+.tab, .MeshTab, #deskarea0 .tab {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--nav-ink) !important;
+  padding: 8px 14px !important;
+  border-bottom: 2px solid transparent !important;
+}
+.tab.selected, .MeshTabSel {
+  border-bottom: 2px solid var(--accent) !important;
+  color: #fff !important;
+  background: rgba(255,255,255,.06) !important;
+}
+
+/* ---- Dialogs ---------------------------------------------------------- */
+#dialog, .dialogBody, #MainDialog {
+  border-radius: var(--radius) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow) !important;
+}
+#dialogHeader, .dialogHeader {
+  background: var(--nav) !important;
+  color: var(--nav-ink) !important;
+  border-top-left-radius: var(--radius) !important;
+  border-top-right-radius: var(--radius) !important;
+}
+
+/* ---- Footer ----------------------------------------------------------- */
+#footer, .footer {
+  background: var(--surface) !important;
+  color: var(--ink-soft) !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+/* ---- Modern thin scrollbars ------------------------------------------ */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong); border-radius: 8px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- Login page ------------------------------------------------------- */
+#loginpanel, #loginTable {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
+}
