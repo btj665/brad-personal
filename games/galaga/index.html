@@ -130,7 +130,7 @@
 <div class="cab">
   <div class="screen">
     <canvas id="g" width="224" height="288" aria-label="Galaga arcade game"></canvas>
-    <div class="crt" id="crt"></div>
+    <div class="crt" id="crt" hidden></div>
   </div>
 </div>
 
@@ -141,7 +141,7 @@
 
 <div class="rack">
   <button id="bSound" type="button" aria-pressed="false">Sound Off</button>
-  <button id="bCrt" type="button" aria-pressed="true">CRT On</button>
+  <button id="bCrt" type="button" aria-pressed="false">CRT Off</button>
   <button id="bReset" type="button">Reset</button>
 </div>
 
@@ -375,6 +375,62 @@ var ART_BOSS = [
   '................'
 ];
 
+/* --- transforms: a Zako morphs into these from stage 4 on --- */
+var ART_SCORPION = [
+  '................',
+  '.YY..........YY.',
+  'YRRY........YRRY',
+  'YRRY........YRRY',
+  '.YYY..YYYY..YYY.',
+  '..YY.YYYYYY.YY..',
+  '...YYYYYYYYYY...',
+  '...YYYRRRRYYY...',
+  '...YYYRRRRYYY...',
+  '....YYYYYYYY....',
+  '...YY.YYYY.YY...',
+  '..YY...YY...YY..',
+  '.......YY.......',
+  '......YYY.......',
+  '.....YY.YY......',
+  '......YYY.......'
+];
+var ART_STINGRAY = [
+  '................',
+  '.....GGGGGG.....',
+  '...GGGGGGGGGG...',
+  '..GGGWWGGWWGGG..',
+  '..GGWWWGGWWWGG..',
+  '.GGGGGGGGGGGGGG.',
+  '.GGCCGGGGGGCCGG.',
+  'GGCCCCGGGGCCCCGG',
+  'GGCCCCGGGGCCCCGG',
+  '.GGCCGGGGGGCCGG.',
+  '.GGGGGGGGGGGGGG.',
+  '..GGWWWGGWWWGG..',
+  '..GGGWWGGWWGGG..',
+  '...GGGGGGGGGG...',
+  '.....GGGGGG.....',
+  '................'
+];
+var ART_FLAGSHIP = [
+  '................',
+  '.......WW.......',
+  '......WWWW......',
+  '......YYYY......',
+  '.....YYYYYY.....',
+  '..RR.YYYYYY.RR..',
+  '.RRRRYYYYYYRRRR.',
+  'RRRRRYYYYYYRRRRR',
+  'RRRRRYWWWWYRRRRR',
+  'BBBBBYWWWWYBBBBB',
+  'BBBBBYYYYYYBBBBB',
+  '.BBBBYYYYYYBBBB.',
+  '..BB.YYYYYY.BB..',
+  '.....YY..YY.....',
+  '....BB....BB....',
+  '................'
+];
+
 var SPR = {};
 function initSprites() {
   SPR.fighter    = buildSprite(ART_FIGHTER, { W: C.white, R: C.red });
@@ -387,15 +443,25 @@ function initSprites() {
   SPR.bossRot    = buildRotations(SPR.boss);
   SPR.boss2      = buildSprite(ART_BOSS, { G: C.purple, B: C.blue, W: C.white });
   SPR.boss2Rot   = buildRotations(SPR.boss2);
+  SPR.scorpion   = buildSprite(ART_SCORPION, { Y: C.yellow, R: C.red });
+  SPR.stingray   = buildSprite(ART_STINGRAY, { G: C.green, W: C.white, C: C.cyan });
+  SPR.flagship   = buildSprite(ART_FLAGSHIP, { Y: C.yellow, W: C.white, R: C.red, B: C.blue });
+  SPR.transRot   = [buildRotations(SPR.scorpion),
+                    buildRotations(SPR.stingray),
+                    buildRotations(SPR.flagship)];
 }
 
 /* enemy kinds */
-var BEE = 0, GOEI = 1, BOSS = 2;
+var BEE = 0, GOEI = 1, BOSS = 2, TRANS = 3;
 function rotSetFor(e) {
   if (e.kind === BEE) return SPR.beeRot;
   if (e.kind === GOEI) return SPR.goeiRot;
+  if (e.kind === TRANS) return SPR.transRot[e.tkind];
   return (e.chal || e.hp > 1) ? SPR.bossRot : SPR.boss2Rot;
 }
+/* stage 4,5,6 scorpions -> 8,9,10 stingrays -> 12,13,14 flagships -> repeat */
+function transKindFor(st) { var g = Math.floor((st - 4) / 4); return ((g % 3) + 3) % 3; }
+var TRANS_BONUS = [1000, 2000, 3000];
 function drawRot(set, ang, x, y) {
   ctx.drawImage(set[rotIndex(ang)], Math.round(x) - ROT_SIZE / 2, Math.round(y) - ROT_SIZE / 2);
 }
@@ -623,6 +689,9 @@ var enemies, bullets, ebullets, booms, popups, spawnQ, freeShips;
 var player, dualLost;
 var shotsFired, shotsHit, chalHits, nextExtend, extendStep;
 var diveTimer, beamDone, captiveBoss, capturing, captureT;
+var transPhase, transList, transT, transKilled, transDone;
+var demo = false, demoT = 0, attractT = 0, demoRun = 0;
+var DEMO_STAGES = [1, 4, 3];
 
 function loadHi() {
   try { var v = localStorage.getItem('galaga.hi'); return v ? parseInt(v, 10) || 0 : 20000; }
@@ -650,6 +719,7 @@ function clearField() {
   booms = []; popups = []; spawnQ = []; freeShips = [];
   captiveBoss = null; capturing = null; captureT = 0;
   beamDone = false; diveTimer = 120;
+  transPhase = 'none'; transList = []; transT = 0; transKilled = 0; transDone = false;
 }
 function setState(s) { state = s; stateT = 0; }
 
@@ -661,6 +731,7 @@ function isChallenge(st) { return st >= 3 && (st - 3) % 4 === 0; }
 function beginStage() {
   clearField();
   chalHits = 0;
+  transDone = false;
   formT = 0; swayX = 0; breathe = 1;
   var chal = isChallenge(stage);
   if (chal) { buildChallengeWaves(); SFX.start(); }
@@ -675,7 +746,7 @@ function makeEnemy(kind, row, col) {
     hp: kind === BOSS ? 2 : 1,
     st: 'ENTER', path: null, d: 0, spd: 1.55,
     alive: true, hasCaptive: false, escorts: 0,
-    fireCd: 0, beamT: 0, chal: false, scored: false
+    fireCd: 0, beamT: 0, chal: false, pulsing: false, tkind: 0
   };
 }
 
@@ -781,6 +852,50 @@ function startBeam(e) {
   e.d = 0; e.spd = 1.5; e.beamT = 0;
 }
 
+/* --- transform squadron: three Zakos pulse, morph, and sweep the screen --- */
+function pickTransforms() {
+  var bees = enemies.filter(function(o){
+    return o.alive && o.st === 'FORM' && o.kind === BEE;
+  });
+  if (bees.length < 3) return false;
+  /* prefer three from the same row so they leave as a tidy trio */
+  bees.sort(function(a, b){ return (a.row - b.row) || (a.col - b.col); });
+  var startAt = Math.max(0, Math.floor(Math.random() * (bees.length - 3)));
+  transList = bees.slice(startAt, startAt + 3);
+  for (var i = 0; i < transList.length; i++) transList[i].pulsing = true;
+  transPhase = 'pulse';
+  transT = 0;
+  return true;
+}
+function morphTransforms() {
+  transList = transList.filter(function(o){ return o.alive; });
+  if (!transList.length) { transPhase = 'done'; transDone = true; return; }
+  var tk = transKindFor(stage);
+  var lead = transList[0];
+  var dir = lead.x < 112 ? 1 : -1;
+  var path = buildPath([
+    { x: lead.x, y: lead.y },
+    { x: lead.x + dir * 26, y: lead.y + 26 },
+    { x: 112 + dir * 62, y: 118 },
+    { x: 112 - dir * 66, y: 168 },
+    { x: 112 + dir * 54, y: 214 },
+    { x: dir > 0 ? W + 34 : -34, y: 252 }
+  ]);
+  for (var i = 0; i < transList.length; i++) {
+    var e = transList[i];
+    e.pulsing = false;
+    e.kind = TRANS;
+    e.tkind = tk;
+    e.hp = 1;
+    e.st = 'TRANS_FLY';
+    e.path = path;
+    e.d = -i * 20;
+    e.spd = 1.3;
+  }
+  transPhase = 'fly';
+  SFX.dive();
+}
+
 function startReturn(e) {
   e.st = 'RETURN';
   var sx = clamp(e.x, 24, W - 24);
@@ -837,6 +952,7 @@ function popup(x, y, val, col) {
    ============================================================ */
 function scoreFor(e, diving) {
   if (e.chal) return 100;
+  if (e.kind === TRANS) return 160;
   if (e.kind === BEE)  return diving ? 100 : 50;
   if (e.kind === GOEI) return diving ? 160 : 80;
   if (!diving) return 150;
@@ -846,6 +962,7 @@ function scoreFor(e, diving) {
 }
 function addScore(n) {
   score += n;
+  if (demo) return;
   if (score > hiScore) { hiScore = score; saveHi(); }
   if (score >= nextExtend) {
     lives++;
@@ -870,6 +987,7 @@ window.addEventListener('keyup', function(e) { keys[e.key] = false; });
 function startPressed() {
   audioInit();
   if (AC && AC.state === 'suspended') AC.resume();
+  if (demo) { endDemo(); resetGame(); return; }
   if (state === S_ATTRACT || state === S_RESULTS) resetGame();
 }
 
@@ -877,7 +995,7 @@ cv.addEventListener('pointerdown', function(e) {
   cv.setPointerCapture(e.pointerId);
   var r = cv.getBoundingClientRect();
   touchX = (e.clientX - r.left) / r.width * W;
-  if (state === S_ATTRACT || state === S_RESULTS) startPressed();
+  if (state === S_ATTRACT || state === S_RESULTS || demo) startPressed();
   else touchFire = true;
 });
 cv.addEventListener('pointermove', function(e) {
@@ -934,6 +1052,63 @@ function fire() {
 }
 
 /* ============================================================
+   ATTRACT DEMO — the cabinet plays itself between title screens
+   ============================================================ */
+function startDemo() {
+  demo = true; demoT = 0;
+  score = 0; lives = 3;
+  shotsFired = 0; shotsHit = 0;
+  stage = DEMO_STAGES[demoRun % DEMO_STAGES.length];
+  demoRun++;
+  player = newPlayer();
+  beginStage();
+}
+function endDemo() {
+  demo = false; demoT = 0; attractT = 0;
+  score = 0; lives = 3; stage = 1;
+  clearField();
+  player = newPlayer();
+  setState(S_ATTRACT);
+}
+function autopilot() {
+  var spd = 1.45, i;
+
+  /* first priority: slide out from under an incoming shot */
+  var threat = null, near = 1e9;
+  for (i = 0; i < ebullets.length; i++) {
+    var b = ebullets[i];
+    if (b.y < player.y && player.y - b.y < 78 && Math.abs(b.x - player.x) < 24) {
+      var gap = player.y - b.y;
+      if (gap < near) { near = gap; threat = b; }
+    }
+  }
+  if (threat) {
+    player.x += (threat.x > player.x ? -1 : 1) * spd;
+    player.x = clamp(player.x, 8, W - 8);
+    if (frame % 8 === 0) fire();
+    return;
+  }
+
+  /* otherwise line up on the most pressing target: divers first, then formation */
+  var target = null, best = 1e9;
+  for (i = 0; i < enemies.length; i++) {
+    var e = enemies[i];
+    if (!e.alive) continue;
+    var cost = Math.abs(e.x - player.x) + (e.st === 'FORM' ? 260 : 0) +
+               (e.kind === TRANS ? -140 : 0) + (H - e.y) * 0.18;
+    if (cost < best) { best = cost; target = e; }
+  }
+  if (target) {
+    var dx = target.x - player.x;
+    if (Math.abs(dx) > 2) player.x += (dx > 0 ? 1 : -1) * spd;
+    if (Math.abs(dx) < 8 && frame % 7 === 0) fire();
+  }
+  if (frame % 15 === 0) fire();
+  var half = player.dual ? 16 : 8;
+  player.x = clamp(player.x, half, W - half);
+}
+
+/* ============================================================
    UPDATE
    ============================================================ */
 function update() {
@@ -941,7 +1116,17 @@ function update() {
   updateStars();
   stateT++;
 
-  if (state === S_ATTRACT) { starSpeed = 1; return; }
+  if (demo) {
+    demoT++;
+    if (demoT > 1600 || state === S_GAMEOVER || state === S_RESULTS) { endDemo(); return; }
+  }
+
+  if (state === S_ATTRACT) {
+    starSpeed = 1;
+    attractT++;
+    if (attractT > 520) startDemo();
+    return;
+  }
   if (state === S_READY)   { starSpeed = 1; if (stateT > 100) { stage = 1; beginStage(); } return; }
   if (state === S_CLEAR) {
     starSpeed = 2.2;
@@ -960,7 +1145,7 @@ function update() {
 
   /* ---- formation motion ---- */
   formT += 0.016;
-  swayX = Math.sin(formT * 1.15) * 11;
+  swayX = Math.sin(formT * 1.15) * (10 + Math.min(7, stage * 0.35));
   breathe = 1 + Math.sin(formT * 0.62) * 0.05;
 
   /* ---- spawn queue ---- */
@@ -1009,12 +1194,14 @@ function updatePlayer() {
       captiveBoss = b;
       capturing = null;
       player.alive = false;
-      lives--;
+      if (!demo) lives--;
       setState(S_DYING);
     }
     return;
   }
   if (state !== S_PLAY || !player.alive) return;
+
+  if (demo) { autopilot(); return; }
 
   var spd = 1.45;
   if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.x -= spd;
@@ -1042,6 +1229,12 @@ function updateEnemies() {
     if (e.st === 'FORM') {
       formCount++;
       e.x = formX(e.col); e.y = formY(e.row); e.ang = Math.PI / 2;
+    }
+    else if (e.st === 'TRANS_FLY') {
+      e.d += e.spd;
+      var tp = samplePath(e.path, e.d);
+      e.x = tp.x; e.y = tp.y; e.ang = tp.a + Math.PI / 2;
+      if (tp.done) { e.alive = false; continue; }
     }
     else if (e.st === 'ENTER' || e.st === 'TUCK' || e.st === 'RETURN' ||
              e.st === 'DIVE' || e.st === 'CHAL' || e.st === 'BEAM_MOVE') {
@@ -1110,27 +1303,46 @@ function updateEnemies() {
     }
   }
 
+  /* --- transform squadron (normal stages, 4 and up, once per stage) --- */
+  if (!chal && stage >= 4 && !transDone && spawnQ.length === 0 && state === S_PLAY) {
+    if (transPhase === 'none') {
+      transT++;
+      if (transT > 150 && pickTransforms()) { /* pulse begins */ }
+    } else if (transPhase === 'pulse') {
+      transT++;
+      if (transT > 84) morphTransforms();
+    } else if (transPhase === 'fly') {
+      var stillOut = transList.some(function(o){ return o.alive; });
+      if (!stillOut) { transPhase = 'done'; transDone = true; }
+    }
+  }
+
   /* --- attack scheduling --- */
   if (!chal && state === S_PLAY && spawnQ.length === 0) {
     diveTimer--;
     if (diveTimer <= 0) {
-      var pool = enemies.filter(function(o){ return o.st === 'FORM'; });
+      var pool = enemies.filter(function(o){ return o.st === 'FORM' && !o.pulsing; });
       if (pool.length) {
-        var pick = pool[(Math.random() * pool.length) | 0];
         var bossPool = pool.filter(function(o){ return o.kind === BOSS; });
         /* tractor beam: one boss per stage tries it, if the player is single */
         if (!beamDone && bossPool.length && !captiveBoss && !player.dual &&
             player.alive && stage >= 2 && Math.random() < 0.55) {
           startBeam(bossPool[(Math.random() * bossPool.length) | 0]);
           beamDone = true;
-        } else if (pick.kind === BOSS) {
-          startDive(pick, true);
         } else {
-          startDive(pick, false);
+          /* later stages send more than one attacker at a time */
+          var launches = 1;
+          if (stage >= 5 && Math.random() < Math.min(0.55, (stage - 4) * 0.08)) launches = 2;
+          if (stage >= 12 && Math.random() < 0.2) launches = 3;
+          for (var L = 0; L < launches && pool.length; L++) {
+            var idx = (Math.random() * pool.length) | 0;
+            var pick = pool.splice(idx, 1)[0];
+            startDive(pick, pick.kind === BOSS);
+          }
         }
       }
-      var pressure = Math.max(24, 108 - stage * 6 - (40 - aliveCount) * 1.2);
-      diveTimer = pressure + Math.random() * pressure * 0.6;
+      var pressure = Math.max(20, 104 - stage * 5.5 - (40 - aliveCount) * 1.3);
+      diveTimer = pressure + Math.random() * pressure * 0.55;
     }
   }
 }
@@ -1171,7 +1383,7 @@ function killPlayer() {
   player.alive = false;
   boom(player.x, player.y, true);
   SFX.bigBoom();
-  lives--;
+  if (!demo) lives--;
   /* a captured fighter is lost with the run if the stock empties */
   setState(S_DYING);
 }
@@ -1221,6 +1433,16 @@ function updateBullets() {
         var pts = scoreFor(e, diving);
         addScore(pts);
         if (chal) chalHits++;
+        if (e.kind === TRANS) {
+          popup(e.x, e.y, pts, C.yellow);
+          transKilled++;
+          if (transKilled >= 3) {
+            var tb = TRANS_BONUS[e.tkind];
+            addScore(tb);
+            popup(112, 150, tb, C.cyan);
+            SFX.rescue();
+          }
+        }
         if (!chal && (pts >= 400 || e.kind === BOSS)) popup(e.x, e.y, pts, C.cyan);
         boom(e.x, e.y, e.kind === BOSS);
         SFX.hit();
@@ -1358,7 +1580,11 @@ function render() {
   for (var j = 0; j < enemies.length; j++) {
     var e = enemies[j];
     if (!e.alive) continue;
-    drawRot(rotSetFor(e), e.ang, e.x, e.y);
+    if (e.pulsing && (frame % 12) < 6) {
+      drawRot(SPR.transRot[transKindFor(stage)], e.ang, e.x, e.y);
+    } else {
+      drawRot(rotSetFor(e), e.ang, e.x, e.y);
+    }
     if (e.hasCaptive) {
       /* captured fighter rides below the boss, inverted */
       drawRot(SPR.fighterRot, e.ang + Math.PI, e.x, e.y + 16);
@@ -1408,6 +1634,7 @@ function render() {
   } else if (state === S_RESULTS) {
     drawResults();
   }
+  if (demo && (frame % 52) < 34) textC('PUSH START', 224, C.red);
 
   drawHud();
 }
