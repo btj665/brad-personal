@@ -371,10 +371,27 @@ Arcade.Audio = function (opts) {
     return AC;
   }
 
+  /* One second of white noise, made once and shared. Exposed because a game
+     that builds its own nodes — a speech synthesiser, a wind loop — needs
+     the same buffer rather than a second copy of it. */
+  function noiseBuffer() {
+    if (!init()) return null;
+    if (!noiseBuf) {
+      noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return noiseBuf;
+  }
+
   var api = {
     init: init,
     get enabled() { return on; },
     get context() { return AC; },
+    /* The master gain every voice hangs off, so a game can add its own
+       nodes and still be muted by the cabinet's sound button. */
+    get bus() { return gain; },
+    noiseBuffer: noiseBuffer,
     resume: function () { if (AC && AC.state === 'suspended') AC.resume(); },
     toggle: function () {
       init(); on = !on;
@@ -402,12 +419,7 @@ Arcade.Audio = function (opts) {
     noise: function (dur, vol, filtFrom, filtTo, delay) {
       if (!on || !AC) return;
       var t0 = AC.currentTime + (delay || 0);
-      if (!noiseBuf) {
-        noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
-        var d = noiseBuf.getChannelData(0);
-        for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      }
-      var s = AC.createBufferSource(); s.buffer = noiseBuf;
+      var s = AC.createBufferSource(); s.buffer = noiseBuffer();
       var f = AC.createBiquadFilter(); f.type = 'bandpass';
       f.frequency.setValueAtTime(filtFrom, t0);
       f.frequency.exponentialRampToValueAtTime(Math.max(40, filtTo), t0 + dur);

@@ -1,0 +1,1974 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08080d">
+<title>Gorf</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #08080d; color: #8d8da6;
+    font: 12px ui-monospace, Menlo, Consolas, monospace;
+    overscroll-behavior: none;
+  }
+  body { display: grid; place-items: center; }
+  #mount { width: 100%; }
+  #legend {
+    margin: 0; text-align: center; letter-spacing: .12em; text-transform: uppercase;
+    font-size: 10px; color: #5c5c78; line-height: 1.9; padding: 0 12px 18px;
+  }
+  #legend b { color: #8d8da6; font-weight: 600; }
+  /* The on-screen stick only appears where there is no keyboard. */
+  #pad { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    #pad {
+      display: grid; grid-template-columns: 120px 1fr; gap: 12px;
+      align-items: center; padding: 8px 14px 20px; width: 100%;
+      max-width: 420px; box-sizing: border-box; margin: 0 auto;
+    }
+    .stick {
+      position: relative; width: 120px; height: 120px; border-radius: 50%;
+      background: radial-gradient(circle at 50% 40%, #1d1d28, #0d0d14);
+      border: 1px solid #32324a; touch-action: none;
+    }
+    .stick i {
+      position: absolute; left: 50%; top: 50%; width: 42px; height: 42px;
+      margin: -21px 0 0 -21px; border-radius: 50%; pointer-events: none;
+      background: linear-gradient(180deg, #3a3a52, #20202e);
+      border: 1px solid #4a4a68;
+    }
+    .fire {
+      height: 92px; border-radius: 10px; touch-action: none;
+      font: 13px ui-monospace, monospace; letter-spacing: .2em; color: #ffd0b0;
+      background: linear-gradient(180deg, #45161a, #2a0d10);
+      border: 1px solid #6a2228;
+    }
+    .fire:active { background: linear-gradient(180deg, #6a2228, #45161a); }
+    #legend { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="mount"></div>
+<div id="pad">
+  <div class="stick" id="stick"><i id="knob"></i></div>
+  <button class="fire" id="fire" type="button">FIRE</button>
+</div>
+<p id="legend">
+  Move <b>&larr; &uarr; &darr; &rarr;</b> / <b>WASD</b> &nbsp;·&nbsp;
+  Fire <b>Space</b> &nbsp;·&nbsp; Start <b>Enter</b> &nbsp;·&nbsp; Pause <b>P</b>
+</p>
+
+<script>
+/* The shared cabinet engine, games/lib/arcade.js. It is published beside
+   this page as a supporting file, and in the repository it sits one
+   directory up, so the two locations are tried in order rather than the
+   engine being duplicated into this folder. Opening the file straight out
+   of the repository logs one 404 for the first candidate before the second
+   one loads; that is the cost of not keeping a second copy of the engine
+   in version control. */
+(function (srcs, done) {
+  (function next(i) {
+    if (i >= srcs.length) { document.getElementById('mount').textContent = 'arcade.js not found'; return; }
+    var s = document.createElement('script');
+    s.src = srcs[i];
+    s.onload = done;
+    s.onerror = function () { next(i + 1); };
+    document.head.appendChild(s);
+  })(0);
+})(['arcade.js', '../lib/arcade.js'], function () { boot(); });
+</script>
+
+<script>
+/* ============================================================================
+   GORF — Midway, 1981
+   ----------------------------------------------------------------------------
+   Built to the house standard in games/README.md.
+
+   What the real board did, and what this follows:
+
+     Hardware      Bally/Midway Astrocade, Z80 at 1.789773 MHz, two Astrocade
+                   sound chips and a Votrax SC-01 for speech.
+     Display       320x204, two bits per pixel, on a monitor turned on its
+                   side. The play area is therefore 204 wide by 320 tall, and
+                   that is what this renders at, scaled up by whole numbers.
+     Control       An eight-way flight yoke with a trigger. The ship moves in
+                   both axes, which was unusual for 1981.
+     Quark laser   Only one player shot may be in flight. Firing again is
+                   allowed at any time and destroys the shot already out
+                   there, so the trigger is also a cancel button.
+     Five missions Astro Battles, Laser Attack, Galaxians, Space Warp and the
+                   Flag Ship, in that order, repeating. Clearing all five is
+                   a tour, and a tour earns a promotion.
+     Ranks         Space Cadet, Space Captain, Space Colonel, Space General,
+                   Space Warrior, Space Avenger.
+     Speech        Twenty-five sentences across attract mode and play, in a
+                   formant-synthesised robot voice. No samples on the board
+                   and none here: the voice below is three bandpass filters
+                   driven by a pulse train, which is what the SC-01 was.
+
+   Scoring is as documented for the original where sources agree; the
+   Astro Battles saucer values differ between sources and the write-up says
+   which numbers were taken.
+   ========================================================================== */
+function boot() {
+'use strict';
+
+var A = Arcade;
+var clamp = A.clamp, rnd = A.rand, pick = A.pick, hit = A.hit;
+
+/* --------------------------------------------------------------------------
+   The board's palette. The Astrocade gave four colours per scan line out of
+   256, and Gorf changed them line by line; these are the ones the game is
+   remembered in.
+   -------------------------------------------------------------------------- */
+var P = {
+  black:  '#000000',
+  white:  '#ffffff',
+  cyan:   '#4ce0f4',
+  blue:   '#3058e8',
+  navy:   '#101c5c',
+  red:    '#f02818',
+  rose:   '#ff7060',
+  orange: '#ff8c10',
+  yellow: '#fce000',
+  green:  '#30d040',
+  lime:   '#a8f020',
+  purple: '#b040e0',
+  magenta:'#f048c0',
+  sky:    '#3878d8',   /* Astro Battles is the one mission over Earth */
+  steel:  '#9aa4c0',
+  iron:   '#5a6480',
+  dark:   '#242a3c'
+};
+
+/* ==========================================================================
+   SPRITES
+   --------------------------------------------------------------------------
+   One character per pixel. Chunky and solid: a sprite that reads as a few
+   diagonal lines at 1x disappears at arcade size.
+   ========================================================================== */
+var SP = {};   /* built sprites, filled in by buildArt() */
+
+var KEY = {
+  W: P.white,  C: P.cyan,   B: P.blue,   N: P.navy,
+  R: P.red,    O: P.orange, Y: P.yellow, G: P.green,
+  L: P.lime,   P: P.purple, M: P.magenta, S: P.steel,
+  I: P.iron,   D: P.dark,   E: P.rose
+};
+
+/* ---- the player's ship: a delta with outboard pods and two exhausts ---- */
+var ART_SHIP = [
+  '......W......',
+  '......W......',
+  '.....WCW.....',
+  '.....WCW.....',
+  '....WCCCW....',
+  '...WCCCCCW...',
+  '..WCCBBBCCW..',
+  '.WCCBBBBBCCW.',
+  'WWCBBBBBBBCWW',
+  'WSB.BBBBB.BSW',
+  'WS...BBB...SW',
+  '.....O.O.....'
+];
+
+/* ---- Astro Battles: twenty-four invaders in three types, two frames --- */
+var ART_INV_A = [[            /* top row, a hard-edged gun platform */
+  '..M.....M..',
+  '...M...M...',
+  '..MMMMMMM..',
+  '.MM.MMM.MM.',
+  'MMMMMMMMMMM',
+  'M.MMMMMMM.M',
+  'M.M.....M.M',
+  '...MM.MM...'
+], [
+  '..M.....M..',
+  'M..M...M..M',
+  'M.MMMMMMM.M',
+  'MMM.MMM.MMM',
+  'MMMMMMMMMMM',
+  '.MMMMMMMMM.',
+  '..M.....M..',
+  '.M.......M.'
+]];
+
+var ART_INV_B = [[            /* middle rows, a crab */
+  '..C.....C..',
+  '...C...C...',
+  '..CCCCCCC..',
+  '.CC.CCC.CC.',
+  'CCCCCCCCCCC',
+  'C.CCCCCCC.C',
+  'C.C.....C.C',
+  '....CC.CC..'
+], [
+  '..C.....C..',
+  'C..C...C..C',
+  'C.CCCCCCC.C',
+  'CCC.CCC.CCC',
+  'CCCCCCCCCCC',
+  '.CCCCCCCCC.',
+  '..C.....C..',
+  '.CC.....CC.'
+]];
+
+var ART_INV_C = [[            /* bottom rows, a squat hopper */
+  '...GGGGG...',
+  '.GGGGGGGGG.',
+  'GGGGGGGGGGG',
+  'GGG.GGG.GGG',
+  'GGGGGGGGGGG',
+  '..GG.G.GG..',
+  '.GG.....GG.',
+  '..G.....G..'
+], [
+  '...GGGGG...',
+  '.GGGGGGGGG.',
+  'GGGGGGGGGGG',
+  'GGG.GGG.GGG',
+  'GGGGGGGGGGG',
+  '...GGGGG...',
+  '..GG...GG..',
+  '.G.......G.'
+]];
+
+/* ---- the Gorfian robot: the face on the cabinet ------------------------ */
+var ART_GORF = [[
+  '..R.....R..',
+  '..RRRRRRR..',
+  '.RRRRRRRRR.',
+  'RWW.RRR.WWR',
+  'RWW.RRR.WWR',
+  '.RRRRRRRRR.',
+  '.R.RRRRR.R.',
+  'RR.R.R.R.RR',
+  '.R.RRRRR.R.',
+  '..RR...RR..'
+], [
+  '..R.....R..',
+  '..RRRRRRR..',
+  '.RRRRRRRRR.',
+  'RWW.RRR.WWR',
+  'RWW.RRR.WWR',
+  '.RRRRRRRRR.',
+  '.R.RRRRR.R.',
+  'R..R.R.R..R',
+  'RR.RRRRR.RR',
+  '.R.......R.'
+]];
+
+/* ---- the mystery saucer that crosses the top of Astro Battles --------- */
+var ART_SAUCER = [
+  '...OOOOO...',
+  '..OYYYYYO..',
+  '.OYWOWOWYO.',
+  'OOOOOOOOOOO',
+  '.O.O.O.O.O.'
+];
+
+/* ---- Laser Attack: an escort dart, the laser gunner, a mini Gorf ------ */
+var ART_ESCORT = [
+  '....Y....',
+  '...YYY...',
+  '..YYYYY..',
+  '.YYOOOYY.',
+  'YYY.O.YYY',
+  'Y.YYYYY.Y',
+  '...Y.Y...'
+];
+
+var ART_LASER = [
+  '.WWWWWWWWW.',
+  'WWSSSSSSSWW',
+  'WSSWWWWWSSW',
+  'WSSWCCCWSSW',
+  'WWSWCCCWSWW',
+  '.WWWCCCWWW.',
+  '..W.CCC.W..',
+  '.....C.....'
+];
+
+var ART_MINIGORF = [
+  '..R...R..',
+  '..RRRRR..',
+  '.RRRRRRR.',
+  'RW.RRR.WR',
+  'RW.RRR.WR',
+  '.RRRRRRR.',
+  '.R.R.R.R.',
+  '..R...R..'
+];
+
+/* ---- Galaxians: three ranks and the escorted flagship ----------------- */
+function galaxian(c) {
+  return [
+    '....' + c + '....',
+    '...' + c + c + c + '...',
+    '...' + c + 'W' + c + '...',
+    '..' + c + c + c + c + c + '..',
+    '.' + c + c + '.' + c + '.' + c + c + '.',
+    c + c + '..' + c + '..' + c + c,
+    c + '...' + c + '...' + c,
+    '...' + c + '.' + c + '...'
+  ];
+}
+
+var ART_GFLAG = [
+  '.....W.....',
+  '....WYW....',
+  '...WYYYW...',
+  '..WYYWYYW..',
+  '.WYYYWYYYW.',
+  'WYY.WWW.YYW',
+  'W.W.....W.W',
+  '..WW...WW..'
+];
+
+/* ---- Space Warp: one attacker at three sizes, the way a board would --- */
+var ART_WARP_S = [
+  '..P..',
+  '.PPP.',
+  'PPWPP',
+  '.P.P.'
+];
+var ART_WARP_M = [
+  '...P...',
+  '..PPP..',
+  '.PPWPP.',
+  'PPP.PPP',
+  '.P...P.'
+];
+var ART_WARP_L = [
+  '....P....',
+  '...PPP...',
+  '..PPWPP..',
+  '.PPPWPPP.',
+  'PP.PPP.PP',
+  'P.......P',
+  '..P...P..'
+];
+
+/* ---- the debris a shot knocks off the Flag Ship ----------------------- */
+var ART_CHUNK = [
+  '.SS.',
+  'SSSS',
+  'SSSS',
+  '.SS.'
+];
+
+/* ---- the Flag Ship ------------------------------------------------------
+   Not a sprite but a grid of six-pixel blocks, because the mission is about
+   taking it apart. '#' is hull, '=' is heavier armour, '|' is the vent that
+   runs down to the core, and '@' is the reactor itself. Only the reactor
+   kills it; everything else just comes off, and what comes off is as
+   dangerous as anything the ship fires.
+   ----------------------------------------------------------------------- */
+var FLAG_PLAN = [
+  '...#######...',
+  '..##=====##..',
+  '.###==|==###.',
+  '####==@==####',
+  '.###==|==###.',
+  '..##==|==##..',
+  '...##...##...'
+];
+var FLAG_CELL = 6;
+
+/* ==========================================================================
+   Building the art
+   ========================================================================== */
+function buildArt() {
+  var S = A.Sprite;
+  SP.ship      = S.build(ART_SHIP, KEY);
+  SP.invA      = [S.build(ART_INV_A[0], KEY), S.build(ART_INV_A[1], KEY)];
+  SP.invB      = [S.build(ART_INV_B[0], KEY), S.build(ART_INV_B[1], KEY)];
+  SP.invC      = [S.build(ART_INV_C[0], KEY), S.build(ART_INV_C[1], KEY)];
+  SP.gorf      = [S.build(ART_GORF[0], KEY), S.build(ART_GORF[1], KEY)];
+  SP.saucer    = S.build(ART_SAUCER, KEY);
+  SP.escort    = S.build(ART_ESCORT, KEY);
+  SP.laser     = S.build(ART_LASER, KEY);
+  SP.miniGorf  = S.build(ART_MINIGORF, KEY);
+  SP.galY      = S.build(galaxian('Y'), KEY);
+  SP.galB      = S.build(galaxian('C'), KEY);
+  SP.galR      = S.build(galaxian('R'), KEY);
+  SP.galFlag   = S.build(ART_GFLAG, KEY);
+  SP.warp      = [S.build(ART_WARP_S, KEY), S.build(ART_WARP_M, KEY), S.build(ART_WARP_L, KEY)];
+  SP.chunk     = S.build(ART_CHUNK, KEY);
+
+  /* A diving ship is drawn from a fixed set of orientations, the way a real
+     board stored them. Sixteen steps is plenty and never looks interpolated. */
+  SP.escortRot = S.rotations(SP.escort, 16);
+  SP.galYRot   = S.rotations(SP.galY, 16);
+  SP.galBRot   = S.rotations(SP.galB, 16);
+  SP.galRRot   = S.rotations(SP.galR, 16);
+  SP.galFRot   = S.rotations(SP.galFlag, 16);
+  SP.gorfRot   = S.rotations(SP.gorf[0], 16);
+}
+
+/* ==========================================================================
+   VOICE
+   --------------------------------------------------------------------------
+   The SC-01 was a formant synthesiser: a buzz or a hiss pushed through a
+   few resonances that move to shape a phoneme. This is the same idea with
+   three bandpass filters, so Gorf sounds like a 1981 speech chip rather
+   than like a person, which is the point.
+   ========================================================================== */
+var PHONEMES = {
+  /* vowels: [F1, F2, F3, voiced, seconds] */
+  AA: [ 730, 1090, 2440, 1, 0.13 ],
+  AE: [ 660, 1720, 2410, 1, 0.12 ],
+  AH: [ 640, 1190, 2390, 1, 0.10 ],
+  AO: [ 570,  840, 2410, 1, 0.13 ],
+  EH: [ 530, 1840, 2480, 1, 0.11 ],
+  ER: [ 490, 1350, 1690, 1, 0.12 ],
+  EY: [ 400, 2100, 2600, 1, 0.13 ],
+  IH: [ 390, 1990, 2550, 1, 0.09 ],
+  IY: [ 270, 2290, 3010, 1, 0.12 ],
+  OW: [ 430,  920, 2240, 1, 0.13 ],
+  OY: [ 450, 1100, 2400, 1, 0.14 ],
+  UH: [ 440, 1020, 2240, 1, 0.09 ],
+  UW: [ 300,  870, 2240, 1, 0.12 ],
+  AY: [ 660, 1500, 2400, 1, 0.14 ],
+  AW: [ 640, 1200, 2300, 1, 0.14 ],
+  /* consonants */
+  B:  [ 300,  900, 2200, 1, 0.05 ],
+  D:  [ 300, 1700, 2600, 1, 0.05 ],
+  G:  [ 300, 1600, 2000, 1, 0.05 ],
+  P:  [ 400,  900, 2200, 0, 0.05 ],
+  T:  [ 400, 1700, 2600, 0, 0.05 ],
+  K:  [ 400, 1600, 2000, 0, 0.06 ],
+  F:  [ 300, 1200, 2400, 0, 0.08 ],
+  V:  [ 300, 1200, 2400, 1, 0.07 ],
+  S:  [ 400, 2600, 4000, 0, 0.10 ],
+  Z:  [ 400, 2600, 4000, 1, 0.09 ],
+  SH: [ 400, 2100, 2900, 0, 0.11 ],
+  TH: [ 400, 1600, 2600, 0, 0.08 ],
+  DH: [ 400, 1600, 2600, 1, 0.06 ],
+  HH: [ 500, 1500, 2500, 0, 0.07 ],
+  M:  [ 250,  900, 2200, 1, 0.07 ],
+  N:  [ 250, 1700, 2600, 1, 0.07 ],
+  NG: [ 250, 1900, 2400, 1, 0.08 ],
+  L:  [ 360, 1300, 2600, 1, 0.07 ],
+  R:  [ 340, 1100, 1600, 1, 0.08 ],
+  W:  [ 300,  700, 2200, 1, 0.07 ],
+  Y:  [ 280, 2200, 3000, 1, 0.06 ],
+  CH: [ 400, 1900, 2700, 0, 0.09 ],
+  JH: [ 350, 1900, 2700, 1, 0.08 ],
+  _:  [ 300,  900, 2200, 0, 0.07 ]   /* silence between words */
+};
+
+/* A small dictionary. Everything Gorf says is built from these, so the
+   pronunciation is written once and reused. */
+var LEX = {
+  'GORF':        'G AO R F',
+  'GORFIAN':     'G AO R F IY AH N',
+  'GORFIANS':    'G AO R F IY AH N Z',
+  'ROBOTS':      'R OW B AA T S',
+  'ROBOT':       'R OW B AA T',
+  'EMPIRE':      'EH M P AY ER',
+  'CONSCIOUSNESS':'K AA N SH AH S N EH S',
+  'SPACE':       'S P EY S',
+  'CADET':       'K AH D EH T',
+  'CAPTAIN':     'K AE P T IH N',
+  'COLONEL':     'K ER N AH L',
+  'GENERAL':     'JH EH N ER AH L',
+  'WARRIOR':     'W AO R IY ER',
+  'AVENGER':     'AH V EH N JH ER',
+  'SOME':        'S AH M',
+  'GALACTIC':    'G AH L AE K T IH K',
+  'DEFENDER':    'D IH F EH N D ER',
+  'YOU':         'Y UW',
+  'ARE':         'AA R',
+  'PREPARE':     'P R IY P EH R',
+  'YOURSELF':    'Y AO R S EH L F',
+  'FOR':         'F AO R',
+  'ANNIHILATION':'AH N AY AH L EY SH AH N',
+  'CANNOT':      'K AE N AA T',
+  'ESCAPE':      'EH S K EY P',
+  'THE':         'DH AH',
+  'MY':          'M AY',
+  'UNBEATABLE':  'AH N B IY T AH B AH L',
+  'LONG':        'L AO NG',
+  'LIVE':        'L IH V',
+  'I':           'AY',
+  'AM':          'AE M',
+  'TAKE':        'T EY K',
+  'NO':          'N OW',
+  'PRISONERS':   'P R IH Z AH N ER Z',
+  'DEVOUR':      'D IH V AW ER',
+  'COINS':       'K OY N Z',
+  'COIN':        'K OY N',
+  'INSERT':      'IH N S ER T',
+  'BAD':         'B AE D',
+  'MOVE':        'M UW V',
+  'YOUR':        'Y AO R',
+  'END':         'EH N D',
+  'DRAWS':       'D R AO Z',
+  'NEAR':        'N IH R',
+  'WILL':        'W IH L',
+  'MEET':        'M IY T',
+  'A':           'AH',
+  'DOOM':        'D UW M',
+  'NOW':         'N AW',
+  'PROMOTED':    'P R AH M OW T IH D',
+  'TO':          'T UW',
+  'MISSION':     'M IH SH AH N',
+  'COMPLETE':    'K AH M P L IY T',
+  'BEWARE':      'B IH W EH R',
+  'FLAG':        'F L AE G',
+  'SHIP':        'SH IH P',
+  'DESTROYED':   'D IH S T R OY D',
+  'IS':          'IH Z',
+  'PLAY':        'P L EY',
+  'AGAIN':       'AH G EH N',
+  'HA':          'HH AA',
+  'AND':         'AE N D',
+  'ALL':         'AO L',
+  'NOTHING':     'N AH TH IH NG',
+  'BUT':         'B AH T',
+  'AN':          'AE N',
+  'EARTHLING':   'ER TH L IH NG'
+};
+
+function phonemesFor(text) {
+  var words = String(text).toUpperCase().replace(/[^A-Z' ]/g, '').split(/\s+/);
+  var out = [];
+  for (var i = 0; i < words.length; i++) {
+    var w = words[i];
+    if (!w) continue;
+    if (LEX[w]) out = out.concat(LEX[w].split(' '));
+    else {
+      /* Not in the dictionary: spell it out roughly, which is also very
+         much what a 1981 speech chip sounded like when it guessed. */
+      for (var k = 0; k < w.length; k++) {
+        var c = w[k];
+        var g = { A:'EY', E:'IY', I:'AY', O:'OW', U:'Y UW', C:'K', Q:'K', X:'K S', J:'JH' }[c];
+        out = out.concat((g || c).split(' '));
+      }
+    }
+    if (i < words.length - 1) out.push('_');
+  }
+  return out;
+}
+
+/* The voice runs on its own gain so speech ducks the music rather than
+   fighting it, exactly as the cabinet's mixer did. */
+function Voice(audio) {
+  var speaking = 0;
+  return {
+    busy: function () { return speaking > performance.now(); },
+    say: function (text, pitch) {
+      var AC = audio.init();
+      if (!AC || !audio.enabled) return 0;
+      var ph = phonemesFor(text);
+      var t = AC.currentTime + 0.02;
+      var f0 = pitch || 84;             /* a low, flat robot larynx */
+      var bus = AC.createGain();
+      bus.gain.value = 0.9;
+      bus.connect(audio.bus);
+
+      for (var i = 0; i < ph.length; i++) {
+        var d = PHONEMES[ph[i]] || PHONEMES._;
+        var dur = d[4];
+        if (ph[i] !== '_') speakPhoneme(AC, bus, t, dur, d, f0, i);
+        t += dur;
+      }
+      speaking = performance.now() + (t - AC.currentTime) * 1000;
+      return t - AC.currentTime;
+    }
+  };
+
+  function speakPhoneme(AC, out, t0, dur, d, f0, idx) {
+    var src;
+    if (d[3]) {
+      /* voiced: a buzzy pulse train, drifting very slightly so a long line
+         does not sound like a held organ note */
+      src = AC.createOscillator();
+      src.type = 'sawtooth';
+      src.frequency.setValueAtTime(f0 * (1 + Math.sin(idx * 0.7) * 0.03), t0);
+    } else {
+      src = AC.createBufferSource();
+      src.buffer = audio.noiseBuffer();
+      src.loop = true;
+    }
+    var mix = AC.createGain();
+    mix.gain.setValueAtTime(0.0001, t0);
+    mix.gain.linearRampToValueAtTime(d[3] ? 0.5 : 0.22, t0 + 0.012);
+    mix.gain.setValueAtTime(d[3] ? 0.5 : 0.22, t0 + dur - 0.012);
+    mix.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+
+    /* three resonances, weighted the way a vocal tract weights them */
+    var amps = [1.0, 0.65, 0.32];
+    for (var f = 0; f < 3; f++) {
+      var bp = AC.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(d[f], t0);
+      bp.Q.value = 7 + f * 3;
+      var g = AC.createGain();
+      g.gain.value = amps[f];
+      src.connect(bp); bp.connect(g); g.connect(mix);
+    }
+    mix.connect(out);
+    src.start(t0);
+    src.stop(t0 + dur + 0.01);
+  }
+}
+
+/* ==========================================================================
+   GAME
+   ========================================================================== */
+var W = 204, H = 320;                    /* 320x204 board, monitor on its side */
+
+var screen = A.Screen({ width: W, height: H });
+var ctx = screen.ctx;
+var font = A.Font();
+var audio = A.Audio({ volume: 0.2 });
+var voice = Voice(audio);
+var fx = A.FX(screen, font);
+var stars = A.Stars(screen, { count: 70, groups: 4, colors: [P.white, P.cyan, P.blue, P.steel] });
+var input = A.Input(screen.canvas, screen);
+
+buildArt();
+
+var RANKS = ['SPACE CADET', 'SPACE CAPTAIN', 'SPACE COLONEL',
+             'SPACE GENERAL', 'SPACE WARRIOR', 'SPACE AVENGER'];
+
+var MISSIONS = [
+  { key: 'astro', name: 'ASTRO BATTLES' },
+  { key: 'laser', name: 'LASER ATTACK' },
+  { key: 'galax', name: 'GALAXIANS' },
+  { key: 'warp',  name: 'SPACE WARP' },
+  { key: 'flag',  name: 'FLAG SHIP' }
+];
+
+/* Scoring, as documented for the original. Sources agree on the laser,
+   Galaxian, warp and flagship values; the Astro Battles saucer is given as
+   100 and as 200 in different places and 100 is used here. */
+var SCORE = {
+  invader: 50, gorfRobot: 300, saucer: 100, saucerFast: 300,
+  escort: 100, laserShip: 300, miniGorf: 100,
+  galFormation: 50, galYellow: 60, galBlue: 80, galRed: 100, galFlagship: 200,
+  warper: 250,
+  hullPiece: 20, flyingPiece: 150, flagEscort: 100, reactor: 1000
+};
+
+var EXTRA_LIFE = 10000;
+
+/* --------------------------------------------------------------------------
+   State
+   -------------------------------------------------------------------------- */
+var G = {
+  mode: 'attract',        /* attract | brief | play | dying | clear | promote | over */
+  t: 0, modeT: 0,
+  score: 0, high: A.Store.get('gorf.high', 5000),
+  lives: 3, rank: 0, tour: 0, mission: 0, nextExtra: EXTRA_LIFE,
+  shake: 0, flash: 0,
+  paused: false,
+  attractPhase: 0
+};
+
+var ship = { x: W / 2, y: H - 34, w: 13, h: 12, alive: true, invuln: 0, blink: 0 };
+
+/* The quark laser. One shot, and pulling the trigger again takes it back. */
+var shot = null;
+
+var foes = [];          /* everything hostile that can be shot */
+var eshots = [];        /* enemy fire */
+var debris = [];        /* Flag Ship pieces, which are also lethal */
+var field = null;       /* Astro Battles force field */
+var flag = null;        /* Flag Ship state */
+
+/* --------------------------------------------------------------------------
+   Sound
+   -------------------------------------------------------------------------- */
+var SFX = {
+  fire:    function () { audio.tone(880, 0.07, 'square', 0.18, 240); },
+  cancel:  function () { audio.tone(300, 0.04, 'square', 0.10, 180); },
+  hit:     function () { audio.noise(0.22, 0.30, 1500, 180); },
+  bigHit:  function () { audio.noise(0.55, 0.42, 900, 70); },
+  chunk:   function () { audio.tone(220, 0.05, 'square', 0.14, 140); },
+  enemy:   function () { audio.tone(160, 0.10, 'sawtooth', 0.10, 90); },
+  laser:   function () { audio.tone(70, 0.30, 'sawtooth', 0.14, 50); },
+  dive:    function () { audio.tone(440, 0.18, 'square', 0.10, 170); },
+  saucer:  function () { audio.tone(600, 0.09, 'triangle', 0.10, 760); },
+  die:     function () { audio.noise(0.9, 0.45, 700, 50); audio.tone(200, 0.9, 'sawtooth', 0.2, 40); },
+  extra:   function () { audio.sequence([523, 659, 784, 1047], 0.07, 0.10, 'square', 0.2); },
+  clear:   function () { audio.sequence([392, 523, 659, 784, 1047], 0.09, 0.12, 'square', 0.22); },
+  warp:    function () { audio.tone(120, 0.40, 'sine', 0.12, 900); }
+};
+
+/* Gorf talks. The rank is folded in because the cabinet did that. */
+function taunt(which) {
+  var r = RANKS[G.rank];
+  var lines = {
+    coin:    ['INSERT COIN', 'I DEVOUR COINS'],
+    start:   ['PREPARE YOURSELF FOR ANNIHILATION ' + r,
+              'MY GORFIAN ROBOTS ARE UNBEATABLE'],
+    taunt:   ['SOME GALACTIC DEFENDER YOU ARE ' + r,
+              'YOU CANNOT ESCAPE THE GORFIAN ROBOTS',
+              'GORFIANS TAKE NO PRISONERS',
+              'YOUR END DRAWS NEAR',
+              'BAD MOVE ' + r],
+    die:     ['BAD MOVE ' + r, 'YOU WILL MEET A GORFIAN DOOM',
+              'SOME GALACTIC DEFENDER YOU ARE ' + r],
+    clear:   ['MISSION COMPLETE'],
+    promote: ['YOU ARE NOW PROMOTED TO ' + RANKS[Math.min(G.rank, RANKS.length - 1)]],
+    flag:    ['BEWARE THE FLAG SHIP'],
+    win:     ['THE FLAG SHIP IS DESTROYED'],
+    over:    ['LONG LIVE GORF', 'I AM THE GORFIAN EMPIRE']
+  };
+  var set = lines[which];
+  if (set) voice.say(pick(set));
+}
+
+/* --------------------------------------------------------------------------
+   Helpers
+   -------------------------------------------------------------------------- */
+function addScore(n, x, y) {
+  var before = G.score;
+  G.score += n;
+  if (x != null) fx.popup(x, y, String(n), P.yellow);
+  if (before < G.nextExtra && G.score >= G.nextExtra) {
+    G.lives++; G.nextExtra += EXTRA_LIFE; SFX.extra();
+  }
+  if (G.score > G.high) { G.high = G.score; A.Store.set('gorf.high', G.high); }
+}
+
+function difficulty() { return 1 + G.tour * 0.22 + G.mission * 0.04; }
+
+function drawSprite(spr, x, y) { A.Sprite.draw(ctx, spr, Math.round(x), Math.round(y)); }
+
+function drawRot(frames, angle, x, y) { frames.draw(ctx, angle, Math.round(x), Math.round(y)); }
+
+/* --------------------------------------------------------------------------
+   The quark laser
+   -------------------------------------------------------------------------- */
+function fire() {
+  if (!ship.alive) return;
+  if (shot) { SFX.cancel(); fx.boom(shot.x, shot.y); }   /* the old one is taken back */
+  shot = { x: ship.x, y: ship.y - 8, vy: -4.2 };
+  SFX.fire();
+}
+
+function enemyShot(x, y, vx, vy, kind) {
+  eshots.push({ x: x, y: y, vx: vx || 0, vy: vy == null ? 1.5 : vy,
+                kind: kind || 'bolt', t: 0, len: kind === 'beam' ? 26 : 0 });
+}
+
+/* ==========================================================================
+   MISSION 1 — ASTRO BATTLES
+   --------------------------------------------------------------------------
+   Twenty-four invaders over Earth, and a parabolic force field between them
+   and the player. The field wears away under enemy fire, and switches off
+   where the player's own shot goes through it, which is the whole trick:
+   every shot you take opens the hole they can shoot back through.
+   ========================================================================== */
+var FIELD_SEGS = 17;
+
+function startAstro() {
+  var cols = 6, rows = 4;
+  var x0 = 26, y0 = 54, dx = 26, dy = 18;
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      foes.push({
+        kind: 'inv', row: r, col: c,
+        x: x0 + c * dx, y: y0 + r * dy, w: 11, h: 8,
+        art: r === 0 ? SP.invA : (r < 3 ? SP.invB : SP.invC),
+        pts: SCORE.invader, alive: true
+      });
+    }
+  }
+  /* the marching block */
+  G.astro = { dir: 1, stepT: 0, stepEvery: 46, frame: 0, dropped: 0,
+              saucerT: rnd(360, 660), gorfT: rnd(500, 900) };
+
+  /* the field: an arc of segments, each with its own health and its own
+     shutter timer */
+  field = { segs: [], y: H - 84, on: true };
+  for (var i = 0; i < FIELD_SEGS; i++) {
+    var u = (i / (FIELD_SEGS - 1)) * 2 - 1;        /* -1..1 across the screen */
+    field.segs.push({
+      x: 14 + i * ((W - 28) / (FIELD_SEGS - 1)),
+      y: field.y + u * u * 16,                      /* parabola, opening upward */
+      hp: 3, open: 0
+    });
+  }
+}
+
+function segAt(x) {
+  if (!field) return null;
+  var step = (W - 28) / (FIELD_SEGS - 1);
+  var i = Math.round((x - 14) / step);
+  if (i < 0 || i >= FIELD_SEGS) return null;
+  return field.segs[i];
+}
+
+function updateAstro() {
+  var st = G.astro, live = foes.filter(function (f) { return f.kind === 'inv' && f.alive; });
+  if (!live.length && !foes.some(function (f) { return f.kind === 'gorf'; })) { missionCleared(); return; }
+
+  /* The block speeds up as it thins out, exactly as the game it is quoting. */
+  var speed = st.stepEvery - (24 - live.length) * 1.4;
+  speed = Math.max(6, speed / difficulty());
+  if (++st.stepT >= speed) {
+    st.stepT = 0; st.frame ^= 1;
+    var edge = false;
+    for (var i = 0; i < live.length; i++) {
+      live[i].x += st.dir * 3;
+      if (live[i].x < 10 || live[i].x > W - 21) edge = true;
+    }
+    if (edge) {
+      st.dir *= -1;
+      for (var j = 0; j < live.length; j++) { live[j].x += st.dir * 3; live[j].y += 7; }
+      st.dropped++;
+    }
+    audio.tone(70 + st.frame * 14, 0.05, 'square', 0.07);
+    /* they reach the field and start eating it */
+    for (var k = 0; k < live.length; k++) {
+      if (live[k].y > field.y - 24) { damageFieldAt(live[k].x, 1); }
+      if (live[k].y > H - 40) { loseLife(); return; }
+    }
+  }
+
+  /* fire from the bottom of each column */
+  if (Math.random() < 0.012 * difficulty() && live.length) {
+    var byCol = {};
+    for (var m = 0; m < live.length; m++) {
+      var f = live[m];
+      if (!byCol[f.col] || f.y > byCol[f.col].y) byCol[f.col] = f;
+    }
+    var shooters = Object.keys(byCol);
+    var s = byCol[shooters[(Math.random() * shooters.length) | 0]];
+    enemyShot(s.x + 5, s.y + 8, 0, 1.4 + G.tour * 0.12);
+    SFX.enemy();
+  }
+
+  /* the Gorfian robot that walks the invaders out, and the saucer */
+  if ((st.saucerT -= 1) <= 0) {
+    st.saucerT = rnd(420, 800);
+    var fast = Math.random() < 0.3;
+    foes.push({ kind: 'saucer', x: fast ? W + 12 : -12, y: 34, w: 11, h: 5,
+                vx: (fast ? -1 : 1) * (fast ? 1.5 : 0.8), pts: fast ? SCORE.saucerFast : SCORE.saucer,
+                alive: true });
+  }
+  if ((st.gorfT -= 1) <= 0 && live.length) {
+    st.gorfT = rnd(700, 1200);
+    foes.push({ kind: 'gorf', x: -12, y: 44, w: 11, h: 10, vx: 0.7, t: 0,
+                pts: SCORE.gorfRobot, alive: true });
+  }
+}
+
+function damageFieldAt(x, n) {
+  var s = segAt(x);
+  if (!s || s.hp <= 0) return false;
+  s.hp -= n;
+  return true;
+}
+
+function drawField() {
+  if (!field) return;
+  for (var i = 0; i < FIELD_SEGS; i++) {
+    var s = field.segs[i];
+    if (s.hp <= 0) continue;
+    if (s.open > 0) {
+      /* shuttered: drawn as a faint flicker so the gap is visible */
+      if ((G.t >> 1) & 1) continue;
+      ctx.fillStyle = P.navy;
+    } else {
+      ctx.fillStyle = s.hp >= 3 ? P.cyan : (s.hp === 2 ? P.blue : P.navy);
+    }
+    var step = (W - 28) / (FIELD_SEGS - 1);
+    ctx.fillRect(Math.round(s.x - step / 2) + 1, Math.round(s.y), Math.round(step) - 1, 3);
+  }
+}
+
+/* ==========================================================================
+   MISSION 2 — LASER ATTACK
+   --------------------------------------------------------------------------
+   Two formations of five: three yellow escorts, one white laser ship that
+   fires a heavy beam straight down, and a red Gorfian robot. Kill the laser
+   ship and that formation loses its shape — the survivors stop holding
+   station and come at you until one of you is gone.
+   ========================================================================== */
+function startLaser() {
+  for (var g = 0; g < 2; g++) {
+    var baseX = g === 0 ? W * 0.30 : W * 0.70;
+    var baseY = 52 + g * 22;
+    var group = { id: g, x: baseX, y: baseY, dir: g === 0 ? 1 : -1, broken: false };
+    G.laserGroups = G.laserGroups || [];
+    G.laserGroups.push(group);
+    var slots = [
+      { dx: -22, dy: 0,  kind: 'escort' },
+      { dx: -11, dy: -8, kind: 'escort' },
+      { dx:  11, dy: -8, kind: 'escort' },
+      { dx:   0, dy: 0,  kind: 'laserShip' },
+      { dx:  22, dy: 0,  kind: 'miniGorf' }
+    ];
+    for (var i = 0; i < slots.length; i++) {
+      var s = slots[i];
+      foes.push({
+        kind: s.kind, group: group, dx: s.dx, dy: s.dy,
+        x: baseX + s.dx, y: baseY + s.dy,
+        w: s.kind === 'laserShip' ? 11 : 9, h: s.kind === 'laserShip' ? 8 : 7,
+        alive: true, state: 'formation', ang: 0, t: 0, cool: rnd(60, 200),
+        pts: s.kind === 'laserShip' ? SCORE.laserShip
+           : s.kind === 'miniGorf' ? SCORE.miniGorf : SCORE.escort
+      });
+    }
+  }
+}
+
+function updateLaser() {
+  var groups = G.laserGroups || [];
+  var live = foes.filter(function (f) { return f.alive; });
+  if (!live.length) { missionCleared(); return; }
+
+  for (var g = 0; g < groups.length; g++) {
+    var gr = groups[g];
+    gr.x += gr.dir * 0.42 * difficulty();
+    if (gr.x < 34) { gr.x = 34; gr.dir = 1; }
+    if (gr.x > W - 34) { gr.x = W - 34; gr.dir = -1; }
+    gr.y = (g === 0 ? 52 : 74) + Math.sin(G.t * 0.013 + g) * 5;
+  }
+
+  for (var i = 0; i < live.length; i++) {
+    var f = live[i];
+    f.t++;
+
+    if (f.state === 'formation') {
+      f.x += ((f.group.x + f.dx) - f.x) * 0.16;
+      f.y += ((f.group.y + f.dy) - f.y) * 0.16;
+      f.ang = 0;
+
+      if (f.kind === 'laserShip' && (f.cool -= difficulty()) <= 0) {
+        f.cool = rnd(110, 200) / difficulty();
+        f.state = 'charging'; f.charge = 34;
+      } else if (f.kind !== 'laserShip' && (f.cool -= difficulty()) <= 0) {
+        f.cool = rnd(180, 420) / difficulty();
+        /* a formation ship sometimes leaves the pattern to ram */
+        if (Math.random() < (f.group.broken ? 0.95 : 0.35)) beginDive(f);
+        else { enemyShot(f.x + f.w / 2, f.y + f.h, 0, 1.6); SFX.enemy(); }
+      }
+
+    } else if (f.state === 'charging') {
+      /* the muzzle glows for a beat before the beam, so it is dodgeable */
+      f.x += ((f.group.x + f.dx) - f.x) * 0.16;
+      f.y += ((f.group.y + f.dy) - f.y) * 0.16;
+      if (--f.charge <= 0) {
+        f.state = 'formation';
+        enemyShot(f.x + f.w / 2 - 1, f.y + f.h, 0, 2.2, 'beam');
+        SFX.laser();
+      }
+
+    } else if (f.state === 'dive') {
+      f.t += 1;
+      f.x += f.vx; f.y += f.vy;
+      /* steer toward the player for the first part of the run */
+      if (f.t < 70) {
+        var want = clamp((ship.x - f.x) * 0.012, -0.16, 0.16);
+        f.vx = clamp(f.vx + want, -2.2, 2.2);
+      }
+      f.vy = Math.min(f.vy + 0.024, 2.6);
+      f.ang = Math.atan2(f.vy, f.vx) - Math.PI / 2;
+      if (Math.random() < 0.012) { enemyShot(f.x + f.w / 2, f.y + f.h, 0, 2.0); }
+      if (f.y > H + 12) {
+        /* a broken formation has nothing to come back to */
+        if (f.group.broken) { f.y = -14; f.x = rnd(16, W - 16); f.vx = 0; f.vy = 1.1; f.t = 0; }
+        else { f.state = 'formation'; f.y = -14; f.x = f.group.x + f.dx; }
+      }
+    }
+  }
+}
+
+function beginDive(f) {
+  f.state = 'dive'; f.t = 0;
+  f.vx = (ship.x > f.x ? 1 : -1) * rnd(0.5, 1.1);
+  f.vy = 1.2;
+  SFX.dive();
+}
+
+/* ==========================================================================
+   MISSION 3 — GALAXIANS
+   --------------------------------------------------------------------------
+   Fewer than the game it names, and far pushier. Yellow and blue peel off
+   alone; red only ever leaves as an escort to a flagship, two at a time,
+   and the three of them come down together.
+   ========================================================================== */
+function startGalax() {
+  var plan = [
+    { row: 0, n: 2, kind: 'gflag' },
+    { row: 1, n: 4, kind: 'gred' },
+    { row: 2, n: 6, kind: 'gblue' },
+    { row: 3, n: 6, kind: 'gyellow' }
+  ];
+  G.galax = { dir: 1, ox: 0, launchT: 90 };
+  for (var p = 0; p < plan.length; p++) {
+    var row = plan[p];
+    var span = row.n * 18;
+    for (var i = 0; i < row.n; i++) {
+      var hx = (W - span) / 2 + i * 18 + 9;
+      foes.push({
+        kind: row.kind, hx: hx, hy: 46 + row.row * 15,
+        x: hx, y: 46 + row.row * 15, w: row.kind === 'gflag' ? 11 : 9, h: 8,
+        alive: true, state: 'formation', ang: 0, t: 0,
+        pts: row.kind === 'gflag' ? SCORE.galFlagship : SCORE.galFormation
+      });
+    }
+  }
+}
+
+function updateGalax() {
+  var st = G.galax;
+  var live = foes.filter(function (f) { return f.alive; });
+  if (!live.length) { missionCleared(); return; }
+
+  st.ox += st.dir * 0.28 * difficulty();
+  if (Math.abs(st.ox) > 12) st.dir *= -1;
+
+  for (var i = 0; i < live.length; i++) {
+    var f = live[i];
+    if (f.state === 'formation') {
+      f.x = f.hx + st.ox;
+      f.y = f.hy;
+      f.ang = 0;
+    } else {
+      runDive(f);
+    }
+  }
+
+  /* launches */
+  if ((st.launchT -= difficulty()) <= 0) {
+    st.launchT = rnd(60, 150) / difficulty();
+    var inForm = live.filter(function (f) { return f.state === 'formation'; });
+    var flags = inForm.filter(function (f) { return f.kind === 'gflag'; });
+    var reds  = inForm.filter(function (f) { return f.kind === 'gred'; });
+    if (flags.length && reds.length >= 2 && Math.random() < 0.45) {
+      /* a flagship run: the flagship and two red escorts, together */
+      launchDive(flags[0], 0);
+      launchDive(reds[0], -16);
+      launchDive(reds[1], 16);
+      SFX.dive();
+    } else {
+      var solo = inForm.filter(function (f) { return f.kind === 'gyellow' || f.kind === 'gblue'; });
+      if (solo.length) { launchDive(pick(solo), 0); SFX.dive(); }
+    }
+  }
+}
+
+function launchDive(f, offset) {
+  f.state = 'dive'; f.t = 0; f.offset = offset || 0;
+  f.sx = f.x; f.sy = f.y;
+  f.side = ship.x > f.x ? 1 : -1;
+  /* diving is worth more than sitting in the rack, and the colour says how much */
+  f.pts = f.kind === 'gyellow' ? SCORE.galYellow
+        : f.kind === 'gblue'   ? SCORE.galBlue
+        : f.kind === 'gred'    ? SCORE.galRed : SCORE.galFlagship;
+}
+
+function runDive(f) {
+  f.t += difficulty() * 0.9;
+  var t = f.t;
+  /* a peel-off: swing out to the side, then sweep back across the player */
+  var px = f.sx + f.side * Math.sin(t * 0.045) * 44 + f.offset;
+  var py = f.sy + t * 1.45;
+  var ox = f.x, oy = f.y;
+  f.x = px; f.y = py;
+  /* Banked, not broadside: a real board held a handful of orientations and
+     never turned a diving ship past about fifty degrees off vertical. */
+  f.ang = clamp(Math.atan2(f.y - oy, f.x - ox) - Math.PI / 2, -0.9, 0.9);
+  if (Math.random() < 0.010 * difficulty()) { enemyShot(f.x + f.w / 2, f.y + f.h, 0, 2.0); }
+  if (f.y > H + 12) {
+    f.state = 'formation'; f.t = 0;
+    f.pts = f.kind === 'gflag' ? SCORE.galFlagship : SCORE.galFormation;
+  }
+}
+
+/* ==========================================================================
+   MISSION 4 — SPACE WARP
+   --------------------------------------------------------------------------
+   A wormhole. Attackers come out of the middle of the screen and grow as
+   they reach you, drawn at three fixed sizes rather than scaled, which is
+   how a board of this age would have done it. Enemy fire can be shot down
+   in this mission and only in this one.
+   ========================================================================== */
+function startWarp() {
+  G.warp = { spawnT: 40, left: 18 + G.tour * 3, spin: 0 };
+}
+
+function updateWarp() {
+  var st = G.warp;
+  st.spin += 0.02;
+  var live = foes.filter(function (f) { return f.alive; });
+  if (!live.length && st.left <= 0) { missionCleared(); return; }
+
+  if (st.left > 0 && (st.spawnT -= difficulty()) <= 0) {
+    st.spawnT = rnd(26, 58) / difficulty();
+    st.left--;
+    var a = rnd(0, Math.PI * 2);
+    foes.push({
+      kind: 'warper', centred: true, x: W / 2, y: H * 0.36, w: 5, h: 4,
+      a: a, r: 2, spin: rnd(-0.02, 0.02), t: 0,
+      pts: SCORE.warper, alive: true, cool: rnd(40, 120)
+    });
+    SFX.warp();
+  }
+
+  for (var i = 0; i < live.length; i++) {
+    var f = live[i];
+    f.t++;
+    f.a += f.spin;
+    f.r += 0.34 + f.t * 0.0055 + G.tour * 0.04;
+    /* the hole sits above centre and the field opens out toward the player */
+    f.x = W / 2 + Math.cos(f.a) * f.r * 1.15;
+    f.y = H * 0.36 + Math.sin(f.a) * f.r * 0.92 + f.r * 0.55;
+    var stage = f.r < 26 ? 0 : (f.r < 58 ? 1 : 2);
+    f.stage = stage;
+    f.w = [5, 7, 9][stage]; f.h = [4, 5, 7][stage];
+    if ((f.cool -= difficulty()) <= 0 && stage > 0) {
+      f.cool = rnd(70, 170) / difficulty();
+      var dx = ship.x - f.x, dy = ship.y - f.y, d = Math.hypot(dx, dy) || 1;
+      enemyShot(f.x, f.y, dx / d * 1.5, dy / d * 1.5, 'orb');
+      SFX.enemy();
+    }
+    if (f.y > H + 14 || f.x < -14 || f.x > W + 14) f.alive = false;
+  }
+}
+
+function drawWarpTunnel() {
+  /* Concentric rings falling outward. Plotted a pixel at a time rather than
+     stroked, because a smooth anti-aliased ellipse is the one thing on this
+     screen the hardware could not have produced. */
+  var cx = W / 2, cy = H * 0.36;
+  for (var i = 0; i < 7; i++) {
+    var f = ((G.warp.spin * 2 + i / 7) % 1);
+    var r = f * f * 150;
+    if (r < 3 || f > 0.94) continue;
+    var rx = r * 1.15, ry = r * 0.92;
+    var col = i % 2 ? P.purple : P.blue;
+    var dim = f > 0.62;
+    ctx.fillStyle = dim ? (i % 2 ? '#5a2070' : '#182c78') : col;
+    var steps = Math.max(32, Math.round(r * 7));
+    for (var k = 0; k < steps; k++) {
+      var a = (k / steps) * Math.PI * 2;
+      var px = Math.round(cx + Math.cos(a) * rx);
+      var py = Math.round(cy + r * 0.55 + Math.sin(a) * ry);
+      if (px < 0 || py < 0 || px >= W || py >= H) continue;
+      ctx.fillRect(px, py, 1, 1);
+    }
+  }
+}
+
+/* ==========================================================================
+   MISSION 5 — THE FLAG SHIP
+   --------------------------------------------------------------------------
+   One ship, and only one way to kill it: put a shot into the reactor at the
+   middle. You either cut a channel through the hull to reach it, or you
+   thread the vent, which is one cell wide and worth the attempt. Anything
+   you knock off keeps flying, and it will kill you as readily as the ship's
+   own guns. From Space Colonel up it brings two Gorfian robots with it.
+   ========================================================================== */
+function startFlag() {
+  var cols = FLAG_PLAN[0].length, rows = FLAG_PLAN.length;
+  var cells = [];
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      var ch = FLAG_PLAN[r][c];
+      if (ch === '.') continue;
+      cells.push({
+        c: c, r: r, type: ch,
+        hp: ch === '=' ? 2 : 1,
+        alive: true
+      });
+    }
+  }
+  flag = {
+    x: W / 2, y: 62, vx: 0.5 * (Math.random() < 0.5 ? 1 : -1),
+    cols: cols, rows: rows, cells: cells,
+    w: cols * FLAG_CELL, h: rows * FLAG_CELL,
+    cool: 90, descend: 0, dead: false, deadT: 0
+  };
+  if (G.rank >= 2) {
+    for (var g = 0; g < 2; g++) {
+      foes.push({ kind: 'flagEscort', x: g ? W - 30 : 30, y: 120, w: 11, h: 10,
+                  a: g * Math.PI, t: 0, alive: true, pts: SCORE.flagEscort, cool: rnd(60, 160) });
+    }
+  }
+  taunt('flag');
+}
+
+function flagCellRect(cell) {
+  return {
+    x: flag.x - flag.w / 2 + cell.c * FLAG_CELL,
+    y: flag.y - flag.h / 2 + cell.r * FLAG_CELL
+  };
+}
+
+function updateFlag() {
+  if (!flag) return;
+  if (flag.dead) {
+    /* it comes apart a piece at a time before it goes */
+    if (++flag.deadT % 3 === 0) {
+      var alive = flag.cells.filter(function (c) { return c.alive; });
+      if (alive.length) {
+        var c = pick(alive); c.alive = false;
+        var p = flagCellRect(c);
+        fx.boom(p.x + 3, p.y + 3);
+        SFX.chunk();
+      }
+    }
+    if (flag.deadT > 90) { missionCleared(); }
+    return;
+  }
+
+  flag.x += flag.vx * difficulty();
+  if (flag.x < flag.w / 2 + 6) { flag.x = flag.w / 2 + 6; flag.vx = Math.abs(flag.vx); }
+  if (flag.x > W - flag.w / 2 - 6) { flag.x = W - flag.w / 2 - 6; flag.vx = -Math.abs(flag.vx); }
+  /* it presses down slowly, so stalling is not a strategy */
+  flag.descend += 0.004 * difficulty();
+  flag.y = 62 + flag.descend;
+  if (flag.y + flag.h / 2 > ship.y - 6) { loseLife(); return; }
+
+  if ((flag.cool -= difficulty()) <= 0) {
+    flag.cool = rnd(50, 110) / difficulty();
+    /* it fires from whichever of its lower cells still exist */
+    var bottom = {};
+    for (var i = 0; i < flag.cells.length; i++) {
+      var c = flag.cells[i];
+      if (!c.alive) continue;
+      if (!bottom[c.c] || c.r > bottom[c.c].r) bottom[c.c] = c;
+    }
+    var ks = Object.keys(bottom);
+    if (ks.length) {
+      var muzzle = bottom[ks[(Math.random() * ks.length) | 0]];
+      var p = flagCellRect(muzzle);
+      enemyShot(p.x + 2, p.y + FLAG_CELL, 0, 2.0);
+      SFX.enemy();
+    }
+  }
+
+  /* escorts orbit and snipe */
+  for (var e = 0; e < foes.length; e++) {
+    var f = foes[e];
+    if (f.kind !== 'flagEscort' || !f.alive) continue;
+    f.t++; f.a += 0.017;
+    f.x = W / 2 + Math.cos(f.a) * 62;
+    f.y = 132 + Math.sin(f.a * 1.6) * 24;
+    if ((f.cool -= difficulty()) <= 0) {
+      f.cool = rnd(90, 200) / difficulty();
+      var dx = ship.x - f.x, dy = ship.y - f.y, d = Math.hypot(dx, dy) || 1;
+      enemyShot(f.x + 5, f.y + 10, dx / d * 1.4, dy / d * 1.4);
+    }
+  }
+}
+
+/* A shot arriving at the hull. Returns true if it was consumed. */
+function hitFlag(sx, sy) {
+  if (!flag || flag.dead) return false;
+  var lx = sx - (flag.x - flag.w / 2), ly = sy - (flag.y - flag.h / 2);
+  if (lx < 0 || ly < 0 || lx >= flag.w || ly >= flag.h) return false;
+  var c = Math.floor(lx / FLAG_CELL), r = Math.floor(ly / FLAG_CELL);
+  for (var i = 0; i < flag.cells.length; i++) {
+    var cell = flag.cells[i];
+    if (!cell.alive || cell.c !== c || cell.r !== r) continue;
+    if (cell.type === '@') {
+      /* the reactor */
+      flag.dead = true; flag.deadT = 0;
+      addScore(SCORE.reactor, flag.x, flag.y);
+      SFX.bigHit(); G.shake = 26; G.flash = 8;
+      taunt('win');
+      return true;
+    }
+    if (cell.type === '|') {
+      /* The vent. It is a hole, so it neither breaks nor scores; a shot
+         that finds it keeps going, and what is above it is the reactor.
+         One cell wide, with both of you moving, which is the point. */
+      return false;
+    }
+    if (--cell.hp > 0) { SFX.chunk(); return true; }
+    cell.alive = false;
+    addScore(SCORE.hullPiece, sx, sy);
+    /* the piece comes off and keeps going, and it is lethal */
+    var p = flagCellRect(cell);
+    debris.push({ x: p.x, y: p.y, vx: rnd(-0.8, 0.8), vy: rnd(0.5, 1.6),
+                  spin: rnd(-0.1, 0.1), a: 0, live: true, scored: false });
+    SFX.chunk();
+    return true;
+  }
+  return false;
+}
+
+function updateDebris() {
+  for (var i = debris.length - 1; i >= 0; i--) {
+    var d = debris[i];
+    d.x += d.vx; d.y += d.vy; d.vy += 0.012; d.a += d.spin;
+    if (d.y > H + 8) { debris.splice(i, 1); continue; }
+    if (ship.alive && ship.invuln <= 0 &&
+        hit(d.x + 2, d.y + 2, 2, 2, ship.x, ship.y, 5, 5)) {
+      debris.splice(i, 1); loseLife(); return;
+    }
+    /* you can shoot the wreckage out of the air, for a little more */
+    if (shot && hit(d.x + 2, d.y + 2, 3, 3, shot.x, shot.y, 1, 2)) {
+      addScore(SCORE.flyingPiece, d.x, d.y);
+      fx.boom(d.x, d.y); SFX.hit();
+      debris.splice(i, 1); shot = null;
+    }
+  }
+}
+
+function drawFlag() {
+  if (!flag) return;
+  for (var i = 0; i < flag.cells.length; i++) {
+    var cell = flag.cells[i];
+    if (!cell.alive) continue;
+    var p = flagCellRect(cell);
+    var x = Math.round(p.x), y = Math.round(p.y);
+    if (cell.type === '@') {
+      /* the reactor pulses, so it is obvious what you are aiming at */
+      var f = (Math.sin(G.t * 0.14) + 1) / 2;
+      ctx.fillStyle = f > 0.5 ? P.white : P.yellow;
+      ctx.fillRect(x, y, FLAG_CELL, FLAG_CELL);
+      ctx.fillStyle = P.orange;
+      ctx.fillRect(x + 1, y + 1, FLAG_CELL - 2, FLAG_CELL - 2);
+      ctx.fillStyle = f > 0.5 ? P.white : P.red;
+      ctx.fillRect(x + 2, y + 2, FLAG_CELL - 4, FLAG_CELL - 4);
+    } else if (cell.type === '|') {
+      ctx.fillStyle = P.iron;
+      ctx.fillRect(x, y, FLAG_CELL, FLAG_CELL);
+      ctx.fillStyle = P.dark;
+      ctx.fillRect(x + 2, y, 2, FLAG_CELL);
+    } else if (cell.type === '=') {
+      ctx.fillStyle = cell.hp >= 2 ? P.steel : P.iron;
+      ctx.fillRect(x, y, FLAG_CELL, FLAG_CELL);
+      ctx.fillStyle = cell.hp >= 2 ? P.white : P.steel;
+      ctx.fillRect(x, y, FLAG_CELL, 1);
+      ctx.fillStyle = P.dark;
+      ctx.fillRect(x + FLAG_CELL - 1, y, 1, FLAG_CELL);
+    } else {
+      ctx.fillStyle = P.blue;
+      ctx.fillRect(x, y, FLAG_CELL, FLAG_CELL);
+      ctx.fillStyle = P.cyan;
+      ctx.fillRect(x, y, FLAG_CELL, 1);
+      ctx.fillStyle = P.navy;
+      ctx.fillRect(x, y + FLAG_CELL - 1, FLAG_CELL, 1);
+    }
+  }
+}
+
+/* ==========================================================================
+   MISSION PLUMBING
+   ========================================================================== */
+function clearField() {
+  foes.length = 0; eshots.length = 0; debris.length = 0;
+  shot = null; field = null; flag = null;
+  G.laserGroups = null; G.astro = null; G.galax = null; G.warp = null;
+  fx.clear();
+}
+
+function startMission() {
+  clearField();
+  ship.x = W / 2; ship.y = H - 34; ship.alive = true; ship.invuln = 90;
+  var m = MISSIONS[G.mission];
+  if (m.key === 'astro') startAstro();
+  else if (m.key === 'laser') startLaser();
+  else if (m.key === 'galax') startGalax();
+  else if (m.key === 'warp') startWarp();
+  else startFlag();
+}
+
+function missionCleared() {
+  G.mode = 'clear'; G.modeT = 0;
+  SFX.clear();
+  if (MISSIONS[G.mission].key !== 'flag') taunt('clear');
+}
+
+function advanceMission() {
+  G.mission++;
+  if (G.mission >= MISSIONS.length) {
+    G.mission = 0; G.tour++;
+    if (G.rank < RANKS.length - 1) {
+      G.rank++;
+      G.mode = 'promote'; G.modeT = 0;
+      taunt('promote');
+      return;
+    }
+  }
+  G.mode = 'brief'; G.modeT = 0;
+}
+
+function loseLife() {
+  if (!ship.alive || ship.invuln > 0) return;
+  ship.alive = false;
+  G.mode = 'dying'; G.modeT = 0;
+  G.shake = 20;
+  fx.boom(ship.x, ship.y, true);
+  SFX.die();
+  taunt('die');
+}
+
+function afterDeath() {
+  G.lives--;
+  if (G.lives <= 0) {
+    G.mode = 'over'; G.modeT = 0;
+    taunt('over');
+    return;
+  }
+  /* the mission restarts from the top, as it did on the board */
+  G.mode = 'brief'; G.modeT = 0;
+}
+
+/* ==========================================================================
+   PLAYER, SHOTS, COLLISIONS
+   ========================================================================== */
+function updateShip() {
+  if (!ship.alive) return;
+  if (ship.invuln > 0) ship.invuln--;
+
+  var ax = input.axis(), ay = input.axisY();
+  if (padVec.active) { ax = padVec.x; ay = padVec.y; }
+  ship.x = clamp(ship.x + ax * 1.7, 8, W - 8);
+  /* The yoke moved the ship in both axes, unusually for 1981, but only
+     inside a band at the bottom. In Astro Battles the top of that band is
+     the force field: the shield is no use if you can fly out from under it. */
+  var top = field ? field.y + 14 : H * 0.58;
+  ship.y = clamp(ship.y + ay * 1.35, top, H - 22);
+
+  if (input.pressed('fire') || padFire) { fire(); padFire = false; }
+}
+
+function updateShots() {
+  if (shot) {
+    /* stepped in two half-pixels so a fast shot cannot skip a hull cell */
+    for (var sub = 0; sub < 2 && shot; sub++) {
+      shot.y += shot.vy / 2;
+      if (flag && hitFlag(shot.x, shot.y)) { shot = null; break; }
+    }
+    if (shot && shot.y < -4) shot = null;
+  }
+
+  /* the player's shot opens a hole in its own force field on the way out */
+  if (shot && field) {
+    var s = segAt(shot.x);
+    if (s && s.hp > 0 && shot.y <= s.y + 3 && shot.y >= s.y - 3) s.open = 22;
+  }
+  if (field) {
+    for (var i = 0; i < FIELD_SEGS; i++) if (field.segs[i].open > 0) field.segs[i].open--;
+  }
+
+  for (var e = eshots.length - 1; e >= 0; e--) {
+    var sh = eshots[e];
+    sh.t++;
+    sh.x += sh.vx; sh.y += sh.vy;
+    if (sh.y > H + 30 || sh.x < -8 || sh.x > W + 8) { eshots.splice(e, 1); continue; }
+
+    /* the field stops enemy fire unless that stretch is down or shuttered */
+    if (field && sh.vy > 0) {
+      var seg = segAt(sh.x);
+      if (seg && seg.hp > 0 && seg.open <= 0 && sh.y >= seg.y - 1 && sh.y <= seg.y + 4) {
+        seg.hp--;
+        fx.boom(sh.x, seg.y);
+        audio.tone(440, 0.04, 'square', 0.08, 200);
+        eshots.splice(e, 1);
+        continue;
+      }
+    }
+
+    /* Space Warp is the one mission where you can shoot the shots down */
+    if (MISSIONS[G.mission].key === 'warp' && shot &&
+        hit(sh.x, sh.y, 3, 3, shot.x, shot.y, 1, 2)) {
+      fx.boom(sh.x, sh.y); SFX.hit();
+      eshots.splice(e, 1); shot = null;
+      addScore(10, sh.x, sh.y);
+      continue;
+    }
+
+    if (ship.alive && ship.invuln <= 0) {
+      var hh = sh.kind === 'beam' ? sh.len / 2 : 2;
+      var cy = sh.kind === 'beam' ? sh.y + sh.len / 2 : sh.y;
+      if (hit(sh.x, cy, 1.5, hh, ship.x, ship.y, 5, 5)) { eshots.splice(e, 1); loseLife(); return; }
+    }
+  }
+}
+
+function updateFoes() {
+  for (var i = foes.length - 1; i >= 0; i--) {
+    var f = foes[i];
+    if (!f.alive) { foes.splice(i, 1); continue; }
+
+    /* the two Astro Battles wanderers move here rather than in the mission,
+       because they outlive the block */
+    if (f.kind === 'saucer') {
+      f.x += f.vx;
+      if (f.x < -20 || f.x > W + 20) { f.alive = false; continue; }
+    } else if (f.kind === 'gorf') {
+      f.t++;
+      f.x += f.vx;
+      f.y = 44 + Math.sin(f.t * 0.05) * 9;
+      if (f.x > W + 16) { f.alive = false; continue; }
+      if (Math.random() < 0.006) { enemyShot(f.x + 5, f.y + 10, 0, 1.7); SFX.enemy(); }
+    }
+
+    /* Most foes are positioned by their top-left corner; the warpers ride a
+       spiral and are positioned by their middle. One place decides which. */
+    var cx = f.centred ? f.x : f.x + f.w / 2;
+    var cy = f.centred ? f.y : f.y + f.h / 2;
+
+    if (shot && hit(cx, cy, f.w / 2 + 1, f.h / 2 + 1, shot.x, shot.y, 1, 2)) {
+      f.alive = false;
+      shot = null;
+      fx.boom(cx, cy);
+      SFX.hit();
+      addScore(f.pts, cx, cy);
+      /* losing the laser ship costs its formation its shape */
+      if (f.kind === 'laserShip' && f.group) {
+        f.group.broken = true;
+        for (var k = 0; k < foes.length; k++) {
+          if (foes[k].group === f.group && foes[k].alive && foes[k].state === 'formation') {
+            foes[k].cool = rnd(10, 60);
+          }
+        }
+      }
+      continue;
+    }
+
+    if (ship.alive && ship.invuln <= 0 &&
+        hit(cx, cy, f.w / 2, f.h / 2, ship.x, ship.y, 5, 5)) {
+      f.alive = false;
+      fx.boom(cx, cy);
+      loseLife();
+      return;
+    }
+  }
+}
+
+/* ==========================================================================
+   DRAW
+   ========================================================================== */
+function drawFoe(f) {
+  switch (f.kind) {
+    case 'inv':       drawSprite(f.art[G.astro ? G.astro.frame : 0], f.x, f.y); break;
+    case 'gorf':      drawSprite(SP.gorf[(G.t >> 4) & 1], f.x, f.y); break;
+    case 'saucer':    drawSprite(SP.saucer, f.x, f.y); break;
+    case 'escort':    drawRot(SP.escortRot, f.ang, f.x + 4, f.y + 3); break;
+    case 'miniGorf':  drawSprite(SP.miniGorf, f.x, f.y); break;
+    case 'laserShip':
+      drawSprite(SP.laser, f.x, f.y);
+      if (f.state === 'charging') {
+        /* the muzzle winds up, and it is meant to be read as a warning */
+        ctx.fillStyle = ((G.t >> 1) & 1) ? P.white : P.cyan;
+        ctx.fillRect(Math.round(f.x + 5), Math.round(f.y + 8), 1, 3);
+      }
+      break;
+    case 'gyellow':   drawRot(SP.galYRot, f.ang, f.x + 4, f.y + 4); break;
+    case 'gblue':     drawRot(SP.galBRot, f.ang, f.x + 4, f.y + 4); break;
+    case 'gred':      drawRot(SP.galRRot, f.ang, f.x + 4, f.y + 4); break;
+    case 'gflag':     drawRot(SP.galFRot, f.ang, f.x + 5, f.y + 4); break;
+    case 'warper':    drawSprite(SP.warp[f.stage || 0], f.x - f.w / 2, f.y - f.h / 2); break;
+    case 'flagEscort':drawSprite(SP.gorf[(G.t >> 4) & 1], f.x, f.y); break;
+  }
+}
+
+function drawShots() {
+  if (shot) {
+    /* the quark laser: a bright head with a short tail */
+    ctx.fillStyle = P.white;
+    ctx.fillRect(Math.round(shot.x), Math.round(shot.y), 1, 3);
+    ctx.fillStyle = P.cyan;
+    ctx.fillRect(Math.round(shot.x), Math.round(shot.y) + 3, 1, 2);
+  }
+  for (var i = 0; i < eshots.length; i++) {
+    var s = eshots[i];
+    if (s.kind === 'beam') {
+      ctx.fillStyle = ((G.t >> 1) & 1) ? P.white : P.rose;
+      ctx.fillRect(Math.round(s.x), Math.round(s.y), 2, s.len);
+      ctx.fillStyle = P.red;
+      ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, s.len);
+    } else if (s.kind === 'orb') {
+      ctx.fillStyle = ((G.t >> 2) & 1) ? P.magenta : P.white;
+      ctx.fillRect(Math.round(s.x) - 1, Math.round(s.y) - 1, 3, 3);
+    } else {
+      ctx.fillStyle = ((G.t >> 2) & 1) ? P.yellow : P.red;
+      ctx.fillRect(Math.round(s.x), Math.round(s.y), 2, 4);
+    }
+  }
+}
+
+function drawDebris() {
+  for (var i = 0; i < debris.length; i++) {
+    drawSprite(SP.chunk, debris[i].x, debris[i].y);
+  }
+}
+
+function drawShip() {
+  if (!ship.alive) return;
+  if (ship.invuln > 0 && ((G.t >> 2) & 1)) return;
+  drawSprite(SP.ship, ship.x - 6, ship.y - 6);
+}
+
+function drawHud() {
+  font.draw(ctx, '1UP', 4, 2, P.cyan);
+  font.draw(ctx, pad(G.score, 6), 4, 11, P.white);
+  font.center(ctx, 'HI', W, 2, P.red);
+  font.center(ctx, pad(G.high, 6), W, 11, P.white);
+  /* the rank is on the panel at all times, because the taunts use it */
+  font.right(ctx, shortRank(), W - 4, 2, P.yellow);
+  font.right(ctx, 'TOUR ' + (G.tour + 1), W - 4, 11, P.steel);
+
+  /* A panel strip along the bottom, because Astro Battles puts a bright
+     green planet exactly where the lives and the mission name go. */
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(0, H - 14, W, 14);
+  ctx.fillStyle = P.dark;
+  ctx.fillRect(0, H - 15, W, 1);
+  for (var i = 0; i < Math.min(G.lives - 1, 5); i++) {
+    A.Sprite.draw(ctx, SP.ship, 4 + i * 15, H - 13);
+  }
+  font.right(ctx, MISSIONS[G.mission].name, W - 4, H - 11, P.steel);
+}
+
+function shortRank() {
+  return ['CADET', 'CAPTAIN', 'COLONEL', 'GENERAL', 'WARRIOR', 'AVENGER'][G.rank];
+}
+
+function pad(n, w) {
+  var s = String(n);
+  while (s.length < w) s = '0' + s;
+  return s;
+}
+
+/* ==========================================================================
+   SCREENS
+   ========================================================================== */
+function drawBackdrop() {
+  var key = MISSIONS[G.mission].key;
+  if (G.mode === 'attract') { screen.clear(P.black); stars.draw(); return; }
+  if (key === 'astro') {
+    /* The one mission fought over Earth. The Astrocade gave four colours per
+       scan line, so the sky is banded rather than blended — a smooth vertical
+       gradient is a web page's idea of a sky, not this board's. */
+    screen.clear(P.black);
+    var bands = ['#081028', '#0e1c44', '#16285e', '#1e3878', '#264a98',
+                 '#2e5cb4', '#3878d8', '#4a90e0', '#5ca4e8', '#78b8f0'];
+    var top = 20, bh = Math.ceil((H - 38 - top) / bands.length);
+    for (var b = 0; b < bands.length; b++) {
+      ctx.fillStyle = bands[b];
+      ctx.fillRect(0, top + b * bh, W, bh);
+    }
+    /* The curve of the planet, a column at a time: the horizon is highest
+       at the middle of the screen and falls away at both edges. */
+    for (var x = 0; x < W; x++) {
+      var u = (x - W / 2) / (W / 2);
+      var hz = Math.round(H - 40 + u * u * 13);
+      ctx.fillStyle = '#5ad078';
+      ctx.fillRect(x, hz, 1, 2);
+      ctx.fillStyle = '#2f9a4c';
+      ctx.fillRect(x, hz + 2, 1, 5);
+      ctx.fillStyle = '#1d6030';
+      ctx.fillRect(x, hz + 7, 1, H - hz - 7);
+    }
+    } else {
+    screen.clear(P.black);
+    stars.draw();
+    if (key === 'warp') drawWarpTunnel();
+  }
+}
+
+function drawPlayfield() {
+  drawBackdrop();
+  if (field) drawField();
+  if (flag) drawFlag();
+  for (var i = 0; i < foes.length; i++) drawFoe(foes[i]);
+  drawDebris();
+  drawShots();
+  drawShip();
+  fx.draw();
+  drawHud();
+}
+
+var ATTRACT_PAGES = 4;
+
+function drawAttract() {
+  screen.clear(P.black);
+  stars.draw();
+  var page = Math.floor(G.modeT / 260) % ATTRACT_PAGES;
+
+  font.center(ctx, 'GORF', W, 30, P.red, 3);
+  font.center(ctx, 'MIDWAY  1981', W, 58, P.iron);
+
+  if (page === 0) {
+    font.center(ctx, 'GALACTIC ORBITING', W, 92, P.cyan);
+    font.center(ctx, 'ROBOT FORCE', W, 102, P.cyan);
+    /* drawn at 3x with smoothing off, so it is a big chunky pixel robot
+       rather than a small one */
+    var gsp = SP.gorf[(G.t >> 4) & 1];
+    ctx.drawImage(gsp, 0, 0, gsp.width, gsp.height,
+                  Math.round(W / 2 - gsp.width * 1.5), 118,
+                  gsp.width * 3, gsp.height * 3);
+    font.center(ctx, 'I AM THE', W, 160, P.steel);
+    font.center(ctx, 'GORFIAN EMPIRE', W, 172, P.steel);
+  } else if (page === 1) {
+    font.center(ctx, 'FIVE MISSIONS', W, 88, P.yellow);
+    for (var i = 0; i < MISSIONS.length; i++) {
+      font.draw(ctx, String(i + 1), 30, 104 + i * 12, P.iron);
+      font.draw(ctx, MISSIONS[i].name, 44, 104 + i * 12, P.white);
+    }
+  } else if (page === 2) {
+    font.center(ctx, 'SCORE TABLE', W, 88, P.yellow);
+    var rows = [
+      [SP.invA[0], 50], [SP.gorf[0], 300], [SP.laser, 300],
+      [SP.escort, 100], [SP.galFlag, 200], [SP.warp[2], 250]
+    ];
+    for (var r = 0; r < rows.length; r++) {
+      A.Sprite.draw(ctx, rows[r][0], 52, 104 + r * 14);
+      font.draw(ctx, pad(rows[r][1], 4) + ' PTS', 74, 106 + r * 14, P.white);
+    }
+    font.center(ctx, 'REACTOR    1000 PTS', W, 196, P.orange);
+  } else {
+    font.center(ctx, 'RANKS', W, 88, P.yellow);
+    for (var k = 0; k < RANKS.length; k++) {
+      font.center(ctx, RANKS[k], W, 104 + k * 11, k === 5 ? P.orange : P.steel);
+    }
+  }
+
+  if (((G.t >> 4) & 1)) font.center(ctx, 'PRESS START', W, 228, P.yellow);
+  font.center(ctx, 'HIGH SCORE  ' + pad(G.high, 6), W, 252, P.white);
+  font.center(ctx, 'A TRIBUTE  NOT AFFILIATED', W, 288, '#33384a');
+  font.center(ctx, 'WITH THE RIGHTS HOLDERS', W, 298, '#33384a');
+}
+
+function drawBrief() {
+  drawBackdrop();
+  drawHud();
+  var m = MISSIONS[G.mission];
+  font.center(ctx, 'MISSION ' + (G.mission + 1), W, 120, P.cyan);
+  font.center(ctx, m.name, W, 136, P.yellow, 1);
+  font.center(ctx, shortRank(), W, 158, P.white);
+  if (G.modeT > 60) font.center(ctx, 'GET READY', W, 182, ((G.t >> 3) & 1) ? P.red : P.orange);
+}
+
+function drawClear() {
+  drawPlayfield();
+  font.center(ctx, 'MISSION COMPLETE', W, 140, ((G.t >> 3) & 1) ? P.white : P.yellow);
+}
+
+function drawPromote() {
+  screen.clear(P.black);
+  stars.draw();
+  font.center(ctx, 'TOUR ' + G.tour + ' COMPLETE', W, 96, P.cyan);
+  font.center(ctx, 'YOU ARE PROMOTED TO', W, 124, P.steel);
+  font.center(ctx, RANKS[G.rank], W, 142, ((G.t >> 3) & 1) ? P.white : P.orange);
+  A.Sprite.draw(ctx, SP.ship, W / 2 - 6, 168);
+  drawHud();
+}
+
+function drawOver() {
+  drawBackdrop();
+  for (var i = 0; i < foes.length; i++) drawFoe(foes[i]);
+  if (flag) drawFlag();
+  fx.draw();
+  drawHud();
+  font.center(ctx, 'GAME OVER', W, 132, P.red, 1);
+  font.center(ctx, 'LONG LIVE GORF', W, 152, ((G.t >> 4) & 1) ? P.white : P.iron);
+  if (G.modeT > 150 && ((G.t >> 4) & 1)) font.center(ctx, 'PRESS START', W, 186, P.yellow);
+}
+
+/* ==========================================================================
+   LOOP
+   ========================================================================== */
+function startGame() {
+  G.score = 0; G.lives = 3; G.rank = 0; G.tour = 0; G.mission = 0;
+  G.nextExtra = EXTRA_LIFE;
+  G.mode = 'brief'; G.modeT = 0;
+  taunt('start');
+}
+
+function update() {
+  G.t++;
+  G.modeT++;
+  if (G.shake > 0) G.shake--;
+  if (G.flash > 0) G.flash--;
+  stars.update();
+  fx.update();
+
+  if (input.pressed('p') || input.pressed('P')) {
+    if (G.mode === 'play') G.paused = !G.paused;
+  }
+
+  switch (G.mode) {
+    case 'attract':
+      if (input.pressed('start') || input.pressed('fire') || input.pressed('tap')) { audio.set(true); startGame(); }
+      /* Gorf works the queue */
+      if (G.modeT % 520 === 80) taunt('coin');
+      break;
+
+    case 'brief':
+      if (G.modeT === 1) startMission();
+      if (G.modeT > 110) { G.mode = 'play'; G.modeT = 0; }
+      break;
+
+    case 'play':
+      if (G.paused) break;
+      updateShip();
+      updateShots();
+      var key = MISSIONS[G.mission].key;
+      if (key === 'astro') updateAstro();
+      else if (key === 'laser') updateLaser();
+      else if (key === 'galax') updateGalax();
+      else if (key === 'warp') updateWarp();
+      else { updateFlag(); updateDebris(); }
+      updateFoes();
+      /* Gorf comments on your work from time to time */
+      if (G.modeT % 900 === 600 && !voice.busy()) taunt('taunt');
+      break;
+
+    case 'dying':
+      updateShots();
+      if (G.modeT > 110) afterDeath();
+      break;
+
+    case 'clear':
+      updateShots();
+      if (G.modeT > 130) advanceMission();
+      break;
+
+    case 'promote':
+      if (G.modeT > 220) { G.mode = 'brief'; G.modeT = 0; }
+      break;
+
+    case 'over':
+      if (G.modeT > 150 && (input.pressed('start') || input.pressed('fire') || input.pressed('tap'))) {
+        G.mode = 'attract'; G.modeT = 0; clearField();
+      }
+      break;
+  }
+
+  input.endFrame();
+}
+
+function render() {
+  ctx.save();
+  if (G.shake > 0) {
+    ctx.translate(Math.round(rnd(-G.shake, G.shake) * 0.14),
+                  Math.round(rnd(-G.shake, G.shake) * 0.14));
+  }
+  switch (G.mode) {
+    case 'attract': drawAttract(); break;
+    case 'brief':   drawBrief(); break;
+    case 'clear':   drawClear(); break;
+    case 'promote': drawPromote(); break;
+    case 'over':    drawOver(); break;
+    default:        drawPlayfield(); break;
+  }
+  if (G.paused && G.mode === 'play') {
+    font.center(ctx, 'PAUSED', W, H / 2, ((G.t >> 3) & 1) ? P.white : P.yellow);
+  }
+  ctx.restore();
+  if (G.flash > 0) {
+    ctx.fillStyle = 'rgba(255,255,255,' + (G.flash / 16) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+/* ==========================================================================
+   CABINET AND TOUCH
+   ========================================================================== */
+var cab = A.Cabinet(document.getElementById('mount'), screen, { crt: false });
+cab.addSoundButton(audio);
+cab.addCrtButton();
+cab.button('Pause', null, function () { if (G.mode === 'play') G.paused = !G.paused; });
+cab.autoFit(200);
+
+/* An analogue stick, because the cabinet had a yoke and a d-pad would lose
+   the diagonal movement the ship is built around. */
+var padVec = { x: 0, y: 0, active: false };
+var padFire = false;
+(function touch() {
+  var stick = document.getElementById('stick');
+  var knob = document.getElementById('knob');
+  var fireBtn = document.getElementById('fire');
+  if (!stick) return;
+  var id = null, cx = 0, cy = 0, R = 44;
+
+  function set(ev) {
+    var r = stick.getBoundingClientRect();
+    var dx = ev.clientX - (r.left + r.width / 2);
+    var dy = ev.clientY - (r.top + r.height / 2);
+    var d = Math.hypot(dx, dy) || 1;
+    var k = Math.min(1, d / R);
+    padVec.x = (dx / d) * k;
+    padVec.y = (dy / d) * k;
+    padVec.active = true;
+    knob.style.transform = 'translate(' + (padVec.x * R) + 'px,' + (padVec.y * R) + 'px)';
+  }
+  function release() {
+    id = null; padVec.x = 0; padVec.y = 0; padVec.active = false;
+    knob.style.transform = '';
+  }
+  stick.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); id = e.pointerId; stick.setPointerCapture(id); audio.resume(); set(e);
+  });
+  stick.addEventListener('pointermove', function (e) { if (e.pointerId === id) { e.preventDefault(); set(e); } });
+  stick.addEventListener('pointerup', release);
+  stick.addEventListener('pointercancel', release);
+
+  fireBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    audio.resume();
+    padFire = true;
+    if (G.mode === 'attract' || G.mode === 'over') input.tapFire();
+  });
+})();
+
+/* Tapping the screen starts a game, so a phone never needs a keyboard. */
+screen.canvas.addEventListener('pointerdown', function () {
+  audio.resume();
+  if (G.mode === 'attract') { audio.set(true); startGame(); }
+  else if (G.mode === 'over' && G.modeT > 150) { G.mode = 'attract'; G.modeT = 0; clearField(); }
+});
+
+/* A preview hook, the same one Galaga has, plus a probe the headless tests
+   drive so the mechanics can be checked by playing them rather than by
+   reading the code. Nothing in the game reads either of these. */
+function jumpTo(mission, tour) {
+  G.mission = mission || 0; G.tour = tour || 0;
+  G.rank = Math.min(RANKS.length - 1, G.tour);
+  G.lives = 3; G.mode = 'brief'; G.modeT = 0;
+}
+
+window.__gorf = {
+  go: jumpTo,
+  state: G,
+  sprites: SP,
+  say: function (t) { audio.set(true); voice.say(t); },
+  probe: {
+    go: jumpTo,
+    reset: function () { G.score = 0; G.lives = 3; G.rank = 0; G.tour = 0; G.mission = 0; },
+    pump: function (n) { for (var i = 0; i < (n || 1); i++) update(); },
+    fire: fire,
+    shot: function () { return shot; },
+    shotAt: function (x, y) { shot = { x: x, y: y, vy: -4.2 }; },
+    shipY: function () { return ship.y; },
+    shipAt: function (x, y) { ship.x = x; ship.y = y; ship.invuln = 9999; },
+    fieldSeg: function (i) { return field ? field.segs[i] : null; },
+    enemyShotAt: function (x, y, vy) { enemyShot(x, y, 0, vy == null ? 1.5 : vy); },
+    eshots: function () { return eshots; },
+    debris: function () { return debris; },
+    foes: function () { return foes; },
+    flag: function () { return flag; },
+    cellPos: flagCellRect,
+    killAll: function () {
+      for (var i = 0; i < foes.length; i++) foes[i].alive = false;
+      if (flag) { flag.dead = true; flag.deadT = 0; }
+      if (G.warp) G.warp.left = 0;
+    }
+  }
+};
+
+A.Loop(update, render, 60).start();
+}
+</script>
+</body>
+</html>

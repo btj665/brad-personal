@@ -7,6 +7,7 @@ realistic" means here, concretely, and how to bring an existing game up to it.
 games/
   lib/arcade.js      shared engine (no dependencies, one global: Arcade)
   galaga/index.html  reference implementation
+  gorf/index.html    second reference: five missions, a boss, and speech
 ```
 
 ## The seven rules
@@ -96,7 +97,7 @@ in challenging stages as first assumed, and the squadron bonuses are
 | `Arcade.Font` | 8×8 bitmap text: `draw` `center` `at` `right` |
 | `Arcade.Sprite` | `build` `tint` `flipH` `rotate` `rotations` `draw` |
 | `Arcade.Path` | Catmull-Rom splines sampled by arc length (constant speed) |
-| `Arcade.Audio` | `tone` `noise` `sequence`, silent until toggled on |
+| `Arcade.Audio` | `tone` `noise` `sequence`, silent until toggled on; `bus` and `noiseBuffer()` for games that build their own nodes |
 | `Arcade.note` | Note names → Hz, for writing jingles readably |
 | `Arcade.Input` | Keyboard, pointer drag, `held`/`pressed` edge detection |
 | `Arcade.Loop` | Fixed timestep with backgrounded-tab catch-up guard |
@@ -117,3 +118,15 @@ pixels are the default.
 **Artifacts must inline or ship the file.** Published artifacts cannot load
 scripts from arbitrary hosts. Either paste `arcade.js` into the page or publish
 it as a supporting file alongside the game, referenced by a relative path.
+Gorf takes the second route with a two-candidate loader, so the engine is not
+duplicated into the game's folder; the cost is one 404 in the console when the
+file is opened straight out of the repository.
+
+## Speech
+
+Gorf's cabinet had a Votrax SC-01, and the taunts are half of why anyone
+remembers it. Samples are out under rule 6, so the voice there is formant
+synthesis: a pulse train or a hiss through three bandpass filters whose
+frequencies are the phoneme, driven from a small pronunciation dictionary.
+That is what the SC-01 was doing, and it sounds like it. Any game that needs
+a voice should copy that block rather than reach for an audio file.
