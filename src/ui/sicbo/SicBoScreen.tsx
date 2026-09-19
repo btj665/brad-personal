@@ -19,9 +19,10 @@ import {
   type Face,
 } from '../../sicbo/bets'
 import { SicBoGame } from '../../sicbo/engine'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { WinToast } from '../WinToast'
 
-const START = 500
 const CHIPS = [1, 5, 25, 100]
 /** How long the dice tumble before the faces — and the winning spots — show. */
 const SHAKE_MS = 1400
@@ -116,7 +117,7 @@ function Spot({
 }
 
 export function SicBoScreen() {
-  const [game, setGame] = useState(() => new SicBoGame({ seed: randomSeed(), bankroll: START }))
+  const { game, newGame } = useSharedBankroll('sicbo', (bankroll) => new SicBoGame({ seed: randomSeed(), bankroll }))
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   // The engine settles the whole felt the moment the dice are shaken, so the
@@ -137,9 +138,9 @@ export function SicBoScreen() {
   }, [revealed])
 
   const rebuy = useCallback(() => {
-    setGame(new SicBoGame({ seed: randomSeed(), bankroll: START }))
+    newGame()
     setRevealed(true)
-  }, [])
+  }, [newGame])
 
   const shake = useCallback(() => {
     if (!game.canShake() || busy) return
@@ -287,7 +288,7 @@ export function SicBoScreen() {
               <span className="sb-staked">On table: {game.staked}</span>
               {broke ? (
                 <button className="btn btn-primary" onClick={rebuy}>
-                  Buy in for {START}
+                  Add {BASE_STAKE}
                 </button>
               ) : game.phase === 'result' && revealed ? (
                 <>

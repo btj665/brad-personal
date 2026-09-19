@@ -8,3 +8,8 @@ the-tables.zip
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Local environment (Supabase keys, etc.) — never commit
+.env
+.env.local
+.env.*.local

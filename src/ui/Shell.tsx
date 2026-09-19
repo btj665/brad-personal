@@ -1,5 +1,9 @@
 import { useState } from 'react'
 
+import { useAuth } from '../auth/AuthProvider'
+import { AuthScreen } from '../auth/AuthScreen'
+import { useWallet } from '../wallet/useWallet'
+import { AdminScreen } from './admin/AdminScreen'
 import { BlackjackScreen } from './App'
 import { BaccaratScreen } from './baccarat/BaccaratScreen'
 import { BigSixScreen } from './bigsix/BigSixScreen'
@@ -110,9 +114,28 @@ const SCREENS: Record<GameId, () => React.JSX.Element> = {
   solitaire: SolitaireScreen,
 }
 
+/** The gate. Loading and signed-out states never reach the floor; guest mode
+ *  (no backend) is always `ready`, so the offline build shows the casino at once. */
 export function App() {
-  const [game, setGame] = useState<GameId>('blackjack')
-  const Screen = SCREENS[game]
+  const { status } = useAuth()
+  if (status === 'loading') {
+    return (
+      <div className="app app-splash">
+        <span className="gamenav-brand">The Tables</span>
+      </div>
+    )
+  }
+  if (status !== 'ready') return <AuthScreen />
+  return <Casino />
+}
+
+type View = GameId | 'admin'
+
+function Casino() {
+  const [view, setView] = useState<View>('blackjack')
+  const { profile, email, signOut } = useAuth()
+  const balance = useWallet()
+  const Screen = view === 'admin' ? AdminScreen : SCREENS[view]
 
   return (
     <div className="app">
@@ -126,8 +149,8 @@ export function App() {
                 {games.map((g) => (
                   <button
                     key={g.id}
-                    className={`gamenav-tab${game === g.id ? ' gamenav-tab-on' : ''}`}
-                    onClick={() => setGame(g.id)}
+                    className={`gamenav-tab${view === g.id ? ' gamenav-tab-on' : ''}`}
+                    onClick={() => setView(g.id)}
                   >
                     <span className="gamenav-name">{g.label}</span>
                     <span className="gamenav-blurb">{g.blurb}</span>
@@ -136,6 +159,26 @@ export function App() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="gamenav-account">
+          <span className="gamenav-balance" title="Your balance, shared across every game">
+            ${balance.toLocaleString('en-US')}
+          </span>
+          {profile && <span className="gamenav-user">{profile.username}</span>}
+          {profile?.isAdmin && (
+            <button
+              className={`gamenav-adminbtn${view === 'admin' ? ' on' : ''}`}
+              onClick={() => setView((v) => (v === 'admin' ? 'blackjack' : 'admin'))}
+            >
+              {view === 'admin' ? 'Back to floor' : 'Back office'}
+            </button>
+          )}
+          {(profile || email) && (
+            <button className="gamenav-signout" onClick={() => void signOut()}>
+              Sign out
+            </button>
+          )}
         </div>
       </nav>
 

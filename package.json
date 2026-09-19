@@ -35,6 +35,7 @@
     "package": "node scripts/make-package.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
