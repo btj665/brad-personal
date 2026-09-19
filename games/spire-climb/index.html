@@ -2092,19 +2092,19 @@ const MONSTER_KEYS = Object.keys(MONSTERS);
 const ROOM_TYPES = {
   monster:  { n:'Monster Room',    icon:'✶', hex:'#c9503f', short:'Hostiles',
     desc:'Something is already in here, and it was put here on purpose.',
-    layouts:['hall','cavern','chambers','pillared','cross'] },
+    layouts:['hall','cavern','chambers','pillared','cross','spiral'] },
   guardian: { n:'Guardian Room',   icon:'✦', hex:'#e0454f', short:'Guardian',
     desc:'The floor’s stair is behind something the spire built to hold it.',
     layouts:['arena','hall','dais'] },
   trap:     { n:'Trap Room',       icon:'⚠', hex:'#d9832b', short:'Traps',
     desc:'A room whose only content is the floor, which is the problem.',
-    layouts:['corridors','grid','bridge','gauntlet'] },
+    layouts:['corridors','grid','bridge','gauntlet','catwalks'] },
   logic:    { n:'Puzzle Room',     icon:'◈', hex:'#6fa8dc', short:'Puzzle',
     desc:'The door will not open until somebody in the party understands the room.',
     layouts:['chambers','ritual','library','workshop'] },
   treasure: { n:'Treasure Room',   icon:'◆', hex:'#e0b040', short:'Treasure',
     desc:'The spire keeps what previous climbers stopped needing.',
-    layouts:['vault','chambers','hall'] },
+    layouts:['vault','chambers','hall','spiral'] },
   safe:     { n:'Safe Zone',       icon:'⌂', hex:'#7ed08a', short:'Safe',
     desc:'A room the spire has agreed not to contest. Rest, spend, or leave.',
     layouts:['sanctum','hall'] },
@@ -2116,7 +2116,7 @@ const ROOM_TYPES = {
     layouts:['arena','pit'] },
   hazard:   { n:'Hazard Room',     icon:'≈', hex:'#3f86c4', short:'Hazard',
     desc:'The room itself is the encounter.',
-    layouts:['bridge','cavern','flooded','gauntlet'] },
+    layouts:['bridge','cavern','flooded','gauntlet','catwalks'] },
   encounter:{ n:'Encounter',       icon:'☖', hex:'#c98ce0', short:'Encounter',
     desc:'Someone else is in here, and they are not a monster.',
     layouts:['hall','chambers','sanctum'] },
@@ -2125,7 +2125,7 @@ const ROOM_TYPES = {
     layouts:['ritual','dais','sanctum'] },
   anomaly:  { n:'Anomaly',         icon:'⁇', hex:'#e0454f', short:'Anomaly',
     desc:'The spire is doing something it is not recorded as doing.',
-    layouts:['cavern','ritual','chambers','pit'] },
+    layouts:['cavern','ritual','chambers','pit','spiral'] },
   judgment: { n:'Judgment',        icon:'✧', hex:'#f0dfa0', short:'Judgment',
     desc:'The spire has a question, and it will not be repeated.',
     layouts:['dais','sanctum','ritual'] },
@@ -2139,8 +2139,8 @@ const ROOM_TYPE_KEYS = Object.keys(ROOM_TYPES);
    Consumed by the map generator. `w`/`h` are tile extents.
 ------------------------------------------------------------------------- */
 const LAYOUTS = {
-  hall:     { n:'hall',      w:[26,34], h:[18,24], pillars:1.0, rubble:0.5, alcoves:1 },
-  pillared: { n:'pillared',  w:[28,36], h:[20,26], pillars:2.0, rubble:0.3, alcoves:1 },
+  hall:     { n:'hall',      w:[32,40], h:[24,30], pillars:1.0, rubble:0.5, alcoves:1 },
+  pillared: { n:'pillared',  w:[34,42], h:[26,32], pillars:2.0, rubble:0.3, alcoves:1 },
   cross:    { n:'cross',     w:[28,34], h:[22,28], pillars:0.6, rubble:0.4, alcoves:0 },
   cavern:   { n:'cavern',    w:[30,38], h:[22,28], pillars:0.2, rubble:1.4, organic:true },
   chambers: { n:'chambers',  w:[30,38], h:[22,28], pillars:0.4, rubble:0.6, rooms:[3,5] },
@@ -2150,13 +2150,15 @@ const LAYOUTS = {
   bridge:   { n:'bridge',    w:[30,38], h:[22,28], pillars:0.2, rubble:0.3, chasm:true },
   arena:    { n:'arena',     w:[28,34], h:[24,30], pillars:0.5, rubble:0.4, round:true },
   pit:      { n:'pit',       w:[26,32], h:[24,30], pillars:0.3, rubble:0.8, round:true, sunken:true },
-  vault:    { n:'vault',     w:[22,28], h:[18,22], pillars:1.2, rubble:0.2, alcoves:2 },
+  vault:    { n:'vault',     w:[28,34], h:[24,28], pillars:1.2, rubble:0.2, alcoves:2 },
   sanctum:  { n:'sanctum',   w:[22,28], h:[18,22], pillars:1.4, rubble:0.1, round:true, ornate:true },
   dais:     { n:'dais',      w:[26,32], h:[22,26], pillars:1.0, rubble:0.2, dais:true, ornate:true },
   ritual:   { n:'ritual',    w:[26,32], h:[22,26], pillars:1.6, rubble:0.2, circle:true, ornate:true },
   library:  { n:'library',   w:[30,36], h:[22,26], pillars:0.4, rubble:0.3, shelves:true },
   workshop: { n:'workshop',  w:[30,36], h:[20,26], pillars:0.6, rubble:0.5, benches:true },
   flooded:  { n:'flooded',   w:[30,36], h:[22,28], pillars:0.6, rubble:0.4, water:true },
+  spiral:   { n:'spiral',    w:[36,44], h:[32,38], pillars:0.3, rubble:0.4, spiral:true, alcoves:1 },
+  catwalks: { n:'catwalks',  w:[32,40], h:[24,30], pillars:0.2, rubble:0.2, catwalks:true },
 };
 
 /* ---- trap catalogue ----------------------------------------------------- */
@@ -3073,7 +3075,9 @@ function carve(room) {
   const { grid: g, layout: L, rng } = room;
   const w = g.w, h = g.h;
   const cx = (w / 2) | 0, cy = (h / 2) | 0;
-  const m = 2; // margin of void
+  /* Margin of void around the carved body. Layouts with alcoves get a
+     thicker one, because a bay has to be cut back into something. */
+  const m = 2 + (L.alcoves ? 3 : 0);
 
   if (L.organic) {
     /* cellular-automata cavern */
@@ -3092,8 +3096,15 @@ function carve(room) {
       a.set(b);
     }
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) g.set(x, y, a[y * w + x] ? T.WALL : T.FLOOR);
-    /* guarantee a connected main body: flood from centre, wall off the rest */
-    connectify(g, cx, cy);
+    /* guarantee a connected main body */
+    const body = connectifyLargest(g);
+    /* the automaton can close almost everything on an unlucky seed; a cavern
+       the party cannot walk across is not a room, so cut a plain one instead */
+    if (body < Math.max(40, (w * h) * 0.06)) {
+      g.fillRect(0, 0, w - 1, h - 1, T.VOID);
+      g.fillRect(m, m, w - m - 1, h - m - 1, T.FLOOR);
+      outline(g, m);
+    }
   } else if (L.round) {
     g.fillRect(m, m, w - m - 1, h - m - 1, T.WALL);
     g.ellipse(cx, cy, (w - m * 2) / 2 - 1, (h - m * 2) / 2 - 1, T.FLOOR);
@@ -3156,6 +3167,47 @@ function carve(room) {
     for (let y = m; y < h - m; y++) for (let x = m; x < w - m; x++)
       if (fbm(noise, x * 0.13, y * 0.13, 3) > 0.05) g.set(x, y, T.WATER);
     outline(g, m);
+  } else if (L.spiral) {
+    /* A spire built the way the outside of a spire looks: one wall wound in
+       from the edge to the middle, so the route is a single long turn and
+       the party is never able to see where it ends. */
+    g.fillRect(m, m, w - m - 1, h - m - 1, T.FLOOR);
+    let x0 = m + 2, y0 = m + 2, x1 = w - m - 3, y1 = h - m - 3;
+    let turn = 0;
+    while (x1 - x0 > 4 && y1 - y0 > 4) {
+      g.fillRect(x0, y0, x1, y0, T.WALL);          // top
+      g.fillRect(x1, y0, x1, y1, T.WALL);          // right
+      g.fillRect(x0, y1, x1, y1, T.WALL);          // bottom
+      g.fillRect(x0, y0, x0, y1, T.WALL);          // left
+      /* one gap per ring, walked round so the route spirals inward */
+      const gapLen = 3;
+      if (turn % 4 === 0) g.fillRect(x0 + 1, y0, x0 + gapLen, y0, T.FLOOR);
+      else if (turn % 4 === 1) g.fillRect(x1, y0 + 1, x1, y0 + gapLen, T.FLOOR);
+      else if (turn % 4 === 2) g.fillRect(x1 - gapLen, y1, x1 - 1, y1, T.FLOOR);
+      else g.fillRect(x0, y1 - gapLen, x0, y1 - 1, T.FLOOR);
+      x0 += 3; y0 += 3; x1 -= 3; y1 -= 3; turn++;
+    }
+    outline(g, m);
+    connectifyLargest(g);
+  } else if (L.catwalks) {
+    /* Nothing under the party but the drop, and a lattice of walkways over
+       it. The spire does not put a rail on anything. */
+    g.fillRect(m, m, w - m - 1, h - m - 1, T.CHASM);
+    const lanesY = [], lanesX = [];
+    for (let y = m + 3; y < h - m - 3; y += rng.int(4, 6)) lanesY.push(y);
+    for (let x = m + 3; x < w - m - 3; x += rng.int(5, 8)) lanesX.push(x);
+    for (const y of lanesY) g.fillRect(m + 1, y, w - m - 2, y + 1, T.FLOOR);
+    for (const x of lanesX) g.fillRect(x, m + 1, x + 1, h - m - 2, T.FLOOR);
+    /* landings where the walkways cross, and a few spans broken through */
+    for (const y of lanesY) for (const x of lanesX)
+      g.fillRect(x - 1, y - 1, x + 2, y + 2, T.FLOOR);
+    for (let i = 0; i < rng.int(2, 5); i++) {
+      const y = rng.pick(lanesY), x = rng.int(m + 5, w - m - 6);
+      if (lanesX.some(lx => Math.abs(lx - x) < 3)) continue;
+      g.fillRect(x, y, x + 1, y + 1, T.CHASM);
+    }
+    outline(g, m);
+    connectifyLargest(g);
   } else {
     /* plain rectangular hall, sometimes cruciform */
     g.fillRect(m, m, w - m - 1, h - m - 1, T.FLOOR);
@@ -3211,6 +3263,29 @@ function corridor(g, a, b, rng) {
   const stepY = () => { while (y !== ty) { y += sign(ty - y); g.set(x, y, T.FLOOR); g.set(x + 1, y, T.FLOOR); } };
   if (horizFirst) { stepX(); stepY(); } else { stepY(); stepX(); }
 }
+/* Keep only the biggest open region, whatever the seed happens to land in.
+   Flooding from the geometric centre alone could seal the whole room off
+   behind a five-tile pocket, which a cavern occasionally produced. */
+function connectifyLargest(g) {
+  const seen = new Uint8Array(g.w * g.h);
+  let best = null, bestN = 0;
+  for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
+    if (seen[g.idx(x, y)] || !g.passable(x, y)) continue;
+    const stack = [[x, y]]; seen[g.idx(x, y)] = 1; let n = 0;
+    while (stack.length) {
+      const [cx2, cy2] = stack.pop(); n++;
+      for (const [dx, dy] of DIRS4) {
+        const nx = cx2 + dx, ny = cy2 + dy;
+        if (!g.inb(nx, ny) || seen[g.idx(nx, ny)] || !g.passable(nx, ny)) continue;
+        seen[g.idx(nx, ny)] = 1; stack.push([nx, ny]);
+      }
+    }
+    if (n > bestN) { bestN = n; best = [x, y]; }
+  }
+  if (best) connectify(g, best[0], best[1]);
+  return bestN;
+}
+
 function connectify(g, sx, sy) {
   /* flood-fill from a seed; anything unreached becomes wall */
   if (!g.passable(sx, sy)) {
@@ -3254,7 +3329,11 @@ const PROP_KINDS = {
   pack:    { blocks:false, h:0.3 },
   plate:   { blocks:false, h:0.05 },
   lever:   { blocks:false, h:0.9 },
-  mirror:  { blocks:true,  h:1.5, sight:true },
+  mirror:  { blocks:false, h:1.5, sight:true },
+  ward:    { blocks:false, h:1.5, sight:false, light:{ r:4, warm:0 } },
+  pad:     { blocks:false, h:0.05 },
+  emitter: { blocks:false, h:1.2, sight:false, light:{ r:5, warm:0 } },
+  receiver:{ blocks:false, h:1.2, sight:false },
   brazier_cold:{ blocks:false, h:0.9 },
 };
 
@@ -3295,6 +3374,55 @@ function decorate(room) {
       g.set(x, y, T.WALL);
     }
   }
+  /* Alcoves: bays cut back into the outer wall, each with something standing
+     in it. A hall reads as a built thing rather than a box the moment the
+     wall stops being a straight line. */
+  if (L.alcoves > 0) {
+    const depth = 3 + (L.alcoves > 1 ? 1 : 0);
+    const bays = [];
+    /* north and south walls, spaced so they do not run into each other */
+    for (let x = 6; x < g.w - 8; x += rng.int(6, 9)) {
+      bays.push({ x, y: 0, dy: 1 });
+      if (rng.chance(0.7)) bays.push({ x: x + rng.int(-1, 1), y: g.h - 1, dy: -1 });
+    }
+    for (const bay of bays) {
+      if (rng.chance(0.25)) continue;
+      const wdt = rng.int(2, 3);
+      /* find the wall line by walking in from the edge until floor appears */
+      let wy = bay.y, steps = 0;
+      while (steps < 6 && !g.passable(bay.x, wy + bay.dy)) { wy += bay.dy; steps++; }
+      if (steps >= 6) continue;
+      /* cut the bay back out of the wall, away from the room */
+      let cut = 0;
+      for (let d2 = 0; d2 < depth; d2++) {
+        const yy = wy - bay.dy * d2;
+        if (yy < 1 || yy > g.h - 2) break;
+        for (let x = bay.x - wdt; x <= bay.x + wdt; x++) {
+          if (x < 1 || x > g.w - 2) continue;
+          if (g.get(x, yy) !== T.WALL && g.get(x, yy) !== T.VOID) continue;
+          g.set(x, yy, T.FLOOR);
+        }
+        cut++;
+      }
+      if (!cut) continue;
+      /* something in the back of it */
+      const back = wy - bay.dy * (depth - 1);
+      if (!g.passable(bay.x, back)) continue;
+      const fill = rng.weighted([['statue', 3], ['brazier', 3], ['altar', 1.5],
+                                 ['bones', 1.5], ['chest', 0.5], ['banner', 1]]);
+      if (fill === 'chest') { addChest(room, rng, room.floor, null, { x: bay.x, y: back }); }
+      else {
+        addProp(room, fill, bay.x, back);
+        if (fill === 'statue' || fill === 'altar') g.set(bay.x, back, T.WALL);
+      }
+      if (fill !== 'brazier' && rng.chance(0.5)) {
+        const side = bay.x + (rng.chance(0.5) ? -wdt : wdt);
+        if (g.passable(side, back)) addProp(room, 'brazier', side, back);
+      }
+    }
+    wrapWalls(g);
+  }
+
   /* ornate features */
   if (L.ornate) {
     const cx = g.w >> 1, cy = g.h >> 1;
@@ -3347,16 +3475,21 @@ function decorate(room) {
   }
 
   /* light: braziers along the walls so the room reads as lit architecture */
-  const wantLights = clamp(Math.round((g.w * g.h) / 110), 3, 10);
+  const wantLights = clamp(Math.round((g.w * g.h) / 110), 3, L.catwalks ? 14 : 10);
   let placed = room.lights.length;
-  const cands = freeTiles(room, 3).filter(t => {
-    for (const [dx, dy] of DIRS4) if (g.get(t.x + dx, t.y + dy) === T.WALL) return true;
-    return false;
-  });
+  const free3 = freeTiles(room, 3);
+  /* A light wants a wall behind it. Over a chasm there is no wall to put it
+     against, so a catwalk takes standing lamps at the edge of the drop
+     instead — without this the whole layout comes out unreadable. */
+  const edgeOf = (t, kinds) => DIRS4.some(([dx, dy]) => kinds.has(g.get(t.x + dx, t.y + dy)));
+  let cands = free3.filter(t => edgeOf(t, new Set([T.WALL])));
+  if (cands.length < wantLights * 2)
+    cands = cands.concat(free3.filter(t => edgeOf(t, new Set([T.CHASM, T.WATER, T.VOID]))));
+  if (!cands.length) cands = free3;
   const shuffledCands = rng.shuffle(cands);
   for (const t of shuffledCands) {
     if (placed >= wantLights) break;
-    if (room.lights.some(l => dist(l.x, l.y, t.x, t.y) < 6)) continue;
+    if (room.lights.some(l => dist(l.x, l.y, t.x, t.y) < (L.catwalks ? 4.5 : 6))) continue;
     const cold = spire.key === 'whisper' || spire.key === 'unclaimed' || spire.key === 'verdant';
     addProp(room, cold ? 'crystal' : 'brazier', t.x, t.y);
     placed++;
@@ -4232,22 +4365,213 @@ function drawProp(c, p, sx, sy, z, t, pal) {
       c.lineTo(sx + (p.on ? 8 : -8) * s, sy - 16 * s); c.stroke(); c.lineCap = 'butt';
       break;
     }
-    case 'mirror': {
-      const hgt = 40 * s;
-      shadowBlob(c, sx, sy + 2 * s, 12 * s, 5 * s);
-      c.save(); c.translate(sx, sy - hgt * 0.5); c.rotate((p.angle || 0));
-      const mg = c.createLinearGradient(-12 * s, 0, 12 * s, 0);
-      mg.addColorStop(0, 'rgba(200,220,240,0.85)');
-      mg.addColorStop(0.5, 'rgba(255,255,255,0.6)');
-      mg.addColorStop(1, 'rgba(150,170,200,0.8)');
-      c.fillStyle = mg; c.fillRect(-12 * s, -hgt * 0.5, 24 * s, hgt);
-      c.strokeStyle = mixHex(pal.prop, '#c9a227', 0.5); c.lineWidth = 2 * s;
-      c.strokeRect(-12 * s, -hgt * 0.5, 24 * s, hgt);
+    /* ---- a standing seal: a banded slab with a sigil burned into it --- */
+    case 'ward': {
+      const hgt = 36 * s, wdt = 11 * s;
+      shadowBlob(c, sx, sy + 2 * s, 9 * s, 4 * s, 0.32);
+      /* a squat plinth so it reads as set into the floor on purpose */
+      c.fillStyle = mixHex(pal.prop, '#000000', 0.42);
+      c.fillRect(sx - wdt * 1.35, sy - 4 * s, wdt * 2.7, 4 * s);
+      /* the slab: straight sides, a flat top, iron rather than stone */
+      c.fillStyle = litGrad(c, sx - wdt, sy - hgt, wdt * 2, hgt, mixHex(pal.prop, '#2a2a32', 0.5), 0.2, 0.55);
+      c.fillRect(sx - wdt, sy - hgt, wdt * 2, hgt - 3 * s);
+      c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 1.1 * s;
+      c.strokeRect(sx - wdt, sy - hgt, wdt * 2, hgt - 3 * s);
+      /* two brass bands across it */
+      c.fillStyle = mixHex(pal.prop, '#c9a227', 0.55);
+      c.fillRect(sx - wdt * 1.16, sy - hgt + 3 * s, wdt * 2.32, 2.4 * s);
+      c.fillRect(sx - wdt * 1.16, sy - 9 * s, wdt * 2.32, 2.4 * s);
+      /* the sigil: a ring with the mark inside, lit while the seal holds */
+      const my = sy - hgt * 0.54;
+      const glow = p.open ? 0 : (p.cool > 0 ? 0.3 : 0.75 + Math.sin(t * 2.6) * 0.18);
+      if (glow > 0) {
+        c.save(); c.globalCompositeOperation = 'lighter';
+        const rg = c.createRadialGradient(sx, my, 0, sx, my, 16 * s);
+        rg.addColorStop(0, rgba(p.hex, 0.62 * glow));
+        rg.addColorStop(1, rgba(p.hex, 0));
+        c.fillStyle = rg; c.beginPath(); c.arc(sx, my, 16 * s, 0, TAU); c.fill();
+        c.restore();
+      }
+      c.strokeStyle = p.open ? 'rgba(120,112,96,0.7)' : rgba(p.hex, 0.55 + glow * 0.35);
+      c.lineWidth = 1.5 * s;
+      c.beginPath(); c.arc(sx, my, 8.2 * s, 0, TAU); c.stroke();
+      c.fillStyle = p.open ? 'rgba(130,122,104,0.75)' : mixHex(p.hex, '#fff3d6', 0.35);
+      c.font = `${13 * s}px serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(p.sigil || '❈', sx, my);
+      c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+      /* once it is open the slab is split and the two halves have shifted */
+      if (p.open) {
+        c.strokeStyle = 'rgba(255,244,214,0.75)'; c.lineWidth = 2 * s;
+        c.beginPath();
+        c.moveTo(sx - wdt, sy - hgt * 0.18);
+        c.lineTo(sx - wdt * 0.2, sy - hgt * 0.52);
+        c.lineTo(sx + wdt * 0.35, sy - hgt * 0.68);
+        c.lineTo(sx + wdt, sy - hgt * 0.94); c.stroke();
+        c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1 * s; c.stroke();
+      }
+      break;
+    }
+
+    /* ---- a transference plate: flush to the floor, thrown or not ------ */
+    case 'pad': {
+      /* Dark, a transference plate still has to be findable across a room,
+         so the metal of it is drawn whether or not it is carrying charge. */
+      tilePathAt(c, sx, sy, z);
+      c.fillStyle = p.on ? rgba(p.hex, 0.34) : 'rgba(26,24,20,0.85)';
+      c.fill();
+      c.strokeStyle = p.on ? rgba(p.hex, 0.95) : mixHex(pal.prop, '#c9a227', 0.35);
+      c.lineWidth = 2 * s; c.stroke();
+      c.save();
+      c.translate(sx, sy);
+      /* concentric rings, turning while it is lit, so it does not read as
+         one more pressure plate */
+      const spin = p.on ? t * 0.6 : 0;
+      for (let r = 1; r <= 2; r++) {
+        c.strokeStyle = p.on ? rgba(p.hex, 0.6 / r) : `rgba(178,162,120,${0.34 / r})`;
+        c.lineWidth = 1.3 * s;
+        c.beginPath();
+        c.ellipse(0, 0, 8 * s * r * 0.55, 4 * s * r * 0.55, spin * (r % 2 ? 1 : -1), 0, TAU);
+        c.stroke();
+      }
+      /* the stud at the centre */
+      c.fillStyle = p.on ? '#fff3d6' : 'rgba(178,162,120,0.55)';
+      c.beginPath(); c.ellipse(0, 0, 2.2 * s, 1.2 * s, 0, 0, TAU); c.fill();
       c.restore();
+      if (p.on) {
+        c.save(); c.globalCompositeOperation = 'lighter';
+        const pg = c.createRadialGradient(sx, sy, 0, sx, sy, 20 * s);
+        pg.addColorStop(0, rgba(p.hex, 0.28)); pg.addColorStop(1, rgba(p.hex, 0));
+        c.fillStyle = pg; c.beginPath(); c.ellipse(sx, sy, 20 * s, 10 * s, 0, 0, TAU); c.fill();
+        c.restore();
+      }
+      break;
+    }
+
+    /* ---- the lens the beam comes out of ------------------------------- */
+    case 'emitter': {
+      const hgt = 26 * s;
+      shadowBlob(c, sx, sy + 2 * s, 9 * s, 4 * s, 0.3);
+      c.fillStyle = litGrad(c, sx - 9 * s, sy - hgt, 18 * s, hgt, pal.prop, 0.2, 0.5);
+      rr(c, sx - 9 * s, sy - hgt, 18 * s, hgt, 3 * s); c.fill();
+      c.strokeStyle = mixHex(pal.prop, '#c9a227', 0.45); c.lineWidth = 1.4 * s; c.stroke();
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const lg = c.createRadialGradient(sx, sy - hgt * 0.6, 0, sx, sy - hgt * 0.6, 10 * s);
+      lg.addColorStop(0, rgba(p.hex, 0.9)); lg.addColorStop(1, rgba(p.hex, 0));
+      c.fillStyle = lg; c.beginPath(); c.arc(sx, sy - hgt * 0.6, 10 * s, 0, TAU); c.fill();
+      c.restore();
+      c.fillStyle = '#fff6dc';
+      c.beginPath(); c.arc(sx, sy - hgt * 0.6, 3.2 * s, 0, TAU); c.fill();
+      break;
+    }
+
+    /* ---- the socket it has to reach ----------------------------------- */
+    case 'receiver': {
+      const hgt = 26 * s;
+      shadowBlob(c, sx, sy + 2 * s, 9 * s, 4 * s, 0.3);
+      c.fillStyle = litGrad(c, sx - 9 * s, sy - hgt, 18 * s, hgt, pal.prop, 0.14, 0.55);
+      rr(c, sx - 9 * s, sy - hgt, 18 * s, hgt, 3 * s); c.fill();
+      c.strokeStyle = mixHex(pal.prop, '#000000', 0.4); c.lineWidth = 1.4 * s; c.stroke();
+      /* an empty socket, or a full one */
+      c.fillStyle = p.lit ? '#fff6dc' : 'rgba(0,0,0,0.65)';
+      c.beginPath(); c.arc(sx, sy - hgt * 0.6, 4.4 * s, 0, TAU); c.fill();
+      if (p.lit) {
+        c.save(); c.globalCompositeOperation = 'lighter';
+        const rg2 = c.createRadialGradient(sx, sy - hgt * 0.6, 0, sx, sy - hgt * 0.6, 16 * s);
+        rg2.addColorStop(0, rgba(p.hex, 0.8)); rg2.addColorStop(1, rgba(p.hex, 0));
+        c.fillStyle = rg2; c.beginPath(); c.arc(sx, sy - hgt * 0.6, 16 * s, 0, TAU); c.fill();
+        c.restore();
+      } else {
+        c.strokeStyle = rgba(p.hex, 0.35); c.lineWidth = 1.1 * s;
+        c.beginPath(); c.arc(sx, sy - hgt * 0.6, 6.6 * s, 0, TAU); c.stroke();
+      }
+      break;
+    }
+
+    case 'mirror': {
+      /* A mirror stands on the tile along one of its two diagonals, and
+         which diagonal is the whole puzzle, so the footprint is drawn as
+         well as the glass. In screen space the grid diagonal (1,-1) runs
+         flat across the tile and (1,1) runs down it, which tells the two
+         settings apart at a glance without a label. */
+      const hgt = 26 * s;
+      const set = p.set ? 1 : 0;
+      const ax = set ? -TW / 2 * z * 0.46 : TW / 2 * z * 0.46;
+      const ay = TH / 2 * z * 0.46;
+      shadowBlob(c, sx, sy + 1 * s, 11 * s, 5 * s, 0.32);
+      /* the rail it is seated in, on the floor */
+      c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 3.2 * s; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(sx - ax, sy - ay); c.lineTo(sx + ax, sy + ay); c.stroke();
+      c.strokeStyle = mixHex(pal.prop, '#c9a227', 0.5); c.lineWidth = 1.4 * s;
+      c.beginPath(); c.moveTo(sx - ax, sy - ay); c.lineTo(sx + ax, sy + ay); c.stroke();
+      c.lineCap = 'butt';
+      /* one pane of glass standing on that rail */
+      const mg = c.createLinearGradient(sx - ax, sy - ay - hgt, sx + ax, sy + ay);
+      mg.addColorStop(0, 'rgba(216,234,250,0.94)');
+      mg.addColorStop(0.42, 'rgba(255,255,255,0.8)');
+      mg.addColorStop(0.62, 'rgba(168,192,222,0.9)');
+      mg.addColorStop(1, 'rgba(104,128,164,0.92)');
+      c.fillStyle = mg;
+      c.beginPath();
+      c.moveTo(sx - ax, sy - ay);
+      c.lineTo(sx + ax, sy + ay);
+      c.lineTo(sx + ax, sy + ay - hgt);
+      c.lineTo(sx - ax, sy - ay - hgt);
+      c.closePath(); c.fill();
+      /* brass frame, heavier on the two uprights so it reads as a pane */
+      c.strokeStyle = mixHex(pal.prop, '#c9a227', 0.6); c.lineWidth = 1.5 * s; c.stroke();
+      c.lineWidth = 2.6 * s;
+      c.beginPath(); c.moveTo(sx - ax, sy - ay); c.lineTo(sx - ax, sy - ay - hgt); c.stroke();
+      c.beginPath(); c.moveTo(sx + ax, sy + ay); c.lineTo(sx + ax, sy + ay - hgt); c.stroke();
+      /* a hot line down the reflecting face */
+      c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 1.3 * s;
+      c.beginPath();
+      c.moveTo(sx - ax * 0.72, sy - ay * 0.72 - hgt * 0.86);
+      c.lineTo(sx + ax * 0.78, sy + ay * 0.78 - hgt * 0.22); c.stroke();
       break;
     }
   }
 }
+/* ---- the refraction beam ------------------------------------------------
+   A thread of mana with a hot core and a wide bloom, drawn tile to tile
+   along the traced route. The bloom is a second pass in 'lighter' so it
+   brightens the floor under it rather than painting over it.
+------------------------------------------------------------------------- */
+function drawBeam(c, cam, room, pz, t, alpha) {
+  const pts = [worldToScreen(cam, pz.emitter.x + 0.5, pz.emitter.y + 0.5)];
+  for (const p of pz.path) {
+    if (!room.grid.explored[room.grid.idx(p.x, p.y)]) break;
+    pts.push(worldToScreen(cam, p.x + 0.5, p.y + 0.5));
+  }
+  if (pts.length < 2) return;
+  const lift = 16 * cam.z;          // the beam runs at about waist height
+  const hex = pz.emitter.hex || '#9ad0ff';
+  const pulse = 0.82 + Math.sin(t * 5) * 0.12;
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  const line = () => {
+    c.beginPath();
+    c.moveTo(pts[0].x, pts[0].y - lift);
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i].x, pts[i].y - lift);
+    c.stroke();
+  };
+  c.strokeStyle = rgba(hex, 0.16 * alpha * pulse); c.lineWidth = 11 * cam.z; line();
+  c.strokeStyle = rgba(hex, 0.34 * alpha * pulse); c.lineWidth = 5 * cam.z;  line();
+  c.strokeStyle = `rgba(255,252,240,${0.78 * alpha * pulse})`; c.lineWidth = 1.7 * cam.z; line();
+  /* a bright bead travelling the route, so the direction of travel reads */
+  const total = pts.length - 1;
+  if (total > 0) {
+    const u = (t * 0.55) % 1, f = u * total, i = Math.min(total - 1, f | 0), k = f - i;
+    const bx = lerp(pts[i].x, pts[i + 1].x, k), by = lerp(pts[i].y, pts[i + 1].y, k) - lift;
+    const bg = c.createRadialGradient(bx, by, 0, bx, by, 9 * cam.z);
+    bg.addColorStop(0, `rgba(255,255,255,${0.85 * alpha})`);
+    bg.addColorStop(1, rgba(hex, 0));
+    c.fillStyle = bg; c.beginPath(); c.arc(bx, by, 9 * cam.z, 0, TAU); c.fill();
+  }
+  c.restore();
+  c.lineCap = 'butt'; c.lineJoin = 'miter';
+}
+
 function tilePathAt(c, sx, sy, z) {
   c.beginPath();
   c.moveTo(sx, sy - TH / 2 * z); c.lineTo(sx + TW / 2 * z, sy);
@@ -8409,11 +8733,16 @@ function populateRoom(room, game) {
   if (rng.chance(0.3) && room.type !== 'safe') addChest(room, rng, floor, 'plain');
 }
 
-function addChest(room, rng, floor, forceKind) {
+/* `at` puts the chest on a chosen tile — an alcove, a vault niche — rather
+   than anywhere the generator finds room for it. */
+function addChest(room, rng, floor, forceKind, at) {
   const kind = forceKind ? CHEST_KINDS.find(k => k.k === forceKind)
              : rng.weighted(CHEST_KINDS.map(k => [k, k.w]));
-  const cands = freeTiles(room, 3).filter(t => dist(t.x, t.y, room.entry.x, room.entry.y) > 5);
-  const t = rng.pick(cands.length ? cands : freeTiles(room, 2));
+  let t = at;
+  if (!t) {
+    const cands = freeTiles(room, 3).filter(c => dist(c.x, c.y, room.entry.x, room.entry.y) > 5);
+    t = rng.pick(cands.length ? cands : freeTiles(room, 2));
+  }
   if (!t) return null;
   const loot = [];
   const n = 1 + (kind.bonus || 0);
@@ -8454,156 +8783,533 @@ function addTraps(room, rng, floor, n) {
   }
 }
 
-/* ---------- puzzles ------------------------------------------------------ */
-const PUZZLE_KINDS = ['rune_sequence', 'plates', 'levers', 'elemental_lock', 'riddle', 'logic', 'memory'];
+/* ---------- puzzles ------------------------------------------------------
+   A spire door is a test, and the thing being tested is the party. Three of
+   these are questions put to the player directly; the rest are put to the
+   four people on the floor, and are answered by where they stand, what they
+   can cast, and how strong the one holding the door is.
+------------------------------------------------------------------------- */
+const PUZZLE_KINDS = ['rune_sequence', 'plates', 'levers', 'elemental_lock',
+                      'beam', 'wards', 'transference', 'riddle', 'logic', 'memory'];
+
+/* Step vectors for the beam, in grid space. */
+const BEAM_DIRS = [{ x:1, y:0 }, { x:0, y:1 }, { x:-1, y:0 }, { x:0, y:-1 }];
+/* A mirror set to '/' sends east->north, south->west, west->south, north->east.
+   A mirror set to '\' sends east->south, north->west, west->north, south->east. */
+const MIRROR_MAP = [[3, 2, 1, 0], [1, 0, 3, 2]];
 
 function buildPuzzle(room, rng, floor) {
-  const kind = rng.pick(PUZZLE_KINDS);
-  const cx = room.grid.w >> 1, cy = room.grid.h >> 1;
   const spots = (n) => {
     const c = freeTiles(room, 3).filter(t => dist(t.x, t.y, room.entry.x, room.entry.y) > 4);
     return rng.some(c.length >= n ? c : freeTiles(room, 2), n);
   };
+  /* The spatial puzzles need particular geometry and can fail to place. Roll
+     until one takes, then fall back to a kind that always fits. */
+  const order = rng.shuffle(PUZZLE_KINDS.slice());
+  for (const kind of order.concat(['levers'])) {
+    const pz = buildPuzzleOf(kind, room, rng, floor, spots);
+    if (pz) return pz;
+  }
+  return null;
+}
 
+function buildPuzzleOf(kind, room, rng, floor, spots) {
   switch (kind) {
+
+    /* ---- a rune lock that does not tell you the combination ------------ */
     case 'rune_sequence': {
-      const n = clamp(3 + Math.floor(floor / 8), 3, 6);
-      const glyphs = rng.some(['✶','◈','☩','✷','⟐','⌘','✧','⊛'], n);
+      const n = clamp(3 + Math.floor(floor / 9), 3, 5);
+      const glyphs = rng.some(['✶', '◈', '☩', '✷', '⟐', '⌘', '✧', '⊛'], n);
       const order = rng.shuffle(glyphs.map((_, i) => i));
       const pos = spots(n);
+      if (pos.length < n) return null;
       const nodes = pos.map((p, i) => addProp(room, 'plate', p.x, p.y, {
-        puzzleNode:true, idx:i, glyph:glyphs[i], active:false, hex:room.spire.pal.trim }));
-      const clueOrder = order.map(i => glyphs[i]);
-      return { kind, n, glyphs, order, nodes, progress:0, solved:false,
-        title:'A sequence of runes',
-        clue:`An inscription runs the length of the far wall: "${clueOrder.join('  ')}" — and beneath it, in a later hand, "in this order, and not quickly".`,
-        hint:'Touch the runes in the order the inscription gives.',
-        fail:'The sequence breaks. The runes go dark and the floor takes its price in mana.' };
+        puzzleNode: true, idx: i, glyph: glyphs[i], active: false, hex: room.spire.pal.trim }));
+      return { kind, n, glyphs, order, nodes, attempt: [], tries: 0, solved: false,
+        title: 'A lock of runes',
+        clue: `${n} runes are set into the floor and a line is cut above the door: "the order is not written down, and the door will say how close you came."`,
+        hint: `Touch all ${n} runes in some order. The room reports how many of them you put in the right place, and nothing more.` };
     }
+
+    /* ---- weighted plates, but the counterweights sink ------------------ */
     case 'plates': {
-      const n = clamp(2 + Math.floor(floor / 10), 2, 4);
+      const n = clamp(2 + Math.floor(floor / 9), 2, 4);
       const pos = spots(n);
+      if (pos.length < n) return null;
+      const hold = Math.max(2.4, 6.0 - floor * 0.08);
       const nodes = pos.map((p, i) => addProp(room, 'plate', p.x, p.y, {
-        puzzleNode:true, idx:i, weight:true, active:false, hex:room.spire.pal.trim }));
-      return { kind, n, nodes, solved:false,
-        title:'Weighted plates',
-        clue:`${n} plates, sunk a finger's width into the floor, and a portcullis that will not lift while any of them is empty.`,
-        hint:'Stand a climber on every plate at once.' };
+        puzzleNode: true, idx: i, weight: true, active: false, held: 0, hex: room.spire.pal.trim }));
+      return { kind, n, nodes, hold, solved: false,
+        title: 'Weighted plates',
+        clue: `${n} plates sunk a finger's width into the floor, and a portcullis that will not lift while any of them is empty. The counterweights are not patient: a plate left alone rises again in about ${Math.round(hold)} seconds.`,
+        hint: 'Get a climber onto every plate inside the window. Split the party before anybody steps on the first one.' };
     }
+
+    /* ---- geared levers, with the gearing no longer always adjacent ----- */
     case 'levers': {
-      const n = 5;
+      const n = rng.int(4, 6);
       const pos = spots(n);
-      const state = Array.from({ length: n }, () => rng.chance(0.5));
-      /* guarantee solvable: apply random toggles from the solved state */
-      const solvedState = Array(n).fill(true);
-      let s = solvedState.slice();
-      const toggle = (arr, i) => { arr[i] = !arr[i];
-        if (i > 0) arr[i - 1] = !arr[i - 1];
-        if (i < n - 1) arr[i + 1] = !arr[i + 1]; };
-      for (let i = 0; i < rng.int(2, 4); i++) toggle(s, rng.int(0, n - 1));
+      if (pos.length < n) return null;
+      /* Each lever throws itself and a fixed set of others. Adjacent gearing
+         reads as a bank; a scrambled linkage reads as a machine nobody has
+         maintained, which is the more interesting of the two. */
+      const geared = rng.chance(0.45);
+      const links = [];
+      for (let i = 0; i < n; i++) {
+        const s = new Set([i]);
+        if (geared) { if (i > 0) s.add(i - 1); if (i < n - 1) s.add(i + 1); }
+        else {
+          /* the clue promises the linkage is not to a neighbour, so it is not */
+          const far = [];
+          for (let j = 0; j < n; j++) if (Math.abs(j - i) > 1) far.push(j);
+          if (far.length) {
+            s.add(rng.pick(far));
+            if (rng.chance(0.4)) s.add(rng.pick(far));
+          } else s.add((i + 1) % n);
+        }
+        links.push([...s]);
+      }
+      /* three moves out by the tenth floor, four by the twentieth */
+      const want = clamp(2 + Math.floor(floor / 9), 2, 5);
+      const st = scrambleByDepth(n, links, rng, want);
       const nodes = pos.map((p, i) => addProp(room, 'lever', p.x, p.y, {
-        puzzleNode:true, idx:i, on:s[i], hex:room.spire.pal.trim }));
-      return { kind, n, nodes, solved:false, toggleFn:'neighbours',
-        title:'A bank of levers',
-        clue:'Five levers in a row, geared together. Throwing one throws its neighbours with it.',
-        hint:'Get all five standing up at once.' };
+        puzzleNode: true, idx: i, on: st[i], hex: room.spire.pal.trim }));
+      return { kind, n, nodes, links, solved: false,
+        title: 'A bank of levers',
+        clue: geared
+          ? `${n} levers in a row, geared together. Throwing one throws its neighbours with it.`
+          : `${n} levers, and behind the wall a linkage that has been repaired at least twice. Throwing one throws something else, and not the one beside it.`,
+        hint: 'Get all of them standing up at once.' };
     }
+
+    /* ---- the lock that asks what your party can actually do ------------ */
     case 'elemental_lock': {
-      const types = rng.some(['fire','lightning','ice','earth','water','air','mana','mental','death','judgment'], 3);
-      const pos = spots(3);
+      /* Weight the draw toward mana the party can produce. A lock nobody in
+         the room can open is a wall, not a puzzle. */
+      const pool = ['fire', 'lightning', 'ice', 'earth', 'water', 'air', 'mana', 'mental', 'death', 'judgment'];
+      const nPos = clamp(2 + Math.floor(floor / 12), 2, 4);
+      const types = rng.some(pool, nPos);
+      const pos = spots(nPos);
+      if (pos.length < nPos) return null;
       const nodes = pos.map((p, i) => addProp(room, 'plate', p.x, p.y, {
-        puzzleNode:true, idx:i, elem:types[i], active:false, hex:DTYPES[types[i]].hex }));
-      return { kind, nodes, types, solved:false,
-        title:'An elemental lock',
-        clue:`Three sigils set into the floor, each keyed to a different kind of mana: ${types.map(t => DTYPES[t].n).join(', ')}.`,
-        hint:'Strike each sigil with a spell of the matching kind.' };
+        puzzleNode: true, idx: i, elem: types[i], active: false, hex: DTYPES[types[i]].hex }));
+      return { kind, nodes, types, solved: false,
+        title: 'An elemental lock',
+        clue: `${nPos} sigils set into the floor, each keyed to a different kind of mana: ${types.map(t => DTYPES[t].n).join(', ')}.`,
+        hint: 'Strike each sigil with a spell of the matching kind. A wand or a scroll counts; the sigil does not care who is holding it.' };
     }
+
+    /* ---- refraction: aim a beam through mirrors at a receiver ---------- */
+    case 'beam': return buildBeamPuzzle(room, rng, floor);
+
+    /* ---- three seals, three different ways through --------------------- */
+    case 'wards': {
+      const pos = spots(3);
+      if (pos.length < 3) return null;
+      const elem = rng.pick(['fire', 'lightning', 'ice', 'earth', 'water', 'air', 'mana', 'mental', 'death', 'judgment']);
+      const dc = 10 + Math.floor(floor / 3);
+      const methods = rng.shuffle([
+        { m: 'force', hex: '#c9503f', sigil: '⊠',
+          n: 'the barred seal', tell: 'A seal with a bar through it, and the bar is seated in stone.',
+          how: 'Somebody strong has to take hold of it and pull.' },
+        { m: 'mana', hex: DTYPES[elem].hex, sigil: '❈', elem,
+          n: `the ${DTYPES[elem].n.toLowerCase()} seal`, tell: `A seal cut for ${DTYPES[elem].n.toLowerCase()} mana and nothing else.`,
+          how: `Strike it with ${DTYPES[elem].n.toLowerCase()} and it will take the charge.` },
+        { m: 'wit', hex: '#6fa8dc', sigil: '⌖',
+          n: 'the written seal', tell: 'A seal that is mostly instructions, in a hand that assumed you could read it.',
+          how: 'Somebody has to work out what it says before touching it.' },
+      ]);
+      const nodes = pos.map((p, i) => addProp(room, 'ward', p.x, p.y, {
+        puzzleNode: true, idx: i, open: false, cool: 0, dc,
+        method: methods[i].m, elem: methods[i].elem, sigil: methods[i].sigil, hex: methods[i].hex }));
+      return { kind, nodes, dc, solved: false,
+        title: 'Three seals on one door',
+        clue: 'The door carries three seals, and they were not made by the same hand or for the same kind of climber.\n\n'
+            + methods.map(m => `— ${m.tell}`).join('\n'),
+        hint: methods.map(m => m.how).join(' ') };
+    }
+
+    /* ---- transference plates with a linkage you have to learn ---------- */
+    case 'transference': {
+      const n = rng.int(4, 6);
+      const pos = spots(n);
+      if (pos.length < n) return null;
+      /* Each plate is bound to one other. Touching a plate throws both. The
+         binding is invisible until a plate has been touched once. */
+      const partner = pairing(rng, n);
+      const links = partner.map((j, i) => (i === j ? [i] : [i, j]));
+      const want = clamp(2 + Math.floor(floor / 10), 2, 4);
+      const st = scrambleByDepth(n, links, rng, want);
+      const nodes = pos.map((p, i) => addProp(room, 'pad', p.x, p.y, {
+        puzzleNode: true, idx: i, on: st[i], known: false, hex: room.spire.pal.trim }));
+      return { kind, n, nodes, partner, solved: false,
+        title: 'A ring of transference',
+        clue: `${n} transference plates, set well apart, and no two of them wired to the plate beside them. Touching one lights it, and lights whichever plate it is bound to, wherever that is.`,
+        hint: 'Get every plate lit at once. The bindings show themselves once a plate has been used.' };
+    }
+
     case 'riddle': {
       const r = rng.pick(RIDDLES);
       const opts = rng.shuffle([r.a, ...r.wrong]);
-      return { kind, dialog:true, solved:false, q:r.q, answer:r.a, opts,
-        title:'An inscribed question',
-        clue:'The door carries a question cut deep enough to have taken a mason a week.' };
+      return { kind, dialog: true, solved: false, q: r.q, answer: r.a, opts,
+        title: 'An inscribed question',
+        clue: 'The door carries a question cut deep enough to have taken a mason a week.' };
     }
+
     case 'logic': {
       const p = rng.pick(LOGIC_PROBLEMS);
       const opts = rng.shuffle([p.a, ...p.wrong]);
-      return { kind, dialog:true, solved:false, q:p.setup + '\n\n' + p.q, answer:p.a, opts, reveal:p.reveal,
-        title:'A problem in deduction',
-        clue:'The room states its terms and waits.' };
+      return { kind, dialog: true, solved: false, q: p.setup + '\n\n' + p.q, answer: p.a, opts, reveal: p.reveal,
+        title: 'A problem in deduction',
+        clue: 'The room states its terms and waits.' };
     }
+
     case 'memory': {
       const len = clamp(4 + Math.floor(floor / 7), 4, 8);
       const seq = Array.from({ length: len }, () => rng.int(0, 3));
-      return { kind, dialog:true, solved:false, seq, input:[], playing:false,
-        title:'A pattern in the wall runes',
-        clue:'Four wall runes light in sequence, once, and then wait to be repeated.' };
+      return { kind, dialog: true, solved: false, seq, input: [], playing: false,
+        title: 'A pattern in the wall runes',
+        clue: 'Four wall runes light in sequence, once, and then wait to be repeated.' };
     }
   }
+  return null;
 }
 
+/* Scrambling a toggle puzzle by applying random moves to the solved state
+   produces a start position one move from the answer about a third of the
+   time, because the moves cancel. So the start is chosen by distance
+   instead: breadth-first from the solved state over the whole reachable
+   space (at most 2^6 positions here), then a position at the wanted depth,
+   or the deepest one that exists. */
+function scrambleByDepth(n, links, rng, want) {
+  const solved = Array(n).fill(1);
+  const key = a => a.join('');
+  const byDepth = new Map([[0, [solved]]]);
+  const seen = new Set([key(solved)]);
+  let frontier = [solved], depth = 0;
+  while (frontier.length) {
+    const next = [];
+    for (const st of frontier) for (let i = 0; i < n; i++) {
+      const t = st.slice();
+      for (const j of links[i]) t[j] ^= 1;
+      const k = key(t);
+      if (seen.has(k)) continue;
+      seen.add(k); next.push(t);
+    }
+    if (!next.length) break;
+    depth++;
+    byDepth.set(depth, next);
+    frontier = next;
+  }
+  const deepest = depth;
+  for (let d = Math.min(want, deepest); d >= 1; d--) {
+    const pool = byDepth.get(d);
+    if (pool && pool.length) return rng.pick(pool).map(v => !!v);
+  }
+  return solved.map(() => true);
+}
+
+/* Every plate bound to exactly one other, and none to itself: a derangement
+   of the indices. The binding is one-way in the data and two-way in play —
+   touching a plate throws it and whatever it is wired to. */
+function pairing(rng, n) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const p = rng.shuffle(Array.from({ length: n }, (_, i) => i));
+    if (p.every((v, i) => v !== i)) return p;
+  }
+  return Array.from({ length: n }, (_, i) => (i + 1) % n);
+}
+
+/* ---- beam construction --------------------------------------------------
+   Built backwards from a route rather than forwards from a guess: pick a
+   start, walk a few legs turning at each mirror, and put the receiver where
+   the walk finishes. Every tile on the route has to be floor the beam can
+   cross, so the whole thing is discarded and retried if the room is in the
+   way. Then the mirrors are scrambled.
+------------------------------------------------------------------------- */
+function buildBeamPuzzle(room, rng, floor) {
+  const g = room.grid;
+  /* The beam crosses rubble and bones happily; it is stopped by anything
+     tall, and a mirror cannot stand on a tile that already holds something. */
+  const clear = (x, y) => g.inb(x, y) && g.get(x, y) !== T.WALL && g.get(x, y) !== T.VOID
+    && !room.props.some(p => p.x === x && p.y === y && (p.def.blocks || p.def.h > 0.6));
+  /* One turn is not a puzzle and the builder rejects it, so the route always
+     has at least three legs; deep floors get a fourth and a fifth. */
+  const legs = clamp(3 + Math.floor(floor / 11), 3, 5);
+
+  for (let attempt = 0; attempt < 220; attempt++) {
+    const start = { x: rng.int(3, g.w - 4), y: rng.int(3, g.h - 4) };
+    if (!clear(start.x, start.y)) continue;
+    let d = rng.int(0, 3);
+    let cur = { x: start.x, y: start.y };
+    const route = [{ x: cur.x, y: cur.y }];
+    const mirrors = [];
+    let ok = true;
+
+    for (let l = 0; l < legs && ok; l++) {
+      const run = rng.int(2, 6);
+      let went = 0;
+      for (let step = 0; step < run; step++) {
+        const nx = cur.x + BEAM_DIRS[d].x, ny = cur.y + BEAM_DIRS[d].y;
+        if (!clear(nx, ny)) break;          // wall ahead: turn early rather than give up
+        cur = { x: nx, y: ny };
+        route.push({ x: cur.x, y: cur.y });
+        went++;
+      }
+      /* a leg of one tile leaves no room for the mirror to be read as a turn */
+      if (went < 2) { ok = false; break; }
+      if (l < legs - 1) {
+        const set = rng.int(0, 1);
+        mirrors.push({ x: cur.x, y: cur.y, set });
+        d = MIRROR_MAP[set][d];
+      }
+    }
+    if (!ok || mirrors.length < 2) continue;
+    /* the route must not double back over itself or over the entry */
+    const seen = new Set();
+    let dup = false;
+    for (const r of route) { const k = r.y * g.w + r.x; if (seen.has(k)) { dup = true; break; } seen.add(k); }
+    if (dup) continue;
+    if (route.some(r => dist(r.x, r.y, room.entry.x, room.entry.y) < 2)) continue;
+
+    const end = route[route.length - 1];
+    /* the party has to be able to walk to every mirror */
+    const reach = (t) => !room.reachable || room.reachable.has(t.y * g.w + t.x)
+      || [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => room.reachable.has((t.y + dy) * g.w + (t.x + dx)));
+    if (!mirrors.every(reach)) continue;
+
+    const emitter = addProp(room, 'emitter', start.x, start.y, { beamDir: dirOfRoute(start, route[1]), hex: room.spire.pal.trim });
+    const receiver = addProp(room, 'receiver', end.x, end.y, { lit: false, hex: room.spire.pal.trim });
+    const nodes = mirrors.map((m, i) => addProp(room, 'mirror', m.x, m.y, {
+      puzzleNode: true, idx: i, set: rng.int(0, 1), hex: room.spire.pal.trim, angle: 0 }));
+    /* The scramble must not already light the socket, and the route built
+       above is not the only solution, so this is checked by tracing rather
+       than by comparing against the mirrors it was built from. */
+    /* The route built above is not the only answer, so the start is chosen
+       by enumerating every orientation of the mirrors, finding the ones
+       that light the socket, and starting from a setting as many turns
+       away from all of them as the room allows. */
+    const probe = { emitter, receiver, nodes, path: [] };
+    const N = nodes.length, answers = [];
+    for (let m = 0; m < (1 << N); m++) {
+      for (let j = 0; j < N; j++) nodes[j].set = (m >> j) & 1;
+      if (traceBeam(room, probe)) answers.push(m);
+    }
+    if (!answers.length || answers.length === (1 << N)) {
+      /* unreachable, or lit whichever way the mirrors face: not a puzzle */
+      room.props = room.props.filter(pr => pr !== emitter && pr !== receiver && !nodes.includes(pr));
+      continue;
+    }
+    const bits = (v) => { let c = 0; while (v) { c += v & 1; v >>= 1; } return c; };
+    let bestD = -1, pool = [];
+    for (let m = 0; m < (1 << N); m++) {
+      if (answers.includes(m)) continue;
+      const d = Math.min(...answers.map(a => bits(a ^ m)));
+      if (d > bestD) { bestD = d; pool = [m]; }
+      else if (d === bestD) pool.push(m);
+    }
+    const pick = rng.pick(pool);
+    for (let j = 0; j < N; j++) nodes[j].set = (pick >> j) & 1;
+    for (const nd of nodes) nd.angle = nd.set ? Math.PI * 0.25 : -Math.PI * 0.25;
+
+    return { kind: 'beam', nodes, emitter, receiver, path: [], solved: false,
+      title: 'A question of angles',
+      clue: `A lens in the wall holds a thread of light that goes nowhere useful, and ${nodes.length} mirrors stand on the floor between it and a socket in the far wall. The mirrors turn.`,
+      hint: 'Turn each mirror until the light reaches the socket. Touch a mirror to turn it.' };
+  }
+  return null;
+}
+
+function dirOfRoute(a, b) {
+  for (let i = 0; i < 4; i++) if (a.x + BEAM_DIRS[i].x === b.x && a.y + BEAM_DIRS[i].y === b.y) return i;
+  return 0;
+}
+
+/* Walk the beam from the emitter. Returns the list of tiles it crosses and
+   whether it arrived at the receiver. Called every frame the room is open;
+   it is a few dozen grid lookups, which is cheaper than caching it. */
+function traceBeam(room, pz) {
+  const g = room.grid;
+  const path = [];
+  let d = pz.emitter.beamDir;
+  let x = pz.emitter.x, y = pz.emitter.y;
+  let hit = false;
+  for (let step = 0; step < 90; step++) {
+    x += BEAM_DIRS[d].x; y += BEAM_DIRS[d].y;
+    if (!g.inb(x, y)) break;
+    const tile = g.get(x, y);
+    if (tile === T.WALL || tile === T.VOID) break;
+    path.push({ x, y });
+    if (pz.receiver.x === x && pz.receiver.y === y) { hit = true; break; }
+    const m = pz.nodes.find(n => n.x === x && n.y === y);
+    if (m) { d = MIRROR_MAP[m.set][d]; continue; }
+    /* anything else standing on the tile stops it */
+    if (room.props.some(p => p.x === x && p.y === y && p.def && p.def.blocks)) break;
+  }
+  pz.path = path;
+  return hit;
+}
+
+/* ---------- puzzle interaction ------------------------------------------ */
 function puzzleTouch(game, node) {
   const pz = game.room.puzzle;
   if (!pz || pz.solved) return;
   switch (pz.kind) {
+
     case 'rune_sequence': {
-      const want = pz.order[pz.progress];
-      if (node.idx === want) {
-        node.active = true; pz.progress++;
-        game.log(`The ${node.glyph} rune lights.`, 'good');
-        spellImpact(game.field.fx, 'glyph', node.x + 0.5, node.y + 0.5, node.hex, 1);
-        if (pz.progress >= pz.n) solvePuzzle(game);
-      } else {
-        game.log(pz.fail, 'bad');
-        for (const n of pz.nodes) n.active = false;
-        pz.progress = 0;
-        for (const e of game.field.livingParty()) {
-          const loss = Math.round(e.ch.d.manaMax * 0.15);
-          e.ch.mana = Math.max(0, e.ch.mana - loss);
-          game.field.floatText.add(e.x, e.y, `-${loss} mana`, '#6f7d6a', 11);
-        }
+      if (node.active) { game.log('That rune is already down.', 'info'); return; }
+      node.active = true;
+      pz.attempt.push(node.idx);
+      spellImpact(game.field.fx, 'glyph', node.x + 0.5, node.y + 0.5, node.hex, 0.9);
+      if (pz.attempt.length < pz.n) { game.log(`The ${node.glyph} rune sinks and stays down.`, 'info'); return; }
+      /* full attempt: report how many landed in the right place */
+      let right = 0;
+      for (let i = 0; i < pz.n; i++) if (pz.attempt[i] === pz.order[i]) right++;
+      pz.tries++;
+      if (right === pz.n) { game.stats.puzzles++; solvePuzzle(game); return; }
+      game.log(right === 0
+        ? 'The door answers: none of them. The runes rise again.'
+        : `The door answers: ${right} of ${pz.n} in place. The runes rise again.`, right === 0 ? 'bad' : 'info');
+      pz.attempt = [];
+      for (const n of pz.nodes) n.active = false;
+      /* the room charges for a wrong combination, and charges more each time */
+      const loss = 0.06 + Math.min(0.12, pz.tries * 0.02);
+      for (const e of game.field.livingParty()) {
+        const l = Math.round(e.ch.d.manaMax * loss);
+        e.ch.mana = Math.max(0, e.ch.mana - l);
+        game.field.floatText.add(e.x, e.y, `-${l} mana`, '#6f7d6a', 11);
       }
       break;
     }
+
     case 'levers': {
-      const n = pz.n, i = node.idx;
-      const flip = (j) => { const nd = pz.nodes[j]; if (nd) nd.on = !nd.on; };
-      flip(i); flip(i - 1); flip(i + 1);
+      for (const j of pz.links[node.idx]) { const nd = pz.nodes[j]; if (nd) nd.on = !nd.on; }
       spellImpact(game.field.fx, 'buff', node.x + 0.5, node.y + 0.5, node.hex, 0.8);
-      if (pz.nodes.every(nd => nd.on)) solvePuzzle(game);
+      if (pz.nodes.every(nd => nd.on)) { game.stats.puzzles++; solvePuzzle(game); }
       else game.log('Gears turn somewhere behind the wall.', 'info');
+      break;
+    }
+
+    case 'transference': {
+      const j = pz.partner[node.idx];
+      const other = pz.nodes[j];
+      node.on = !node.on; node.known = true;
+      if (other) { other.on = !other.on; other.known = true; other.pairWith = node.idx; node.pairWith = j; }
+      spellImpact(game.field.fx, 'glyph', node.x + 0.5, node.y + 0.5, node.hex, 0.9);
+      if (other) spellImpact(game.field.fx, 'glyph', other.x + 0.5, other.y + 0.5, other.hex, 0.9);
+      if (pz.nodes.every(nd => nd.on)) { game.stats.puzzles++; solvePuzzle(game); }
+      else game.log('The plate throws, and something the length of the room throws with it.', 'info');
+      break;
+    }
+
+    case 'beam': {
+      node.set ^= 1;
+      node.angle = node.set ? Math.PI * 0.25 : -Math.PI * 0.25;
+      spellImpact(game.field.fx, 'buff', node.x + 0.5, node.y + 0.5, node.hex, 0.6);
+      break;   /* the tick picks up the new route */
+    }
+
+    case 'wards': {
+      if (node.open) return;
+      if (node.cool > 0) { game.log('That seal is still smoking. Give it a moment.', 'info'); return; }
+      const sel = game.selEntities()[0] || game.field.livingParty()[0];
+      if (!sel) return;
+      if (node.method === 'mana') {
+        game.log(`The ${DTYPES[node.elem].n.toLowerCase()} seal does not answer to hands.`, 'info');
+        return;
+      }
+      const d = sel.ch.d;
+      const stat = node.method === 'force' ? d.str : Math.max(d.per, d.mind);
+      const roll = RNG.int(1, 20) + Math.round(stat * 0.8);
+      if (roll >= node.dc) {
+        node.open = true; node.active = true;
+        game.log(node.method === 'force'
+          ? `${sel.ch.name} sets both feet and takes the bar out of the stone.`
+          : `${sel.ch.name} reads the seal through twice and then touches it in the one place it allows.`, 'good');
+        spellImpact(game.field.fx, 'nova', node.x + 0.5, node.y + 0.5, node.hex, 1.2);
+        if (pz.nodes.every(n => n.open)) { game.stats.puzzles++; solvePuzzle(game); }
+      } else {
+        node.cool = 4;
+        game.log(node.method === 'force'
+          ? `${sel.ch.name} cannot shift it, and the seal takes the effort out of them.`
+          : `${sel.ch.name} reads it wrong, and the seal notices.`, 'bad');
+        game.field.damage(null, sel, [8, 16], node.method === 'force' ? 'physical' : 'mental', { spell: true });
+      }
       break;
     }
   }
 }
 
-function puzzleTick(game) {
+function puzzleTick(game, dt = 0) {
   const pz = game.room.puzzle;
   if (!pz || pz.solved) return;
+
   if (pz.kind === 'plates') {
-    let ok = true;
+    /* A plate stays down for `hold` seconds after the last boot leaves it,
+       so the party can stagger their arrival but not by much. */
+    let all = true;
     for (const n of pz.nodes) {
       const on = game.field.livingParty().some(e => (e.x | 0) === n.x && (e.y | 0) === n.y);
-      if (on !== n.active) { n.active = on;
-        if (on) spellImpact(game.field.fx, 'buff', n.x + 0.5, n.y + 0.5, n.hex, 0.8); }
-      if (!on) ok = false;
+      if (on) {
+        if (!n.active) spellImpact(game.field.fx, 'buff', n.x + 0.5, n.y + 0.5, n.hex, 0.8);
+        n.active = true; n.held = pz.hold;
+      } else if (n.held > 0) {
+        n.held = Math.max(0, n.held - dt);
+        if (n.held === 0 && n.active) {
+          n.active = false;
+          game.log('A counterweight comes back up somewhere behind the wall.', 'info');
+        }
+      }
+      if (!n.active) all = false;
     }
-    if (ok) solvePuzzle(game);
+    if (all) { game.stats.puzzles++; solvePuzzle(game); }
+    return;
+  }
+
+  if (pz.kind === 'wards') {
+    for (const n of pz.nodes) if (n.cool > 0) n.cool = Math.max(0, n.cool - dt);
+    return;
+  }
+
+  if (pz.kind === 'beam') {
+    const hit = traceBeam(game.room, pz);
+    pz.receiver.lit = hit;
+    if (hit) {
+      if (!pz.settle) pz.settle = 0;
+      pz.settle += dt;
+      /* a held beam, not a beam that swept across the socket on its way past */
+      if (pz.settle > 0.45) { game.stats.puzzles++; solvePuzzle(game); }
+    } else pz.settle = 0;
   }
 }
 
 function puzzleElementHit(game, x, y, dtype) {
   const pz = game.room.puzzle;
-  if (!pz || pz.kind !== 'elemental_lock' || pz.solved) return;
-  for (const n of pz.nodes) {
-    if (n.active) continue;
-    if (dist(n.x + 0.5, n.y + 0.5, x, y) > 2.2) continue;
-    if (n.elem !== dtype) continue;
-    n.active = true;
-    game.log(`The ${DTYPES[n.elem].n} sigil takes the charge and holds it.`, 'good');
-    spellImpact(game.field.fx, 'nova', n.x + 0.5, n.y + 0.5, n.hex, 1.4);
+  if (!pz || pz.solved) return;
+
+  if (pz.kind === 'elemental_lock') {
+    for (const n of pz.nodes) {
+      if (n.active) continue;
+      if (dist(n.x + 0.5, n.y + 0.5, x, y) > 2.2) continue;
+      if (n.elem !== dtype) continue;
+      n.active = true;
+      game.log(`The ${DTYPES[n.elem].n} sigil takes the charge and holds it.`, 'good');
+      spellImpact(game.field.fx, 'nova', n.x + 0.5, n.y + 0.5, n.hex, 1.4);
+    }
+    if (pz.nodes.every(n => n.active)) { game.stats.puzzles++; solvePuzzle(game); }
+    return;
   }
-  if (pz.nodes.every(n => n.active)) solvePuzzle(game);
+
+  if (pz.kind === 'wards') {
+    for (const n of pz.nodes) {
+      if (n.open || n.method !== 'mana' || n.elem !== dtype) continue;
+      if (dist(n.x + 0.5, n.y + 0.5, x, y) > 2.4) continue;
+      n.open = true; n.active = true;
+      game.log(`The ${DTYPES[n.elem].n.toLowerCase()} seal drinks the spell and opens.`, 'good');
+      spellImpact(game.field.fx, 'nova', n.x + 0.5, n.y + 0.5, n.hex, 1.4);
+    }
+    if (pz.nodes.every(n => n.open)) { game.stats.puzzles++; solvePuzzle(game); }
+  }
 }
 
 function solvePuzzle(game) {
@@ -8611,7 +9317,7 @@ function solvePuzzle(game) {
   if (!pz || pz.solved) return;
   pz.solved = true;
   game.log('Something heavy disengages. The room releases.', 'good');
-  for (const n of (pz.nodes || [])) { n.active = true; n.on = true; }
+  for (const n of (pz.nodes || [])) { n.active = true; n.on = true; n.open = true; }
   const xp = 60 + game.floorNo * 14;
   for (const ch of game.party) grantXp(ch, xp, game.log.bind(game));
   game.toast(`Puzzle solved — ${xp} ascension each.`, 'good');
@@ -11316,7 +12022,7 @@ const Game = {
       }
     }
     if (this.room.fogDirty) buildFog(this.room);
-    puzzleTick(this);
+    puzzleTick(this, dt);
     /* deferred interactions once a walker arrives */
     if (this.pendingProp) { const sel = this.selEntities()[0];
       if (sel && dist(sel.x, sel.y, this.pendingProp.x + 0.5, this.pendingProp.y + 0.5) < 2.4) {
@@ -11447,6 +12153,15 @@ const Game = {
 
     const HQ = this.effectiveQuality() === 'high';
     if (HQ) drawWaterCaustics(c, cam, room, t);
+
+    /* The refraction beam. Drawn after the floor and before the props and
+       figures, so a mirror or a climber standing in it occludes it the way
+       they should, and then again faintly on top so the route stays legible
+       across a crowded room. */
+    const bpz = room.puzzle;
+    if (bpz && bpz.kind === 'beam' && bpz.path && bpz.path.length) {
+      drawBeam(c, cam, room, bpz, t, 1);
+    }
 
     /* depth-sorted layer: props + entities */
     const draws = [];
