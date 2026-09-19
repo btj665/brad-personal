@@ -26,7 +26,7 @@ import { offerStageValues, offerValue, playBonus } from '../bonus'
 import { lineWins } from '../evaluate'
 import { resolveSpin } from '../machine'
 import { exactBaseReturn, exactLineReturn, screenCountDistribution } from '../rtp'
-import type { Bonus, Machine, SymbolId } from '../types'
+import type { Bonus, SymbolId } from '../types'
 import { TOPDOLLAR } from './topdollar'
 
 /** The line pays alone, enumerated — the base game in full, since there is no

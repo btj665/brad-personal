@@ -100,6 +100,68 @@ export function screenCountDistribution(machine: Machine, id: SymbolId): number[
   return total
 }
 
+/** For one reel over a uniform stop: the expected number of cells in the
+ *  `rows`-high window that match `id` — the symbol itself or any wild — and the
+ *  probability the window holds none of them. Both are exact, walking every stop;
+ *  it mirrors `reelCountDistribution` but folds wilds into the match, because on a
+ *  ways machine a wild pays as any symbol. A scatter never counts as a match. */
+function reelMatchStats(
+  strip: SymbolId[],
+  rows: number,
+  id: SymbolId,
+  wilds: Set<SymbolId>,
+): { expected: number; pNone: number } {
+  let matches = 0
+  let none = 0
+  for (let stop = 0; stop < strip.length; stop++) {
+    let n = 0
+    for (let r = 0; r < rows; r++) {
+      const s = strip[(stop + r) % strip.length]
+      if (s === id || wilds.has(s)) n++
+    }
+    matches += n
+    if (n === 0) none++
+  }
+  return { expected: matches / strip.length, pNone: none / strip.length }
+}
+
+/** The exact return of an all-ways cabinet, from its ways pays alone.
+ *
+ *  It factorizes because the reels are independent and, by `wayWins`, every
+ *  symbol is scored on its own and the wins are summed. For one symbol `s`, a run
+ *  of exactly length `k` pays `linePays[s][k] · ways`, where `ways` is the product
+ *  of the matched-counts on reels 0..k-1. Take the expectation: the reels are
+ *  independent, and `E[matched_i · 1{matched_i ≥ 1}] = E[matched_i]` since a zero
+ *  count zeroes the product anyway. So the expected ways-and-indicator product is
+ *  `∏_{i<k} E[match_i]`, and the run being *exactly* k needs reel k to break it —
+ *  a factor `P(reel k has no match)` for k < reels, or 1 when k = reels. Hence
+ *
+ *    return = (1/waysCost) · Σ_s Σ_k linePays[s][k] · (∏_{i<k} E[match_i(s)]) · break
+ *
+ *  and we divide by `waysCost` because one stake buys every way at once. No
+ *  sampling: `reelMatchStats` walks every stop of every strip. */
+export function exactWaysReturn(machine: Machine): number {
+  const wilds = new Set(machine.symbols.filter((s) => s.wild).map((s) => s.id))
+  const scatters = new Set(machine.symbols.filter((s) => s.scatter).map((s) => s.id))
+  const reels = machine.strips.length
+  const cost = machine.waysCost ?? 1
+
+  let expected = 0
+  for (const [base, pays] of Object.entries(machine.linePays)) {
+    if (scatters.has(base)) continue
+    const stats = machine.strips.map((strip) => reelMatchStats(strip, machine.rows, base, wilds))
+    let prefix = 1 // ∏_{i<k} E[match_i]
+    for (let k = 1; k <= reels; k++) {
+      prefix *= stats[k - 1].expected
+      const per = pays[k] ?? 0
+      if (per === 0) continue
+      const breakFactor = k < reels ? stats[k].pNone : 1
+      expected += per * prefix * breakFactor
+    }
+  }
+  return expected / cost
+}
+
 /** Expected return per coin staked from scatter pays, which are quoted as
  *  multiples of the total stake and so are already a fraction of it. */
 export function exactScatterReturn(machine: Machine): number {
@@ -115,9 +177,11 @@ export function exactScatterReturn(machine: Machine): number {
   return expected
 }
 
-/** The base game's exact return: lines plus scatters, no features. */
+/** The base game's exact return: the screen pays (lines, or all-ways on a ways
+ *  cabinet) plus scatters, no features. */
 export function exactBaseReturn(machine: Machine): number {
-  return exactLineReturn(machine) + exactScatterReturn(machine)
+  const screen = machine.ways ? exactWaysReturn(machine) : exactLineReturn(machine)
+  return screen + exactScatterReturn(machine)
 }
 
 /** How often a spin pays anything at all — the number that decides whether a

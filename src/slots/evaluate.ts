@@ -90,6 +90,60 @@ export function lineWins(window: SymbolId[][], machine: Machine, coinsPerLine: n
   return wins
 }
 
+/** All-ways pays. A symbol pays when it lands on consecutive reels starting from
+ *  reel one, regardless of row, and the win scales by the "ways": the product of
+ *  how many of that symbol sit on each matched reel. A wild counts toward the
+ *  matched-count on its reel, so wilds multiply the ways rather than sitting in a
+ *  line position — there are no line positions here.
+ *
+ *  Every paying symbol is scored independently and the wins are SUMMED, not
+ *  maxed. A reel of pure wilds matches every symbol at once; summing is the
+ *  standard all-ways rule, and it is also what keeps the return linear in the
+ *  strips and so exactly enumerable — each symbol's contribution factorizes
+ *  across the (independent) reels, which `exactWaysReturn` in rtp.ts relies on. */
+export function wayWins(window: SymbolId[][], machine: Machine, coinsPerLine: number): Win[] {
+  const byId = symbolMap(machine.symbols)
+  const reels = window.length
+  const wins: Win[] = []
+
+  for (const base of payingSymbols(machine.linePays, byId)) {
+    const pays = machine.linePays[base]
+    // Matched cells reel by reel — a cell counts if it is the base symbol or a
+    // wild (never a scatter, even a wild one). The run is the longest unbroken
+    // stretch of matched reels starting at reel one; a reel with no match ends it.
+    const matched: Array<Array<[number, number]>> = []
+    for (let reel = 0; reel < reels; reel++) {
+      const cells: Array<[number, number]> = []
+      for (let row = 0; row < window[reel].length; row++) {
+        const id = window[reel][row]
+        const sym = byId.get(id)
+        if (sym?.scatter) continue
+        if (id === base || sym?.wild) cells.push([reel, row])
+      }
+      if (cells.length === 0) break
+      matched.push(cells)
+    }
+
+    const run = matched.length
+    const per = pays[run] ?? 0
+    if (run === 0 || per === 0) continue
+    // The ways: multiply the matched-counts across the run. Wilds are already in
+    // those counts, so a wild on a reel multiplies that reel's contribution.
+    let ways = 1
+    for (const cells of matched) ways *= cells.length
+    wins.push({
+      kind: 'line',
+      line: -1,
+      symbol: base,
+      count: run,
+      paid: per * coinsPerLine * ways,
+      cells: matched.flat(),
+    })
+  }
+
+  return wins
+}
+
 /** Where a symbol sits on screen. Scatters pay on count wherever they land, so
  *  this is a scan of the whole window rather than of a line. */
 export function findSymbol(window: SymbolId[][], id: SymbolId): Array<[number, number]> {
@@ -129,5 +183,10 @@ export function evaluate(
   coinsPerLine: number,
   totalStake: number,
 ): Win[] {
-  return [...lineWins(window, machine, coinsPerLine), ...scatterWins(window, machine, totalStake)]
+  // A ways cabinet pays by adjacency rather than along fixed lines; scatters
+  // still pay on a whole-screen count, exactly as they do on a line machine.
+  const symbolWins = machine.ways
+    ? wayWins(window, machine, coinsPerLine)
+    : lineWins(window, machine, coinsPerLine)
+  return [...symbolWins, ...scatterWins(window, machine, totalStake)]
 }

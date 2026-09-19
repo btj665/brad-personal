@@ -466,6 +466,8 @@ function bonusIntro(bonus: Bonus): string {
       return 'a board of prizes, turned over one box at a time.'
     case 'holdSpin':
       return 'coins lock in place and the empty cells spin again.'
+    case 'offer':
+      return 'the banker keeps calling with an offer — take it, or pass for the next.'
   }
 }
 
@@ -478,6 +480,8 @@ function alreadyDecided(bonus: Bonus): string {
       return 'the board is dealt — every box, including the duds — before you touch one.'
     case 'holdSpin':
       return 'every respin has already been rolled, coins and all.'
+    case 'offer':
+      return 'every offer is drawn before the phone rings; the smart line takes the call that beats what passing is worth.'
   }
 }
 
