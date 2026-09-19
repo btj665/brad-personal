@@ -9,6 +9,7 @@ games/
   galaga/index.html  reference implementation
   gorf/index.html    second reference: five missions, a boss, and speech
   megamania/index.html  a console port: non-square pixels, one steerable shot
+  mooncresta/index.html a game whose lives are the ship, and a docking clock
 ```
 
 ## The seven rules
@@ -122,6 +123,25 @@ it as a supporting file alongside the game, referenced by a relative path.
 Gorf takes the second route with a two-candidate loader, so the engine is not
 duplicated into the game's folder; the cost is one 404 in the console when the
 file is opened straight out of the repository.
+
+## When the mechanic is the game
+
+Three of these four cabinets turn on one rule that a generic space shooter
+does not have, and getting that rule right matters more than any amount of
+art:
+
+- **Gorf** — one shot in flight, and firing again cancels the shot already
+  out there, so the trigger is also a cancel button.
+- **Megamania** — one shot, and you keep steering it with the ship after you
+  fire it. A shot already taken is still a shot you are aiming.
+- **Moon Cresta** — you do not have three lives, you have a rocket in three
+  sections. Being hit costs the section at the front. Twice a lap the game
+  stops and makes you fly the next section into your own tail on a thirty
+  second clock, and missing costs you that section for the rest of the lap.
+
+Find that rule in the research before writing the wave code, because the
+rest of the game is built around it. In all three cases it was the thing
+most easily missed and the thing that makes the game feel like itself.
 
 ## Pixels that are not square
 

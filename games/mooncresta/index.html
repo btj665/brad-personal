@@ -1,0 +1,1326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08080d">
+<title>Moon Cresta</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #08080d; color: #8d8da6;
+    font: 12px ui-monospace, Menlo, Consolas, monospace;
+    overscroll-behavior: none;
+  }
+  body { display: grid; place-items: center; }
+  #mount { width: 100%; }
+  #legend {
+    margin: 0; text-align: center; letter-spacing: .12em; text-transform: uppercase;
+    font-size: 10px; color: #5c5c78; line-height: 1.9; padding: 0 12px 18px;
+  }
+  #legend b { color: #8d8da6; font-weight: 600; }
+  #pad { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    #pad {
+      display: grid; grid-template-columns: 1fr 96px; gap: 12px;
+      align-items: center; padding: 8px 14px 20px; width: 100%;
+      max-width: 440px; box-sizing: border-box; margin: 0 auto;
+    }
+    .slider {
+      position: relative; height: 84px; border-radius: 10px; touch-action: none;
+      background: linear-gradient(180deg, #1d1d28, #0d0d14); border: 1px solid #32324a;
+      display: grid; place-items: center;
+      font: 10px ui-monospace, monospace; letter-spacing: .2em; color: #4a4a64;
+    }
+    .slider i {
+      position: absolute; top: 8px; bottom: 8px; width: 46px; left: 50%;
+      margin-left: -23px; border-radius: 8px; pointer-events: none;
+      background: linear-gradient(180deg, #3a3a52, #20202e); border: 1px solid #4a4a68;
+    }
+    .fire {
+      height: 84px; border-radius: 10px; touch-action: none;
+      font: 12px ui-monospace, monospace; letter-spacing: .16em; color: #ffd0b0;
+      background: linear-gradient(180deg, #45161a, #2a0d10); border: 1px solid #6a2228;
+    }
+    .fire:active { background: linear-gradient(180deg, #6a2228, #45161a); }
+    #legend { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="mount"></div>
+<div id="pad">
+  <div class="slider" id="slider"><i id="knob"></i>SLIDE TO STEER</div>
+  <button class="fire" id="fire" type="button">FIRE</button>
+</div>
+<p id="legend">
+  Move <b>&larr; &rarr;</b> / <b>A D</b> &nbsp;·&nbsp; Fire <b>Space</b> &nbsp;·&nbsp;
+  Start <b>Enter</b> &nbsp;·&nbsp; Pause <b>P</b><br>
+  Dock your rocket sections to widen the guns — and line them up, or lose one
+</p>
+
+<script>
+/* The shared cabinet engine, games/lib/arcade.js. Published beside this page
+   as a supporting file; in the repository it is one directory up, so the two
+   locations are tried in order rather than duplicating the engine. Opening
+   the file from the repository logs one 404 before the second one loads. */
+(function (srcs, done) {
+  (function next(i) {
+    if (i >= srcs.length) { document.getElementById('mount').textContent = 'arcade.js not found'; return; }
+    var s = document.createElement('script');
+    s.src = srcs[i];
+    s.onload = done;
+    s.onerror = function () { next(i + 1); };
+    document.head.appendChild(s);
+  })(0);
+})(['arcade.js', '../lib/arcade.js'], function () { boot(); });
+</script>
+
+<script>
+/* ============================================================================
+   MOON CRESTA — Nichibutsu, 1980
+   ----------------------------------------------------------------------------
+   Built to the house standard in games/README.md.
+
+     Hardware   Z80 at 3.072 MHz on Galaxian-derived hardware, 224 by 256 on
+                a monitor turned on its side. That is the resolution here,
+                scaled up by whole numbers with smoothing off.
+
+     The rocket The reason anyone remembers this game. You do not have three
+                lives, you have a rocket in three sections, and you fly them
+                one at a time from the nose backwards. Twice a lap the game
+                stops and sends the next section up the screen for you to
+                line up and dock with, on a thirty second clock. Dock and
+                your guns widen and the clock pays out; miss and that section
+                is gone and you fly the rest of the lap without it. Getting
+                hit costs you the section at the front of the stack.
+
+     Waves      Cold Eyes, Super Flies, a docking, Four-Ds, Meteors, a second
+                docking, then Atomic Piles, and round again with the rocket
+                split back into its sections.
+
+     Guns       One section fires a single shot, two fire a pair, all three
+                fire four in a spread.
+
+   Sources disagree on two things and this says which way it went. They give
+   the lap as eight waves or as ten, and they call waves seven and eight
+   meteors or fireballs; the ten-wave reading is used, with waves seven and
+   eight as meteors you are not required to shoot. They also give the full
+   ship as four shots or as five; four in a volley is used, with at most five
+   of the player's bullets in the air at once.
+   ========================================================================== */
+function boot() {
+'use strict';
+
+var A = Arcade;
+var clamp = A.clamp, rnd = A.rand, pick = A.pick, hit = A.hit;
+
+/* Nichibutsu's board was Galaxian-derived, so the palette is that family:
+   a handful of saturated primaries on black. */
+var P = {
+  black:  '#000000',
+  white:  '#ffffff',
+  grey:   '#9a9a9a',
+  dark:   '#4a4a58',
+  red:    '#f83800',
+  rose:   '#ff7060',
+  orange: '#fc9838',
+  yellow: '#fcd800',
+  cream:  '#fcfcd8',
+  green:  '#00b800',
+  lime:   '#7cfc38',
+  cyan:   '#3cbcfc',
+  blue:   '#0058f8',
+  navy:   '#182878',
+  magenta:'#f878f8',
+  purple: '#b800b8'
+};
+
+var KEY = {
+  W: P.white,  g: P.grey,   d: P.dark,
+  R: P.red,    e: P.rose,   O: P.orange,
+  Y: P.yellow, C: P.cream,
+  G: P.green,  L: P.lime,
+  c: P.cyan,   B: P.blue,   N: P.navy,
+  M: P.magenta, P: P.purple,
+  K: P.black
+};
+
+/* ==========================================================================
+   THE ROCKET
+   --------------------------------------------------------------------------
+   Three sections, flown nose first. Each is a ship in its own right, and
+   docked they stack into one tall craft.
+   ========================================================================== */
+
+/* Section 1 — the nose. Small, one gun, and the one you start every lap in. */
+var ART_U1 = [
+  '....W....',
+  '....W....',
+  '...WcW...',
+  '...WcW...',
+  '..WcccW..',
+  '..WcccW..',
+  '.WcBBBcW.',
+  'WWcBBBcWW',
+  'W.cBBBc.W',
+  'W..R.R..W',
+  '...R.R...'
+];
+
+/* Section 2 — the middle. Wider, two guns. */
+var ART_U2 = [
+  '.W.....W.',
+  '.W.....W.',
+  'WWcccccWW',
+  'WcccBcccW',
+  'WccBBBccW',
+  'WcBBBBBcW',
+  'WWBBBBBWW',
+  'W.BBBBB.W',
+  'WOO...OOW',
+  '.O.....O.'
+];
+
+/* Section 3 — the tail. Widest, the outer cannons. */
+var ART_U3 = [
+  'W.........W',
+  'W.........W',
+  'WWccccccc.W',
+  'WcccBBBcccW',
+  'WccBBBBBccW',
+  'WcBBBBBBBcW',
+  'WWBBBBBBBWW',
+  'WOOBBBBBOOW',
+  'WOO.....OOW',
+  '.O.......O.'
+];
+
+/* ==========================================================================
+   THE ATTACKERS
+   ========================================================================== */
+
+/* Cold Eyes — waves 1 and 2. Shoot one and it splits into a pair. */
+var ART_EYE = [[
+  '..MMMMMM..',
+  '.MMMMMMMM.',
+  'MMWWWWWWMM',
+  'MWWWWWWWWM',
+  'MWWKKKKWWM',
+  'MWWKKWKWWM',
+  'MWWWKKWWWM',
+  'MMWWWWWWMM',
+  '.MMMMMMMM.',
+  '..MMMMMM..'
+], [
+  '..MMMMMM..',
+  '.MMMMMMMM.',
+  'MMWWWWWWMM',
+  'MWWWWWWWWM',
+  'MWKKKKWWWM',
+  'MWKKWKWWWM',
+  'MWWKKWWWWM',
+  'MMWWWWWWMM',
+  '.MMMMMMMM.',
+  '..MMMMMM..'
+]];
+
+/* the halves a Cold Eye breaks into */
+var ART_EYE_HALF = [[
+  '..MMM.',
+  '.MMWWM',
+  'MWWWWM',
+  'MWKKWM',
+  'MWWKWM',
+  '.MWWMM',
+  '..MMM.'
+], [
+  '.MMM..',
+  'MWWMM.',
+  'MWWWWM',
+  'MWKKWM',
+  'MWKWWM',
+  'MMWWM.',
+  '..MMM.'
+]];
+
+/* Super Flies — waves 3 and 4. Small, fast, never straight. */
+var ART_FLY = [[
+  '.L.....L.',
+  '..L...L..',
+  '.LLLLLLL.',
+  'LLLGGGLLL',
+  'LLGGGGGLL',
+  '.LLGGGLL.',
+  'L.LLLLL.L',
+  '.L.....L.'
+], [
+  '..L...L..',
+  '.L.....L.',
+  '.LLLLLLL.',
+  'LLGGGGGLL',
+  'LLLGGGLLL',
+  '.LLLLLLL.',
+  '.L.LLL.L.',
+  'L.......L'
+]];
+
+/* Four-Ds — waves 5 and 6. They go invisible and keep coming. */
+var ART_FOURD = [[
+  '....cc....',
+  '..ccBBcc..',
+  '.cBBBBBBc.',
+  'cBBWWWWBBc',
+  'cBWWKKWWBc',
+  'cBWWKKWWBc',
+  'cBBWWWWBBc',
+  '.cBBBBBBc.',
+  '..ccBBcc..',
+  '....cc....'
+], [
+  '....cc....',
+  '..cc..cc..',
+  '.cB....Bc.',
+  'cB.WWWW.Bc',
+  'c.WWKKWW.c',
+  'c.WWKKWW.c',
+  'cB.WWWW.Bc',
+  '.cB....Bc.',
+  '..cc..cc..',
+  '....cc....'
+]];
+
+/* Meteors — waves 7 and 8. They fall, they are worth the most, and you are
+   not required to shoot a single one of them. */
+var ART_METEOR = [[
+  '..OOOO..',
+  '.OYYYYO.',
+  'OYYWWYYO',
+  'OYWWWWYO',
+  'OYWWWWYO',
+  'OYYWWYYO',
+  '.OYYYYO.',
+  '..OOOO..'
+], [
+  '..OOOO..',
+  '.OYWWYO.',
+  'OYWYYWYO',
+  'OWYWWYWO',
+  'OWYWWYWO',
+  'OYWYYWYO',
+  '.OYWWYO.',
+  '..OOOO..'
+]];
+
+/* Atomic Piles — waves 9 and 10. The dive bombers that close the lap. */
+var ART_PILE = [[
+  '...RRRR...',
+  '..RWWWWR..',
+  '.RWWRRWWR.',
+  'RWWRRRRWWR',
+  'RWRRYYRRWR',
+  'RWRRYYRRWR',
+  'RWWRRRRWWR',
+  '.RWWRRWWR.',
+  '..RWWWWR..',
+  '...RRRR...'
+], [
+  '...RRRR...',
+  '..RRRRRR..',
+  '.RRWWWWRR.',
+  'RRWWYYWWRR',
+  'RWWYYYYWWR',
+  'RWWYYYYWWR',
+  'RRWWYYWWRR',
+  '.RRWWWWRR.',
+  '..RRRRRR..',
+  '...RRRR...'
+]];
+
+/* projectiles */
+var ART_SHOT = [
+  'W',
+  'W',
+  'c',
+  'c',
+  'B'
+];
+var ART_EBOLT = [
+  '.Y.',
+  'YRY',
+  'YRY',
+  '.Y.'
+];
+
+/* ==========================================================================
+   SCREEN
+   ========================================================================== */
+var W = 224, H = 256;
+
+var screen = A.Screen({ width: W, height: H });
+var ctx = screen.ctx;
+var font = A.Font();
+var audio = A.Audio({ volume: 0.2 });
+var fx = A.FX(screen, font);
+var stars = A.Stars(screen, { count: 92, groups: 4,
+  colors: [P.white, P.cyan, P.rose, P.lime, P.yellow] });
+var input = A.Input(screen.canvas, screen);
+
+var SP = {};
+function b2(pair) { return [A.Sprite.build(pair[0], KEY), A.Sprite.build(pair[1], KEY)]; }
+function buildArt() {
+  SP.u1 = A.Sprite.build(ART_U1, KEY);
+  SP.u2 = A.Sprite.build(ART_U2, KEY);
+  SP.u3 = A.Sprite.build(ART_U3, KEY);
+  SP.eye = b2(ART_EYE);
+  SP.eyeHalf = b2(ART_EYE_HALF);
+  SP.fly = b2(ART_FLY);
+  SP.fourd = b2(ART_FOURD);
+  SP.meteor = b2(ART_METEOR);
+  SP.pile = b2(ART_PILE);
+  SP.shot = A.Sprite.build(ART_SHOT, KEY);
+  SP.ebolt = A.Sprite.build(ART_EBOLT, KEY);
+  /* a diving attacker is drawn from a fixed set of orientations, as the
+     board stored them; a smoothly rotated sprite reads as modern and wrong */
+  SP.eyeRot = A.Sprite.rotations(SP.eye[0], 16);
+  SP.flyRot = A.Sprite.rotations(SP.fly[0], 16);
+  SP.pileRot = A.Sprite.rotations(SP.pile[0], 16);
+  SP.fourdRot = A.Sprite.rotations(SP.fourd[0], 16);
+}
+buildArt();
+
+/* --------------------------------------------------------------------------
+   The lap. Two waves of each attacker, with a docking after the fourth and
+   the eighth.
+   -------------------------------------------------------------------------- */
+var WAVES = [
+  { n: 'COLD EYES',   k: 'eye',    pts: 50,  count: 10 },
+  { n: 'COLD EYES',   k: 'eye',    pts: 50,  count: 10 },
+  { n: 'SUPER FLY',   k: 'fly',    pts: 30,  count: 14 },
+  { n: 'SUPER FLY',   k: 'fly',    pts: 30,  count: 14 },
+  { n: 'FOUR-D',      k: 'fourd',  pts: 60,  count: 10 },
+  { n: 'FOUR-D',      k: 'fourd',  pts: 60,  count: 10 },
+  { n: 'METEOR',      k: 'meteor', pts: 200, count: 16 },
+  { n: 'METEOR',      k: 'meteor', pts: 200, count: 16 },
+  { n: 'ATOMIC PILE', k: 'pile',   pts: 100, count: 12 },
+  { n: 'ATOMIC PILE', k: 'pile',   pts: 100, count: 12 }
+];
+var DOCK_AFTER = [3, 7];          /* zero-based: after the 4th and the 8th */
+
+var DOCK_SECONDS = 30;
+var DOCK_BONUS_PER_SECOND = 100;
+var MAX_PLAYER_BULLETS = 5;
+
+var TOP = 18, FLOOR = 214;
+/* The tail of the rocket sits here whatever it is made of, so a docked
+   stack grows upward rather than down through the panel. */
+var TAIL_Y = 234;
+
+var G = {
+  mode: 'attract', t: 0, modeT: 0,
+  score: 0, high: A.Store.get('mooncresta.high', 20000),
+  wave: 0, lap: 0,
+  nextExtra: 30000,
+  shake: 0, paused: false,
+  dockT: 0, dockBonus: 0, dockOk: false,
+  waveTimer: 0
+};
+
+/* The rocket. `stack` is what you are flying, nose first; `reserve` is what
+   is still on the pad. Both together are your lives. */
+var rocket = { stack: [0], reserve: [1, 2], x: W / 2, alive: true, invuln: 0 };
+
+var shots = [];
+var bolts = [];
+var foes = [];
+var dockUnit = null;          /* the section flying up to be docked with */
+
+/* --------------------------------------------------------------------------
+   Sound
+   -------------------------------------------------------------------------- */
+var SFX = {
+  fire:   function () { audio.tone(760, 0.05, 'square', 0.13, 1500); },
+  hit:    function () { audio.noise(0.16, 0.24, 2400, 500); },
+  split:  function () { audio.tone(420, 0.10, 'square', 0.12, 820); },
+  bolt:   function () { audio.tone(200, 0.07, 'sawtooth', 0.09, 130); },
+  dive:   function () { audio.tone(520, 0.16, 'square', 0.09, 190); },
+  die:    function () { audio.noise(0.9, 0.42, 900, 60); audio.tone(240, 0.9, 'sawtooth', 0.18, 40); },
+  clear:  function () { audio.sequence([523, 659, 784], 0.08, 0.10, 'square', 0.2); },
+  dockIn: function () { audio.tone(140, 0.5, 'sine', 0.10, 320); },
+  docked: function () { audio.sequence([523, 659, 784, 1047, 1319], 0.07, 0.11, 'square', 0.24); },
+  dockNo: function () { audio.tone(300, 0.5, 'sawtooth', 0.18, 70); },
+  tick:   function () { audio.tone(1200, 0.02, 'square', 0.07); },
+  extra:  function () { audio.sequence([659, 988, 1319], 0.07, 0.10, 'square', 0.22); },
+  bonus:  function () { audio.tone(1000, 0.03, 'square', 0.10, 1500); }
+};
+
+/* --------------------------------------------------------------------------
+   The ship
+   -------------------------------------------------------------------------- */
+var UNIT_SPR = ['u1', 'u2', 'u3'];
+var UNIT_W = [9, 9, 11];
+var UNIT_H = [11, 10, 10];
+
+/* Height of the docked stack, and the y of its nose. */
+function stackHeight() {
+  var h = 0;
+  for (var i = 0; i < rocket.stack.length; i++) h += UNIT_H[rocket.stack[i]];
+  return h;
+}
+function stackWidth() {
+  var w = 0;
+  for (var i = 0; i < rocket.stack.length; i++) w = Math.max(w, UNIT_W[rocket.stack[i]]);
+  return w;
+}
+var DOCK_SHIP_Y = 132;
+/* In play the tail sits at a fixed height and the stack grows upward. During
+   a docking the nose is parked well up the screen so the incoming section
+   has room to climb into the tail. */
+function noseY() { return G.mode === 'dock' ? DOCK_SHIP_Y : TAIL_Y - stackHeight(); }
+function tailY() { return noseY() + stackHeight(); }
+
+/* One section is one shot, two are a pair, three are four in a spread.
+   Sources also give the full ship as five; four in a volley with a cap of
+   five in the air is the reading used here. */
+function gunOffsets() {
+  var n = rocket.stack.length;
+  if (n <= 1) return [0];
+  if (n === 2) return [-3, 3];
+  return [-7, -2, 2, 7];
+}
+
+function drawRocket(x, yNose, alpha) {
+  var y = yNose;
+  if (alpha != null) { ctx.save(); ctx.globalAlpha = alpha; }
+  for (var i = 0; i < rocket.stack.length; i++) {
+    var u = rocket.stack[i];
+    var spr = SP[UNIT_SPR[u]];
+    A.Sprite.draw(ctx, spr, Math.round(x - UNIT_W[u] / 2), Math.round(y));
+    y += UNIT_H[u];
+  }
+  if (alpha != null) ctx.restore();
+}
+
+/* ==========================================================================
+   WAVES
+   ========================================================================== */
+function waveDef() { return WAVES[G.wave]; }
+function speed() { return 1 + G.lap * 0.18 + G.wave * 0.02; }
+
+function startWave() {
+  foes.length = 0; bolts.length = 0; shots.length = 0;
+  fx.clear();
+  var d = waveDef();
+  G.waveTimer = 0;
+  for (var i = 0; i < d.count; i++) {
+    var f = {
+      kind: d.k, pts: d.pts, alive: true, t: i * 7,
+      x: 0, y: 0, w: 10, h: 10, ang: 0, state: 'enter', frame: 0,
+      hidden: false, half: 0
+    };
+    layout(f, i, d);
+    foes.push(f);
+  }
+}
+
+function layout(f, i, d) {
+  switch (d.k) {
+    case 'eye':
+      /* a block that slides in from the side and then peels off */
+      f.hx = 34 + (i % 5) * 34;
+      f.hy = TOP + 14 + Math.floor(i / 5) * 24;
+      f.x = f.hx - 150 - (i % 5) * 16; f.y = f.hy;
+      f.w = 10; f.h = 10;
+      break;
+    case 'fly':
+      f.hx = 22 + (i % 7) * 27;
+      f.hy = TOP + 12 + Math.floor(i / 7) * 22;
+      f.x = f.hx; f.y = -20 - (i % 7) * 12;
+      f.w = 9; f.h = 8;
+      break;
+    case 'fourd':
+      f.hx = 30 + (i % 5) * 36;
+      f.hy = TOP + 16 + Math.floor(i / 5) * 26;
+      f.x = f.hx; f.y = -24 - Math.floor(i / 5) * 18;
+      f.w = 10; f.h = 10;
+      break;
+    case 'meteor':
+      /* they are not a formation, they are weather */
+      f.x = rnd(8, W - 18);
+      f.y = -rnd(10, 280);
+      f.vx = rnd(-0.5, 0.5);
+      f.vy = rnd(1.5, 2.6);
+      f.w = 8; f.h = 8;
+      f.state = 'fall';
+      break;
+    case 'pile':
+      f.hx = 26 + (i % 6) * 34;
+      f.hy = TOP + 14 + Math.floor(i / 6) * 26;
+      f.x = f.hx; f.y = -22 - Math.floor(i / 6) * 20;
+      f.w = 10; f.h = 10;
+      break;
+  }
+}
+
+function updateWave() {
+  var d = waveDef(), s = speed();
+  G.waveTimer++;
+  var live = 0, k = d.k;
+
+  for (var i = 0; i < foes.length; i++) {
+    var f = foes[i];
+    if (!f.alive) continue;
+    live++;
+    f.t += s;
+    f.frame = (G.t >> 3) & 1;
+
+    switch (k) {
+      /* ---- Cold Eyes: slide into the block, hold, then peel off ------ */
+      case 'eye':
+        if (f.state === 'enter') {
+          f.x += 2.7 * s;
+          if (f.x >= f.hx) { f.x = f.hx; f.state = 'hold'; }
+        } else if (f.state === 'hold') {
+          f.x = f.hx + Math.sin(G.t * 0.02) * 9;
+          f.y = f.hy;
+          if (f.t > 120 && Math.random() < 0.0022 * s) startDive(f);
+        } else runDive(f, s, 1.25);
+        break;
+
+      /* ---- Super Flies: never hold still ----------------------------- */
+      case 'fly':
+        if (f.state === 'enter') {
+          f.y += 1.9 * s;
+          f.x = f.hx + Math.sin(f.t * 0.06) * 14;
+          if (f.y >= f.hy) { f.y = f.hy; f.state = 'hold'; }
+        } else if (f.state === 'hold') {
+          f.x = f.hx + Math.sin(f.t * 0.05) * 20;
+          f.y = f.hy + Math.sin(f.t * 0.031) * 8;
+          if (Math.random() < 0.0035 * s) startDive(f);
+        } else runDive(f, s, 1.7);
+        break;
+
+      /* ---- Four-Ds: they blink out and keep coming -------------------- */
+      case 'fourd':
+        if (f.state === 'enter') {
+          f.y += 1.5 * s;
+          if (f.y >= f.hy) { f.y = f.hy; f.state = 'hold'; }
+        } else if (f.state === 'hold') {
+          f.x = f.hx + Math.sin(f.t * 0.026) * 22;
+          f.y = f.hy + Math.cos(f.t * 0.019) * 7;
+          if (Math.random() < 0.0026 * s) startDive(f);
+        } else runDive(f, s, 1.35);
+        /* the trick of the wave: gone from the screen, still in the game */
+        if (f.t % 150 < 52) f.hidden = true;
+        else f.hidden = false;
+        break;
+
+      /* ---- Meteors: they fall, and you need not fire a shot at them --- */
+      case 'meteor':
+        f.x += f.vx * s;
+        f.y += f.vy * s;
+        if (f.y > H + 12) {
+          /* gone past: it counts as survived, not as killed */
+          f.alive = false;
+          f.passed = true;
+        }
+        break;
+
+      /* ---- Atomic Piles: the dive bombers that close the lap ---------- */
+      case 'pile':
+        if (f.state === 'enter') {
+          f.y += 1.6 * s;
+          if (f.y >= f.hy) { f.y = f.hy; f.state = 'hold'; }
+        } else if (f.state === 'hold') {
+          f.x = f.hx + Math.sin(G.t * 0.018 + f.hy) * 12;
+          f.y = f.hy;
+          if (Math.random() < 0.0040 * s) startDive(f);
+        } else runDive(f, s, 1.9);
+        break;
+    }
+
+    if (f.state === 'dive' && Math.random() < 0.010 * s) {
+      bolts.push({ x: f.x + f.w / 2, y: f.y + f.h, vy: 1.9 + G.lap * 0.2 });
+      SFX.bolt();
+    }
+  }
+
+  /* A meteor wave is survived rather than cleared: once they have all gone
+     past or been shot, it is over. Everything else has to be killed. */
+  if (!live) clearedWave();
+}
+
+function startDive(f) {
+  f.state = 'dive';
+  f.dt = 0;
+  f.sx = f.x; f.sy = f.y;
+  f.side = rocket.x > f.x ? 1 : -1;
+  SFX.dive();
+}
+
+function runDive(f, s, rate) {
+  f.dt += s;
+  var ox = f.x, oy = f.y;
+  f.x = f.sx + f.side * Math.sin(f.dt * 0.042) * 52;
+  f.y = f.sy + f.dt * rate;
+  /* fixed orientations only, and never turned far past vertical */
+  f.ang = clamp(Math.atan2(f.y - oy, f.x - ox) - Math.PI / 2, -0.9, 0.9);
+  if (f.y > H + 14) {
+    /* back round to its slot in the block, the way the board did it */
+    f.state = 'hold'; f.dt = 0; f.y = f.hy; f.x = f.hx; f.t = 0;
+  }
+}
+
+/* A Cold Eye does not die when you shoot it the first time: it comes apart
+   into a pair of halves that keep coming. */
+function splitEye(f) {
+  for (var s = -1; s <= 1; s += 2) {
+    foes.push({
+      kind: 'eyeHalf', pts: 50, alive: true, t: 0,
+      x: f.x + s * 5, y: f.y, w: 6, h: 7,
+      vx: s * 1.1, vy: 0.9, state: 'half', frame: s > 0 ? 1 : 0,
+      hidden: false
+    });
+  }
+  SFX.split();
+}
+
+function updateHalves() {
+  var s = speed();
+  for (var i = 0; i < foes.length; i++) {
+    var f = foes[i];
+    if (!f.alive || f.kind !== 'eyeHalf') continue;
+    f.t += s;
+    f.x += f.vx * s;
+    f.y += f.vy * s;
+    if (f.x < 4 || f.x > W - 10) f.vx *= -1;
+    if (f.y > H + 12) f.alive = false;
+  }
+}
+
+/* ==========================================================================
+   DOCKING
+   --------------------------------------------------------------------------
+   The whole reason the game is remembered. Twice a lap everything stops and
+   the next section of your rocket comes down the screen. You have thirty
+   seconds to get under it and line it up. Dock and your guns widen and the
+   clock pays out at a hundred a second; miss it, or run the clock out, and
+   that section is gone for the rest of the lap.
+   ========================================================================== */
+function startDocking() {
+  if (!rocket.reserve.length) { afterDocking(false); return; }
+  G.mode = 'dock'; G.modeT = 0;
+  G.dockT = DOCK_SECONDS * 60;
+  G.dockOk = false; G.dockBonus = 0;
+  foes.length = 0; bolts.length = 0; shots.length = 0;
+  var u = rocket.reserve[0];
+  /* It comes up from below, because it is a booster and it attaches to the
+     tail. The sources describe a thirty second docking sequence but not
+     which end of the rocket it joins; this way the finished ship is nose
+     first, which is the shape on the cabinet art. */
+  dockUnit = {
+    u: u, x: W / 2 + rnd(-56, 56), y: H + 6,
+    vy: -0.34, drift: rnd(0.35, 0.62) * (Math.random() < 0.5 ? 1 : -1),
+    w: UNIT_W[u], h: UNIT_H[u], done: false
+  };
+  SFX.dockIn();
+}
+
+function updateDocking() {
+  if (!dockUnit) { afterDocking(false); return; }
+  if (--G.dockT <= 0) { failDock('OUT OF TIME'); return; }
+  if (G.dockT % 60 === 0) SFX.tick();
+
+  /* it will not simply sit there: it slides across, so keeping under it is
+     the task rather than parking once and waiting */
+  dockUnit.x += dockUnit.drift;
+  if (dockUnit.x < 18 || dockUnit.x > W - 18) dockUnit.drift *= -1;
+  dockUnit.y += dockUnit.vy;
+
+  moveShip();
+
+  /* contact: the top of the incoming unit meets the tail of the stack */
+  if (dockUnit.y <= tailY()) {
+    var off = Math.abs(dockUnit.x - rocket.x);
+    if (off <= 4) {
+      G.dockOk = true;
+      rocket.reserve.shift();
+      rocket.stack.push(dockUnit.u);         /* it joins the tail */
+      G.dockBonus = Math.ceil(G.dockT / 60) * DOCK_BONUS_PER_SECOND;
+      dockUnit = null;
+      G.mode = 'dockpay'; G.modeT = 0;
+      SFX.docked();
+    } else {
+      failDock('MISSED');
+    }
+  }
+}
+
+function failDock(why) {
+  G.dockWhy = why;
+  if (rocket.reserve.length) rocket.reserve.shift();   /* that section is lost */
+  if (dockUnit) fx.boom(dockUnit.x, dockUnit.y + dockUnit.h / 2, true);
+  dockUnit = null;
+  G.shake = 18;
+  SFX.dockNo();
+  G.mode = 'dockfail'; G.modeT = 0;
+}
+
+function afterDocking() {
+  G.wave++;
+  if (G.wave >= WAVES.length) rollLap();
+  else { G.mode = 'ready'; G.modeT = 0; }
+}
+
+/* At the end of a lap the rocket comes apart again and you fly the sections
+   one at a time from the nose, exactly as at the start. */
+function rollLap() {
+  var all = rocket.stack.concat(rocket.reserve);
+  rocket.stack = [all[0]];
+  rocket.reserve = all.slice(1);
+  G.wave = 0; G.lap++;
+  G.mode = 'lap'; G.modeT = 0;
+}
+
+/* ==========================================================================
+   PLAYER
+   ========================================================================== */
+function moveShip() {
+  var ax = input.axis();
+  if (padActive) ax = 0;
+  var halfW = stackWidth() / 2;
+  if (padActive) rocket.x = clamp(padX, halfW, W - halfW);
+  else rocket.x = clamp(rocket.x + ax * 1.9, halfW, W - halfW);
+}
+
+function fire() {
+  if (!rocket.alive) return;
+  if (shots.length >= MAX_PLAYER_BULLETS) return;
+  var offs = gunOffsets();
+  /* a volley is one, two or four depending on how much rocket you have */
+  if (shots.length + offs.length > MAX_PLAYER_BULLETS) return;
+  var y = noseY() - 4;
+  for (var i = 0; i < offs.length; i++) {
+    shots.push({ x: rocket.x + offs[i], y: y, vy: -4.6 });
+  }
+  SFX.fire();
+}
+
+function updatePlayer() {
+  if (!rocket.alive) return;
+  if (rocket.invuln > 0) rocket.invuln--;
+  moveShip();
+  if (input.pressed('fire') || padFire) { fire(); padFire = false; }
+}
+
+function updateShots() {
+  for (var i = shots.length - 1; i >= 0; i--) {
+    var s = shots[i];
+    s.y += s.vy;
+    if (s.y < TOP - 8) { shots.splice(i, 1); continue; }
+    for (var j = 0; j < foes.length; j++) {
+      var f = foes[j];
+      if (!f.alive || f.hidden) continue;
+      if (!hit(f.x + f.w / 2, f.y + f.h / 2, f.w / 2 + 1, f.h / 2 + 1, s.x, s.y + 2, 1, 3)) continue;
+      shots.splice(i, 1);
+      if (f.kind === 'eye') {
+        /* the first hit only breaks it open */
+        f.alive = false;
+        addScore(f.pts, f.x + 5, f.y);
+        splitEye(f);
+      } else {
+        f.alive = false;
+        fx.boom(f.x + f.w / 2, f.y + f.h / 2);
+        SFX.hit();
+        addScore(f.pts, f.x + f.w / 2, f.y);
+      }
+      break;
+    }
+  }
+}
+
+function updateBolts() {
+  for (var i = bolts.length - 1; i >= 0; i--) {
+    var b = bolts[i];
+    b.y += b.vy;
+    if (b.y > H) { bolts.splice(i, 1); continue; }
+    if (!rocket.alive || rocket.invuln > 0) continue;
+    if (hit(b.x, b.y + 2, 2, 3, rocket.x, noseY() + stackHeight() / 2, stackWidth() / 2 - 1, stackHeight() / 2 - 1)) {
+      bolts.splice(i, 1);
+      loseSection();
+      return;
+    }
+  }
+}
+
+function checkRamming() {
+  if (!rocket.alive || rocket.invuln > 0) return;
+  var cy = noseY() + stackHeight() / 2;
+  for (var i = 0; i < foes.length; i++) {
+    var f = foes[i];
+    if (!f.alive || f.hidden) continue;
+    if (hit(f.x + f.w / 2, f.y + f.h / 2, f.w / 2, f.h / 2,
+            rocket.x, cy, stackWidth() / 2 - 1, stackHeight() / 2 - 1)) {
+      f.alive = false;
+      fx.boom(f.x + f.w / 2, f.y + f.h / 2);
+      loseSection();
+      return;
+    }
+  }
+}
+
+/* Being hit costs the section at the front of the stack. When the stack is
+   empty the next section comes off the pad, and when there is nothing left
+   on the pad either, that is the game. */
+function loseSection() {
+  rocket.alive = false;
+  G.mode = 'dying'; G.modeT = 0;
+  G.shake = 20;
+  fx.boom(rocket.x, noseY() + 6, true);
+  SFX.die();
+}
+
+function afterDeath() {
+  rocket.stack.shift();
+  if (!rocket.stack.length) {
+    if (!rocket.reserve.length) { G.mode = 'over'; G.modeT = 0; return; }
+    rocket.stack = [rocket.reserve.shift()];
+  }
+  rocket.alive = true; rocket.invuln = 90;
+  rocket.x = W / 2;
+  G.mode = 'ready'; G.modeT = 0;
+}
+
+function addScore(n, x, y) {
+  var before = G.score;
+  G.score += n;
+  if (x != null) fx.popup(x, y, String(n), P.cream);
+  /* a bonus rocket section. The threshold is a reconstruction: sources give
+     the scoring table but not the extend. */
+  if (before < G.nextExtra && G.score >= G.nextExtra) {
+    rocket.reserve.push(2);
+    G.nextExtra += 30000;
+    SFX.extra();
+  }
+  if (G.score > G.high) { G.high = G.score; A.Store.set('mooncresta.high', G.high); }
+}
+
+function clearedWave() {
+  G.mode = 'cleared'; G.modeT = 0;
+  bolts.length = 0;
+  SFX.clear();
+}
+
+function advance() {
+  if (DOCK_AFTER.indexOf(G.wave) >= 0 && rocket.reserve.length) { startDocking(); return; }
+  G.wave++;
+  if (G.wave >= WAVES.length) rollLap();
+  else { G.mode = 'ready'; G.modeT = 0; }
+}
+
+/* ==========================================================================
+   DRAW
+   ========================================================================== */
+function drawFoe(f) {
+  if (f.hidden) return;
+  var x = Math.round(f.x), y = Math.round(f.y);
+  switch (f.kind) {
+    case 'eye':
+      if (f.state === 'dive') SP.eyeRot.draw(ctx, f.ang, x + 5, y + 5);
+      else A.Sprite.draw(ctx, SP.eye[f.frame], x, y);
+      break;
+    case 'eyeHalf':
+      A.Sprite.draw(ctx, SP.eyeHalf[f.frame], x, y);
+      break;
+    case 'fly':
+      if (f.state === 'dive') SP.flyRot.draw(ctx, f.ang, x + 4, y + 4);
+      else A.Sprite.draw(ctx, SP.fly[f.frame], x, y);
+      break;
+    case 'fourd':
+      if (f.state === 'dive') SP.fourdRot.draw(ctx, f.ang, x + 5, y + 5);
+      else A.Sprite.draw(ctx, SP.fourd[f.frame], x, y);
+      break;
+    case 'meteor':
+      A.Sprite.draw(ctx, SP.meteor[f.frame], x, y);
+      break;
+    case 'pile':
+      if (f.state === 'dive') SP.pileRot.draw(ctx, f.ang, x + 5, y + 5);
+      else A.Sprite.draw(ctx, SP.pile[f.frame], x, y);
+      break;
+  }
+}
+
+function drawPlayfield() {
+  screen.clear(P.black);
+  stars.draw();
+  for (var i = 0; i < foes.length; i++) if (foes[i].alive) drawFoe(foes[i]);
+  for (var b = 0; b < bolts.length; b++) {
+    A.Sprite.draw(ctx, SP.ebolt, Math.round(bolts[b].x) - 1, Math.round(bolts[b].y));
+  }
+  ctx.fillStyle = P.white;
+  for (var s = 0; s < shots.length; s++) {
+    A.Sprite.draw(ctx, SP.shot, Math.round(shots[s].x), Math.round(shots[s].y));
+  }
+  if (rocket.alive && !(rocket.invuln > 0 && ((G.t >> 2) & 1))) drawRocket(rocket.x, noseY());
+  fx.draw();
+  drawHud();
+}
+
+function pad(n, w) {
+  var s = String(n);
+  while (s.length < w) s = '0' + s;
+  return s;
+}
+
+function drawHud() {
+  font.draw(ctx, '1UP', 6, 2, P.cyan);
+  font.draw(ctx, pad(G.score, 6), 6, 10, P.white);
+  font.center(ctx, 'HIGH', W, 2, P.red);
+  font.center(ctx, pad(G.high, 6), W, 10, P.white);
+  font.right(ctx, 'LAP ' + (G.lap + 1), W - 6, 2, P.yellow);
+  /* 224 pixels is twenty-eight characters, and the wave's name will not fit
+     beside a six digit high score. It is on the ready card instead. */
+  font.right(ctx, 'W' + (G.wave + 1) + '/' + WAVES.length, W - 6, 10, P.grey);
+
+  /* the rocket sections still on the pad, drawn as what they are */
+  var x = 6;
+  for (var i = 0; i < Math.min(rocket.reserve.length, 4); i++) {
+    var u = rocket.reserve[i];
+    A.Sprite.draw(ctx, SP[UNIT_SPR[u]], x, H - 13);
+    x += UNIT_W[u] + 3;
+  }
+  /* and how many guns you are currently carrying */
+  font.right(ctx, gunOffsets().length + ' GUN' + (gunOffsets().length > 1 ? 'S' : ''),
+             W - 6, H - 11, P.lime);
+}
+
+function drawDock() {
+  screen.clear(P.black);
+  stars.draw();
+
+  /* the guide rails: the one piece of help this adds, because the whole
+     task is lining two things up and a 1980 monitor made that easier than
+     a browser window does */
+  if (dockUnit) {
+    ctx.fillStyle = Math.abs(dockUnit.x - rocket.x) <= 4 ? P.lime : P.navy;
+    for (var y = tailY(); y < dockUnit.y; y += 6) {
+      ctx.fillRect(Math.round(dockUnit.x) - 1, y, 2, 3);
+    }
+    A.Sprite.draw(ctx, SP[UNIT_SPR[dockUnit.u]],
+                  Math.round(dockUnit.x - dockUnit.w / 2), Math.round(dockUnit.y));
+  }
+  if (rocket.alive) drawRocket(rocket.x, noseY());
+  fx.draw();
+  drawHud();
+
+  font.center(ctx, 'DOCKING', W, 40, ((G.t >> 3) & 1) ? P.white : P.yellow);
+  var secs = Math.ceil(G.dockT / 60);
+  font.center(ctx, pad(secs, 2), W, 54, secs <= 5 ? P.red : P.cream, 2);
+  font.center(ctx, 'BONUS ' + pad(secs * DOCK_BONUS_PER_SECOND, 5), W, 76, P.grey);
+}
+
+function drawDockPay() {
+  drawPlayfield();
+  font.center(ctx, 'DOCKING OK', W, 96, P.lime);
+  font.center(ctx, 'BONUS ' + pad(G.dockBonus, 5), W, 112, ((G.t >> 3) & 1) ? P.white : P.yellow);
+}
+
+function drawDockFail() {
+  drawPlayfield();
+  font.center(ctx, G.dockWhy || 'MISSED', W, 96, P.red);
+  font.center(ctx, 'SECTION LOST', W, 112, P.rose);
+}
+
+function drawReady() {
+  drawPlayfield();
+  font.center(ctx, waveDef().n, W, 96, P.yellow);
+  font.center(ctx, waveDef().pts + ' POINTS', W, 110, P.grey);
+  if (G.modeT > 40 && ((G.t >> 3) & 1)) font.center(ctx, 'READY', W, 128, P.red);
+}
+
+function drawLap() {
+  screen.clear(P.black);
+  stars.draw();
+  font.center(ctx, 'LAP ' + G.lap + ' COMPLETE', W, 80, P.cyan);
+  font.center(ctx, 'THE ROCKET SEPARATES', W, 100, P.grey);
+  /* show it coming apart */
+  var spread = Math.min(30, G.modeT * 0.4);
+  var all = rocket.stack.concat(rocket.reserve);
+  for (var i = 0; i < all.length; i++) {
+    var u = all[i];
+    A.Sprite.draw(ctx, SP[UNIT_SPR[u]], Math.round(W / 2 - UNIT_W[u] / 2),
+                  Math.round(126 + i * (UNIT_H[u] + spread)));
+  }
+  drawHud();
+}
+
+function drawCleared() {
+  drawPlayfield();
+  font.center(ctx, 'WAVE CLEARED', W, 100, ((G.t >> 3) & 1) ? P.white : P.lime);
+}
+
+function drawOver() {
+  drawPlayfield();
+  font.center(ctx, 'GAME OVER', W, 100, P.red, 2);
+  if (G.modeT > 120 && ((G.t >> 4) & 1)) font.center(ctx, 'PRESS START', W, 140, P.yellow);
+}
+
+var ATTRACT_PAGES = 3;
+
+function drawAttract() {
+  screen.clear(P.black);
+  stars.draw();
+  var page = Math.floor(G.modeT / 300) % ATTRACT_PAGES;
+
+  font.center(ctx, 'MOON CRESTA', W, 24, P.red, 2);
+  font.center(ctx, 'NICHIBUTSU  1980', W, 48, P.grey);
+
+  if (page === 0) {
+    font.center(ctx, 'A ROCKET IN', W, 78, P.cyan);
+    font.center(ctx, 'THREE SECTIONS', W, 90, P.cyan);
+    /* the three units, and then the stack they make */
+    var y = 116;
+    for (var i = 0; i < 3; i++) {
+      A.Sprite.draw(ctx, SP[UNIT_SPR[i]], 52 - UNIT_W[i] / 2 | 0, y);
+      y += UNIT_H[i] + 8;
+    }
+    /* nose first, exactly as the docked rocket flies */
+    var sy = 116;
+    for (var j = 0; j < 3; j++) {
+      A.Sprite.draw(ctx, SP[UNIT_SPR[j]], 160 - (UNIT_W[j] / 2 | 0), sy);
+      sy += UNIT_H[j];
+    }
+    font.draw(ctx, 'FLOWN', 34, 176, P.grey);
+    font.draw(ctx, 'ONE AT', 34, 186, P.grey);
+    font.draw(ctx, 'A TIME', 34, 196, P.grey);
+    font.draw(ctx, 'OR', 146, 176, P.lime);
+    font.draw(ctx, 'DOCKED', 140, 186, P.lime);
+    font.draw(ctx, 'AS ONE', 140, 196, P.lime);
+  } else if (page === 1) {
+    font.center(ctx, 'SCORE TABLE', W, 76, P.yellow);
+    var rows = [['eye', 'COLD EYES', 50], ['fly', 'SUPER FLY', 30],
+                ['fourd', 'FOUR-D', 60], ['meteor', 'METEOR', 200],
+                ['pile', 'ATOMIC PILE', 100]];
+    for (var r = 0; r < rows.length; r++) {
+      var ry = 96 + r * 18;
+      A.Sprite.draw(ctx, SP[rows[r][0]][0], 30, ry - 1);
+      font.draw(ctx, rows[r][1], 50, ry, P.white);
+      font.right(ctx, String(rows[r][2]), W - 30, ry, P.cream);
+    }
+    font.center(ctx, 'DOCKING  100 A SECOND', W, 192, P.lime);
+  } else {
+    font.center(ctx, 'COLD EYES SPLIT', W, 82, P.magenta);
+    A.Sprite.draw(ctx, SP.eye[0], 64, 96);
+    font.draw(ctx, '=', 84, 100, P.grey);
+    A.Sprite.draw(ctx, SP.eyeHalf[0], 100, 98);
+    A.Sprite.draw(ctx, SP.eyeHalf[1], 112, 98);
+    font.center(ctx, 'FOUR-D VANISH', W, 124, P.cyan);
+    A.Sprite.draw(ctx, SP.fourd[((G.t >> 4) & 1)], 90, 138);
+    font.center(ctx, 'METEORS NEED NOT', W, 162, P.orange);
+    font.center(ctx, 'BE SHOT AT ALL', W, 174, P.orange);
+  }
+
+  if (((G.t >> 4) & 1)) font.center(ctx, 'PRESS START', W, 214, P.yellow);
+  font.center(ctx, 'A TRIBUTE ONLY', W, 240, '#2a2a38');
+}
+
+/* ==========================================================================
+   LOOP
+   ========================================================================== */
+function startGame() {
+  G.score = 0; G.wave = 0; G.lap = 0; G.nextExtra = 30000;
+  rocket.stack = [0]; rocket.reserve = [1, 2];
+  rocket.x = W / 2; rocket.alive = true; rocket.invuln = 90;
+  shots.length = 0; bolts.length = 0; foes.length = 0;
+  dockUnit = null;
+  G.mode = 'ready'; G.modeT = 0;
+}
+
+function update() {
+  G.t++; G.modeT++;
+  if (G.shake > 0) G.shake--;
+  stars.update();
+  fx.update();
+
+  if (input.pressed('p') || input.pressed('P')) {
+    if (G.mode === 'play') G.paused = !G.paused;
+  }
+
+  switch (G.mode) {
+    case 'attract':
+      if (input.pressed('start') || input.pressed('fire') || input.pressed('tap')) {
+        audio.set(true); startGame();
+      }
+      break;
+
+    case 'ready':
+      if (G.modeT === 1) {
+        startWave();
+        rocket.alive = true;
+        if (rocket.invuln < 60) rocket.invuln = 60;
+      }
+      if (G.modeT > 90) { G.mode = 'play'; G.modeT = 0; }
+      break;
+
+    case 'play':
+      if (G.paused) break;
+      updatePlayer();
+      updateShots();
+      updateBolts();
+      updateWave();
+      updateHalves();
+      if (G.mode === 'play') checkRamming();
+      break;
+
+    case 'cleared':
+      updateShots();
+      if (G.modeT > 90) advance();
+      break;
+
+    case 'dock':
+      updateDocking();
+      break;
+
+    case 'dockpay':
+      if (G.modeT > 20 && G.modeT % 3 === 0 && G.dockBonus > 0) {
+        var step = Math.min(100, G.dockBonus);
+        G.dockBonus -= step;
+        addScore(step);
+        SFX.bonus();
+      }
+      if (G.dockBonus <= 0 && G.modeT > 110) afterDocking();
+      break;
+
+    case 'dockfail':
+      if (G.modeT > 110) afterDocking();
+      break;
+
+    case 'lap':
+      if (G.modeT > 180) { G.mode = 'ready'; G.modeT = 0; }
+      break;
+
+    case 'dying':
+      updateShots();
+      updateWave();
+      if (G.modeT > 110) afterDeath();
+      break;
+
+    case 'over':
+      if (G.modeT > 120 && (input.pressed('start') || input.pressed('fire') || input.pressed('tap'))) {
+        G.mode = 'attract'; G.modeT = 0;
+        foes.length = 0; bolts.length = 0; shots.length = 0; fx.clear();
+      }
+      break;
+  }
+
+  input.endFrame();
+}
+
+function render() {
+  ctx.save();
+  if (G.shake > 0) {
+    ctx.translate(Math.round(rnd(-1, 1) * G.shake * 0.18), Math.round(rnd(-1, 1) * G.shake * 0.18));
+  }
+  switch (G.mode) {
+    case 'attract':  drawAttract(); break;
+    case 'ready':    drawReady(); break;
+    case 'cleared':  drawCleared(); break;
+    case 'dock':     drawDock(); break;
+    case 'dockpay':  drawDockPay(); break;
+    case 'dockfail': drawDockFail(); break;
+    case 'lap':      drawLap(); break;
+    case 'over':     drawOver(); break;
+    default:         drawPlayfield(); break;
+  }
+  if (G.paused && G.mode === 'play') {
+    font.center(ctx, 'PAUSED', W, H / 2, ((G.t >> 3) & 1) ? P.white : P.yellow);
+  }
+  ctx.restore();
+}
+
+/* ==========================================================================
+   CABINET AND TOUCH
+   ========================================================================== */
+var cab = A.Cabinet(document.getElementById('mount'), screen, { crt: false });
+cab.addSoundButton(audio);
+cab.addCrtButton();
+cab.button('Pause', null, function () { if (G.mode === 'play') G.paused = !G.paused; });
+cab.autoFit(210);
+
+/* Docking is a tracking task, so the touch control is an absolute slide
+   rather than a pair of buttons: your thumb is where the rocket is. */
+var padX = W / 2, padActive = false, padFire = false;
+(function touch() {
+  var sl = document.getElementById('slider');
+  var knob = document.getElementById('knob');
+  var fireBtn = document.getElementById('fire');
+  if (!sl) return;
+  var id = null;
+  function set(ev) {
+    var r = sl.getBoundingClientRect();
+    var u = clamp((ev.clientX - r.left) / r.width, 0, 1);
+    padX = u * W; padActive = true;
+    knob.style.left = (u * 100) + '%';
+  }
+  sl.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); id = e.pointerId; sl.setPointerCapture(id); audio.resume(); set(e);
+  });
+  sl.addEventListener('pointermove', function (e) { if (e.pointerId === id) { e.preventDefault(); set(e); } });
+  function rel() { id = null; padActive = false; }
+  sl.addEventListener('pointerup', rel);
+  sl.addEventListener('pointercancel', rel);
+  fireBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); audio.resume(); padFire = true;
+    if (G.mode === 'attract' || G.mode === 'over') input.tapFire();
+  });
+})();
+
+screen.canvas.addEventListener('pointerdown', function () {
+  audio.resume();
+  if (G.mode === 'attract') { audio.set(true); startGame(); }
+  else if (G.mode === 'over' && G.modeT > 120) { G.mode = 'attract'; G.modeT = 0; }
+});
+
+/* A preview hook and a probe for the headless tests, as in the other
+   cabinets. Nothing in the game reads either. */
+function jumpTo(wave, lap) {
+  G.wave = wave || 0; G.lap = lap || 0;
+  G.mode = 'ready'; G.modeT = 0;
+}
+
+window.__mc = {
+  go: jumpTo,
+  state: G,
+  sprites: SP,
+  waves: WAVES,
+  probe: {
+    go: jumpTo,
+    reset: function () {
+      G.score = 0; G.wave = 0; G.lap = 0; G.nextExtra = 30000;
+      rocket.stack = [0]; rocket.reserve = [1, 2];
+      rocket.x = W / 2; rocket.alive = true; rocket.invuln = 0;
+      shots.length = 0; bolts.length = 0; foes.length = 0; dockUnit = null;
+    },
+    pump: function (n) { for (var i = 0; i < (n || 1); i++) update(); },
+    fire: fire,
+    shots: function () { return shots; },
+    bolts: function () { return bolts; },
+    foes: function () { return foes; },
+    rocket: function () { return rocket; },
+    guns: function () { return gunOffsets().length; },
+    shipX: function (x) { if (x != null) rocket.x = x; return rocket.x; },
+    invuln: function (v) { rocket.invuln = v; },
+    dockUnit: function () { return dockUnit; },
+    dockClock: function (v) { if (v != null) G.dockT = v; return G.dockT; },
+    noseY: noseY,
+    killAll: function () { for (var i = 0; i < foes.length; i++) foes[i].alive = false; },
+    advance: advance
+  }
+};
+
+A.Loop(update, render, 60).start();
+}
+</script>
+</body>
+</html>
