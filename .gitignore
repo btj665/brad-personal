@@ -1,0 +1,4 @@
+
+# Each game loads ../lib/arcade.js; a copy beside index.html is only ever a
+# scratch copy made so a headless test can load the page from that folder.
+games/*/arcade.js
