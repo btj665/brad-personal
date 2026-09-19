@@ -8,6 +8,7 @@ games/
   lib/arcade.js      shared engine (no dependencies, one global: Arcade)
   galaga/index.html  reference implementation
   gorf/index.html    second reference: five missions, a boss, and speech
+  megamania/index.html  a console port: non-square pixels, one steerable shot
 ```
 
 ## The seven rules
@@ -93,7 +94,7 @@ in challenging stages as first assumed, and the squadron bonuses are
 
 | Piece | What it does |
 |---|---|
-| `Arcade.Screen` | Native-res canvas, integer `fit()`, pointer→canvas coords |
+| `Arcade.Screen` | Native-res canvas, integer `fit()`, `pixelAspect` for consoles whose pixels are not square, pointer→canvas coords |
 | `Arcade.Font` | 8×8 bitmap text: `draw` `center` `at` `right` |
 | `Arcade.Sprite` | `build` `tint` `flipH` `rotate` `rotations` `draw` |
 | `Arcade.Path` | Catmull-Rom splines sampled by arc length (constant speed) |
@@ -105,7 +106,7 @@ in challenging stages as first assumed, and the squadron bonuses are
 | `Arcade.FX` | Radial explosions and floating score popups |
 | `Arcade.Store` | localStorage that never throws |
 | `Arcade.Cabinet` | Bezel, CRT overlay (off by default), control strip, autofit |
-| `Arcade.palettes` | `namco` `atari` `nintendo` `vector` `williams` |
+| `Arcade.palettes` | `namco` `atari` `atari2600` `nintendo` `vector` `williams` |
 
 Helpers: `Arcade.clamp`, `Arcade.rand`, `Arcade.pick`, `Arcade.hit`.
 
@@ -121,6 +122,22 @@ it as a supporting file alongside the game, referenced by a relative path.
 Gorf takes the second route with a two-candidate loader, so the engine is not
 duplicated into the game's folder; the cost is one 404 in the console when the
 file is opened straight out of the repository.
+
+## Pixels that are not square
+
+Rule 1 says native resolution, and on a console that is only half the answer.
+A 2600 NTSC frame is 160 colour clocks across and 192 scan lines down, shown
+on a 4:3 television, so a 2600 pixel is about 1.6 times wider than it is
+tall. Rendering 160×192 into square pixels gives a tall, thin picture that
+never existed. `Arcade.Screen({ pixelAspect: 2 })` renders in square logical
+pixels — sprites, collisions and the font all stay simple — and stretches
+only on the way to the screen, which is the convention emulators settled on.
+
+This changes how the art is drawn, not just how it is displayed. At 2:1 a
+circle has to be drawn about half as wide as it is tall or it comes out an
+oval; Megamania's cookies, tyres and dice are drawn six columns wide inside
+a ten-wide box for exactly that reason, and the first attempt at all of them
+was wrong.
 
 ## Speech
 

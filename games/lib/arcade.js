@@ -44,6 +44,24 @@ Arcade.palettes = {
   vector: {
     black:'#000000', white:'#ffffff', dim:'#9a9a9a', faint:'#4a4a4a'
   },
+  /* Atari 2600 NTSC (TIA). The chip gave 16 hues at 8 luminances; these are
+     the standard tabulated values for the entries games actually reach for.
+     Keys are hue plus luminance so a game can pick a lighter or darker shade
+     of the same hue the way a 2600 program changed the low nibble. */
+  atari2600: {
+    black:'#000000', grey2:'#4a4a4a', grey4:'#6f6f6f', grey6:'#8e8e8e',
+    grey8:'#aaaaaa', greyA:'#c0c0c0', greyC:'#d6d6d6', white:'#ececec',
+    olive4:'#86861d', olive8:'#bbbb35', oliveC:'#e8e84a', oliveE:'#fcfc54',
+    brown2:'#904811', brown6:'#b47a30', brownA:'#d2a44a', brownE:'#ecc860',
+    orange2:'#a33915', orange6:'#c66c3a', orangeA:'#e39759', orangeE:'#fcbc74',
+    red0:'#940000', red4:'#b83232', red8:'#d65c5c', redC:'#f08080', redE:'#fc9090',
+    purple2:'#68199a', purple6:'#9143c0', purpleA:'#b369e0', purpleE:'#d18cfc',
+    blue0:'#000094', blue4:'#2d32b8', blue8:'#545cd6', blueC:'#7580f0', blueE:'#8490fc',
+    cyan2:'#185080', cyan6:'#4188b0', cyanA:'#65b7d8', cyanE:'#84dcfc',
+    green0:'#004400', green4:'#328432', green8:'#5cb85c', greenC:'#80e580', greenE:'#90fc90',
+    lime4:'#527e2d', lime8:'#87b754', limeC:'#b3e775', limeE:'#c8fc84',
+    gold4:'#866a26', gold8:'#bb9f47', goldC:'#e8cc63', goldE:'#fce070'
+  },
   /* Williams (Defender, Robotron, Joust) — hot and saturated */
   williams: {
     black:'#000000', white:'#ffffff', red:'#ff2020', orange:'#ff8000',
@@ -62,21 +80,27 @@ Arcade.palettes = {
 Arcade.Screen = function (opts) {
   opts = opts || {};
   var w = opts.width || 224, h = opts.height || 288;
+  /* Console pixels are often not square. A 2600 NTSC frame is 160 clocks by
+     192 lines shown on a 4:3 screen, so each pixel is about 1.6 times wider
+     than it is tall; emulators conventionally double the width, and that is
+     what pixelAspect: 2 does here. Everything else — sprites, collisions,
+     the font — keeps working in square logical pixels. */
+  var pa = opts.pixelAspect || 1;
   var canvas = opts.canvas || document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   var ctx = canvas.getContext('2d', { alpha: false });
   ctx.imageSmoothingEnabled = false;
 
   var api = {
-    canvas: canvas, ctx: ctx, width: w, height: h, scale: 1,
+    canvas: canvas, ctx: ctx, width: w, height: h, scale: 1, pixelAspect: pa,
 
     /* Integer scale to fit the box, falling back to fractional only when
        even 1x will not fit (very small phones). */
     fit: function (availW, availH) {
-      var s = Math.min(availW / w, availH / h);
+      var s = Math.min(availW / (w * pa), availH / h);
       var si = Math.floor(s);
       api.scale = si >= 1 ? si : s;
-      canvas.style.width = (w * api.scale) + 'px';
+      canvas.style.width = (w * pa * api.scale) + 'px';
       canvas.style.height = (h * api.scale) + 'px';
       return api.scale;
     },
@@ -89,6 +113,8 @@ Arcade.Screen = function (opts) {
     /* Canvas coords from a pointer event — needed for touch controls. */
     pointerPos: function (ev) {
       var r = canvas.getBoundingClientRect();
+      /* r.width already carries the stretch, so dividing by it puts the
+         pointer back into square logical pixels. */
       return {
         x: (ev.clientX - r.left) / r.width * w,
         y: (ev.clientY - r.top) / r.height * h

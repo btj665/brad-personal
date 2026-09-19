@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08080d">
+<title>Megamania</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #08080d; color: #8d8da6;
+    font: 12px ui-monospace, Menlo, Consolas, monospace;
+    overscroll-behavior: none;
+  }
+  body { display: grid; place-items: center; }
+  #mount { width: 100%; }
+  #legend {
+    margin: 0; text-align: center; letter-spacing: .12em; text-transform: uppercase;
+    font-size: 10px; color: #5c5c78; line-height: 1.9; padding: 0 12px 18px;
+  }
+  #legend b { color: #8d8da6; font-weight: 600; }
+  #pad { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    #pad {
+      display: grid; grid-template-columns: 1fr 96px; gap: 12px;
+      align-items: center; padding: 8px 14px 20px; width: 100%;
+      max-width: 440px; box-sizing: border-box; margin: 0 auto;
+    }
+    .slider {
+      position: relative; height: 84px; border-radius: 10px; touch-action: none;
+      background: linear-gradient(180deg, #1d1d28, #0d0d14); border: 1px solid #32324a;
+      display: grid; place-items: center;
+      font: 10px ui-monospace, monospace; letter-spacing: .2em; color: #4a4a64;
+    }
+    .slider i {
+      position: absolute; top: 8px; bottom: 8px; width: 46px; left: 50%;
+      margin-left: -23px; border-radius: 8px; pointer-events: none;
+      background: linear-gradient(180deg, #3a3a52, #20202e); border: 1px solid #4a4a68;
+    }
+    .fire {
+      height: 84px; border-radius: 10px; touch-action: none;
+      font: 12px ui-monospace, monospace; letter-spacing: .16em; color: #ffd0b0;
+      background: linear-gradient(180deg, #45161a, #2a0d10); border: 1px solid #6a2228;
+    }
+    .fire:active { background: linear-gradient(180deg, #6a2228, #45161a); }
+    #legend { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="mount"></div>
+<div id="pad">
+  <div class="slider" id="slider"><i id="knob"></i>SLIDE TO STEER</div>
+  <button class="fire" id="fire" type="button">FIRE</button>
+</div>
+<p id="legend">
+  Move <b>&larr; &rarr;</b> / <b>A D</b> &nbsp;·&nbsp; Fire <b>Space</b> &nbsp;·&nbsp;
+  Start <b>Enter</b> &nbsp;·&nbsp; Pause <b>P</b><br>
+  Your missile keeps steering with the ship after you fire it
+</p>
+
+<script>
+/* The shared cabinet engine, games/lib/arcade.js. Published beside this page
+   as a supporting file; in the repository it sits one directory up, so the
+   two locations are tried in order rather than the engine being duplicated
+   into this folder. Opening the file straight from the repository logs one
+   404 for the first candidate before the second loads. */
+(function (srcs, done) {
+  (function next(i) {
+    if (i >= srcs.length) { document.getElementById('mount').textContent = 'arcade.js not found'; return; }
+    var s = document.createElement('script');
+    s.src = srcs[i];
+    s.onload = done;
+    s.onerror = function () { next(i + 1); };
+    document.head.appendChild(s);
+  })(0);
+})(['arcade.js', '../lib/arcade.js'], function () { boot(); });
+</script>
+
+<script>
+/* ============================================================================
+   MEGAMANIA — Activision, 1982, Atari 2600, by Steve Cartwright
+   ----------------------------------------------------------------------------
+   Built to the house standard in games/README.md. What the cartridge did,
+   and what this follows:
+
+     Display     TIA, 160 colour clocks by 192 scanlines, shown on a 4:3
+                 television, so a 2600 pixel is about 1.6 times wider than it
+                 is tall. This renders at 160x192 and displays it at double
+                 width, which is the convention emulators settled on and puts
+                 the geometry back where the cartridge had it.
+
+     The missile The one mechanic everything else hangs off: a single shot on
+                 screen at a time, and after you fire it you keep steering it
+                 with the ship. You are aiming for two or three seconds after
+                 pulling the trigger, and holding a shot back is a real
+                 decision because you cannot have a second one.
+
+     Eight waves Hamburgers, cookies, bugs, radial tires, diamonds, steam
+                 irons, bow ties, space dice, in that order. Clearing all
+                 eight is a MegaCycle, after which they come round again
+                 faster, in different colours and with harder patterns.
+
+     Energy      A bar that drains for as long as the wave lasts. Empty is a
+                 lost ship, and whatever is left when the wave clears is paid
+                 out as a bonus of one enemy's value per unit.
+
+     Wrapping    An attacker that reaches the bottom of the screen comes back
+                 in at the top. Nothing leaves except by being shot.
+
+     Scoring     20 points each on wave one and ten more on each wave after,
+                 so the eighth wave is 90; from the second MegaCycle on,
+                 everything is 90. Three ships, and another at every 10,000.
+                 45,000 was the score Activision wanted a photograph of.
+
+   The graphics are the deliberate departure. The geometry, the timing and
+   the rules are the cartridge's; the sprites are not, because the TIA gave
+   Cartwright eight pixels of one colour per scan line and the hamburger had
+   to be suggested rather than drawn. These are drawn, at the same size and
+   on the same grid.
+   ========================================================================== */
+function boot() {
+'use strict';
+
+var A = Arcade;
+var clamp = A.clamp, rnd = A.rand, pick = A.pick, hit = A.hit;
+var T = A.palettes.atari2600;
+
+/* --------------------------------------------------------------------------
+   Sprite palette. Keys are single characters so the art below stays legible
+   as a grid; the values are TIA colours.
+   -------------------------------------------------------------------------- */
+var KEY = {
+  W: T.white,    w: T.greyC,    g: T.grey6,    d: T.grey2,
+  R: T.red4,     r: T.red8,     M: T.redC,
+  O: T.orange6,  o: T.orangeA,  N: T.orangeE,
+  B: T.brown2,   b: T.brown6,   t: T.brownA,   T: T.brownE,
+  Y: T.gold8,    y: T.goldC,    L: T.goldE,
+  G: T.green4,   e: T.green8,   n: T.greenC,
+  C: T.cyan6,    c: T.cyanA,    i: T.cyanE,
+  U: T.blue4,    u: T.blue8,    s: T.blueC,
+  P: T.purple6,  p: T.purpleA,  m: T.purpleE,
+  V: T.olive8,   v: T.oliveE,
+  K: T.black
+};
+
+/* ==========================================================================
+   THE EIGHT ATTACKERS
+   --------------------------------------------------------------------------
+   Two frames each. Pixels are displayed at double width, so these read wider
+   on screen than they look here — which is why they are drawn tall-ish.
+   ========================================================================== */
+
+/* 1 — hamburgers. Sesame bun, lettuce, patty. */
+var ART_BURGER = [[
+  '..TTTTTT..',
+  '.TTTTTTTT.',
+  'TTWTTTTWTT',
+  'TTTTTTTTTT',
+  'TTTTTTTTTT',
+  'nnennennen',
+  '.nnnnnnnn.',
+  'BBBBBBBBBB',
+  'BbBBBbBBBb',
+  'BBBBBBBBBB',
+  '.TTTTTTTT.',
+  '..TTTTTT..'
+], [
+  '..TTTTTT..',
+  '.TTTTTTTT.',
+  'TTTWTTWTTT',
+  'TTTTTTTTTT',
+  'TTTTTTTTTT',
+  'ennennenne',
+  '.nnnnnnnn.',
+  'BBBBBBBBBB',
+  'BBbBBBbBBB',
+  'BBBBBBBBBB',
+  '.TTTTTTTT.',
+  '..TTTTTT..'
+]];
+
+/* 2 — cookies. The wave that runs sideways, then dips and turns back. */
+var ART_COOKIE = [[
+  '....tt....',
+  '...tttt...',
+  '..tttttt..',
+  '..tBtttt..',
+  '..ttttBt..',
+  '..tttttt..',
+  '..tBtttt..',
+  '..ttttBt..',
+  '..tttBtt..',
+  '..tttttt..',
+  '...tttt...',
+  '....tt....'
+], [
+  '....tt....',
+  '...tttt...',
+  '..tttttt..',
+  '..ttBttt..',
+  '..tttttt..',
+  '..tBtttB..',
+  '..tttttt..',
+  '..ttBttt..',
+  '..tttBtt..',
+  '..tttttt..',
+  '...tttt...',
+  '....tt....'
+]];
+
+/* 3 — bugs. */
+var ART_BUG = [[
+  '.G......G.',
+  '..n....n..',
+  '...nnnn...',
+  '..nnnnnn..',
+  '.nnGGGGnn.',
+  'GnnnnnnnnG',
+  'GnnGGGGnnG',
+  '.nnnnnnnn.',
+  'GnnnnnnnnG',
+  '..nnnnnn..',
+  '.G.nnnn.G.',
+  '..G....G..'
+], [
+  '..G....G..',
+  '.n......n.',
+  '...nnnn...',
+  '..nnnnnn..',
+  '.nnGGGGnn.',
+  '.nnnnnnnn.',
+  'GnnGGGGnnG',
+  'GnnnnnnnnG',
+  '.nnnnnnnn.',
+  '..nnnnnn..',
+  'G..nnnn..G',
+  '.G......G.'
+]];
+
+/* 4 — radial tires. */
+var ART_TIRE = [[
+  '....dd....',
+  '..dddddd..',
+  '.dKddddKd.',
+  '.dggggggd.',
+  '.dgwddwgd.',
+  '.dgdKKdgd.',
+  '.dgdKKdgd.',
+  '.dgwddwgd.',
+  '.dggggggd.',
+  '.dKddddKd.',
+  '..dddddd..',
+  '....dd....'
+], [
+  '....dd....',
+  '..dddddd..',
+  '.ddKddKdd.',
+  '.dggggggd.',
+  '.dgdwwdgd.',
+  '.dgwKKwgd.',
+  '.dgwKKwgd.',
+  '.dgdwwdgd.',
+  '.dggggggd.',
+  '.ddKddKdd.',
+  '..dddddd..',
+  '....dd....'
+]];
+
+/* 5 — diamonds. */
+var ART_DIAMOND = [[
+  '....WW....',
+  '...WiiW...',
+  '..WiiiiW..',
+  '.WiiCCiiW.',
+  'WiiCCCCiiW',
+  'WiCCUUCCiW',
+  '.CCUUUUCC.',
+  '.CUUUUUUC.',
+  '..UUUUUU..',
+  '..UUUUUU..',
+  '...UUUU...',
+  '....UU....'
+], [
+  '....WW....',
+  '...WiiW...',
+  '..WiWWiW..',
+  '.WiiCCiiW.',
+  'WiCCiiCCiW',
+  'WiCUUUUCiW',
+  '.CUUCCUUC.',
+  '.CUUUUUUC.',
+  '..UUUUUU..',
+  '..UUUUUU..',
+  '...UUUU...',
+  '....UU....'
+]];
+
+/* 6 — steam irons. */
+var ART_IRON = [[
+  '..dddddd..',
+  '..d....d..',
+  '..dWWWWd..',
+  '..WWWWWWW.',
+  '.WWWWWWWWW',
+  'WWWWWWWWWW',
+  'wwwwwwwwww',
+  'wwwwwwwwww',
+  '.wwwwwwwww',
+  '..dddddddd',
+  '..........',
+  '..i..i..i.'
+], [
+  '..dddddd..',
+  '..d....d..',
+  '..dWWWWd..',
+  '..WWWWWWW.',
+  '.WWWWWWWWW',
+  'WWWWWWWWWW',
+  'wwwwwwwwww',
+  'wwwwwwwwww',
+  '.wwwwwwwww',
+  '..dddddddd',
+  '.i..i..i..',
+  '..........'
+]];
+
+/* 7 — bow ties. */
+var ART_BOW = [[
+  'MM......MM',
+  'MMM....MMM',
+  'MMMM..MMMM',
+  'MMMMRRMMMM',
+  'MMMRWWRMMM',
+  'MMMRWWRMMM',
+  'MMMRWWRMMM',
+  'MMMRWWRMMM',
+  'MMMMRRMMMM',
+  'MMMM..MMMM',
+  'MMM....MMM',
+  'MM......MM'
+], [
+  '.MM....MM.',
+  'MMMM..MMMM',
+  'MMMMM MMMM',
+  'MMMMRRMMMM',
+  'MMMRRWRRMM',
+  'MMRRWWRRMM',
+  'MMRRWWRRMM',
+  'MMMRRWRRMM',
+  'MMMMRRMMMM',
+  'MMMMM MMMM',
+  'MMMM..MMMM',
+  '.MM....MM.'
+]];
+
+/* 8 — space dice. */
+var ART_DICE = [[
+  '...wwww...',
+  '..wwwwww..',
+  '..wWWWWw..',
+  '..WKWWKW..',
+  '..WWWWWW..',
+  '..WWKKWW..',
+  '..WWKKWW..',
+  '..WWWWWW..',
+  '..WKWWKW..',
+  '..wWWWWw..',
+  '..wwwwww..',
+  '...wwww...'
+], [
+  '...wwww...',
+  '..wwwwww..',
+  '..wWWWWw..',
+  '..WKWWKW..',
+  '..WWWWWW..',
+  '..WKWWKW..',
+  '..WKWWKW..',
+  '..WWWWWW..',
+  '..WKWWKW..',
+  '..wWWWWw..',
+  '..wwwwww..',
+  '...wwww...'
+]];
+
+/* ---- the player's cruiser --------------------------------------------- */
+var ART_SHIP = [
+  '....WW....',
+  '....WW....',
+  '...WiiW...',
+  '...WiiW...',
+  '..WiCCiW..',
+  '..WiCCiW..',
+  '.WiCUUCiW.',
+  'WWCUUUUCWW',
+  'WNCUUUUCNW',
+  'WN.UUUU.NW',
+  'W..N..N..W',
+  '...N..N...'
+];
+
+/* ---- the missile, which is the whole game ------------------------------ */
+var ART_SHOT = [
+  '.WW.',
+  'WiiW',
+  'WiiW',
+  '.CC.',
+  '.UU.'
+];
+
+/* ---- enemy fire -------------------------------------------------------- */
+var ART_BOMB = [
+  '.MM.',
+  'MWWM',
+  'MWWM',
+  '.MM.'
+];
+
+/* ==========================================================================
+   SCREEN
+   ========================================================================== */
+var W = 160, H = 192;
+
+var screen = A.Screen({ width: W, height: H, pixelAspect: 2 });
+var ctx = screen.ctx;
+var font = A.Font();
+var audio = A.Audio({ volume: 0.2 });
+var fx = A.FX(screen, font);
+var stars = A.Stars(screen, { count: 46, groups: 4, colors: [T.white, T.greyA, T.cyanA, T.blueC] });
+var input = A.Input(screen.canvas, screen);
+
+var SP = {};
+function build2(pair) { return [A.Sprite.build(pair[0], KEY), A.Sprite.build(pair[1], KEY)]; }
+function buildArt() {
+  SP.burger  = build2(ART_BURGER);
+  SP.cookie  = build2(ART_COOKIE);
+  SP.bug     = build2(ART_BUG);
+  SP.tire    = build2(ART_TIRE);
+  SP.diamond = build2(ART_DIAMOND);
+  SP.iron    = build2(ART_IRON);
+  SP.bow     = build2(ART_BOW);
+  SP.dice    = build2(ART_DICE);
+  SP.ship    = A.Sprite.build(ART_SHIP, KEY);
+  SP.shot    = A.Sprite.build(ART_SHOT, KEY);
+  SP.bomb    = A.Sprite.build(ART_BOMB, KEY);
+}
+buildArt();
+
+/* --------------------------------------------------------------------------
+   The eight waves, in cartridge order. `pts` is the first MegaCycle's value;
+   every attacker is worth 90 from the second cycle on.
+   -------------------------------------------------------------------------- */
+var WAVES = [
+  { n: 'HAMBURGERS',   spr: 'burger',  pts: 20, motion: 'march',   count: 12, fire: 0.0016 },
+  { n: 'COOKIES',      spr: 'cookie',  pts: 30, motion: 'dip',     count: 12, fire: 0.0020 },
+  { n: 'BUGS',         spr: 'bug',     pts: 40, motion: 'skitter', count: 12, fire: 0.0024 },
+  { n: 'RADIAL TIRES', spr: 'tire',    pts: 50, motion: 'bounce',  count: 12, fire: 0.0026 },
+  { n: 'DIAMONDS',     spr: 'diamond', pts: 60, motion: 'sweep',   count: 12, fire: 0.0030 },
+  { n: 'STEAM IRONS',  spr: 'iron',    pts: 70, motion: 'step',    count: 12, fire: 0.0034 },
+  { n: 'BOW TIES',     spr: 'bow',     pts: 80, motion: 'weave',   count: 12, fire: 0.0038 },
+  { n: 'SPACE DICE',   spr: 'dice',    pts: 90, motion: 'tumble',  count: 12, fire: 0.0044 }
+];
+
+/* From the second MegaCycle the attackers come back in different colours.
+   The TIA could recolour a sprite for nothing, and the game did. */
+var CYCLE_TINTS = [null, T.cyanA, T.limeC, T.purpleA, T.orangeA, T.blueC, T.redC, T.goldC];
+
+var TOP = 16, FLOOR = 124;        /* the band the attackers live in */
+var ENERGY_MAX = 60;
+var ENERGY_FRAMES = 46;           /* frames per unit: a wave runs about 46s */
+var EXTRA_LIFE = 10000;
+
+var G = {
+  mode: 'attract', t: 0, modeT: 0,
+  score: 0, high: A.Store.get('megamania.high', 10000),
+  lives: 3, wave: 0, cycle: 0,
+  energy: ENERGY_MAX, energyT: 0,
+  nextExtra: EXTRA_LIFE,
+  shake: 0, bonusLeft: 0, bonusPaid: 0,
+  paused: false
+};
+
+var ship = { x: W / 2, alive: true, invuln: 0 };
+var SHIP_Y = 132;
+
+/* One missile. This is the game. */
+var shot = null;
+var foes = [];
+var bombs = [];
+
+/* --------------------------------------------------------------------------
+   Sound
+   -------------------------------------------------------------------------- */
+var SFX = {
+  fire:  function () { audio.tone(620, 0.06, 'square', 0.16, 980); },
+  hit:   function () { audio.noise(0.16, 0.26, 2200, 400); audio.tone(300, 0.08, 'square', 0.12, 80); },
+  bomb:  function () { audio.tone(180, 0.09, 'sawtooth', 0.10, 110); },
+  die:   function () { audio.noise(0.8, 0.42, 900, 60); audio.tone(240, 0.8, 'sawtooth', 0.18, 40); },
+  clear: function () { audio.sequence([523, 659, 784, 1047], 0.08, 0.11, 'square', 0.2); },
+  tick:  function () { audio.tone(1400, 0.02, 'square', 0.08); },
+  bonus: function () { audio.tone(900, 0.03, 'square', 0.10, 1300); },
+  extra: function () { audio.sequence([659, 784, 988, 1319], 0.07, 0.10, 'square', 0.22); },
+  low:   function () { audio.tone(140, 0.12, 'square', 0.12, 110); }
+};
+
+/* --------------------------------------------------------------------------
+   Helpers
+   -------------------------------------------------------------------------- */
+function waveDef() { return WAVES[G.wave]; }
+
+/* Twenty on the first wave, ten more each wave after, ninety for everything
+   once the first MegaCycle is behind you. */
+function enemyValue() { return G.cycle === 0 ? waveDef().pts : 90; }
+
+function speedScale() { return 1 + G.cycle * 0.16 + G.wave * 0.035; }
+
+function addScore(n, x, y) {
+  var before = G.score;
+  G.score += n;
+  if (x != null) fx.popup(x, y, String(n), T.goldC);
+  if (before < G.nextExtra && G.score >= G.nextExtra) {
+    G.lives++; G.nextExtra += EXTRA_LIFE; SFX.extra();
+  }
+  if (G.score > G.high) { G.high = G.score; A.Store.set('megamania.high', G.high); }
+}
+
+/* ==========================================================================
+   WAVES
+   ========================================================================== */
+function startWave() {
+  foes.length = 0; bombs.length = 0; shot = null;
+  fx.clear();
+  G.energy = ENERGY_MAX; G.energyT = 0;
+  var d = waveDef();
+  for (var i = 0; i < d.count; i++) {
+    foes.push({
+      i: i,
+      x: 8 + (i % 6) * 26,
+      y: TOP + Math.floor(i / 6) * 18,
+      w: 10, h: 12,
+      phase: i * 0.52,
+      vx: 0, vy: 0, step: 0, alive: true,
+      frame: 0
+    });
+  }
+  /* each motion lays its own opening formation */
+  var m = d.motion;
+  for (var k = 0; k < foes.length; k++) {
+    var f = foes[k];
+    if (m === 'march' || m === 'dip' || m === 'sweep') {
+      /* one long line that wraps around the screen */
+      f.x = ((k * 24) % (W + 24)) - 12;
+      f.y = TOP + (k >= 6 ? 20 : 0);
+      f.vx = 1;
+    } else if (m === 'bounce') {
+      f.x = 10 + (k % 6) * 25;
+      f.y = TOP + (k >= 6 ? 26 : 0);
+      f.vx = (k % 2) ? 0.6 : -0.6;
+      f.vy = 0.9;
+    } else if (m === 'weave') {
+      f.x = ((k * 22) % (W + 22)) - 11;
+      f.y = TOP + 8 + (k % 2) * 22;
+      f.vx = (k % 2) ? 1.1 : -1.1;
+    } else {
+      f.x = 6 + (k % 6) * 26;
+      f.y = TOP + Math.floor(k / 6) * 20;
+      f.vx = 1;
+    }
+  }
+}
+
+/* An attacker that reaches the floor comes back in at the top. Nothing
+   leaves the screen except by being shot. */
+function wrapFoe(f) {
+  if (f.y > FLOOR) { f.y = TOP - 10; }
+  if (f.x < -14) f.x = W + 2;
+  if (f.x > W + 14) f.x = -12;
+}
+
+function updateFoes() {
+  var d = waveDef(), s = speedScale(), m = d.motion;
+  var live = 0;
+
+  for (var i = 0; i < foes.length; i++) {
+    var f = foes[i];
+    if (!f.alive) continue;
+    live++;
+    f.frame = (G.t >> 3) & 1;
+    var t = G.t * 0.04 + f.phase;
+
+    switch (m) {
+      /* ---- hamburgers: a line that walks sideways and sinks a row each
+              time it comes back round ---------------------------------- */
+      case 'march':
+        f.x += 0.75 * s * f.vx;
+        if (f.x > W + 14 || f.x < -14) { f.y += 14; }
+        break;
+
+      /* ---- cookies: run sideways, dip toward the player, turn back.
+              This one is described in the sources, so it is literal. ---- */
+      case 'dip':
+        f.step += 1;
+        if (f.step < 70) { f.x += 0.85 * s * f.vx; }
+        else if (f.step < 100) { f.y += 1.05 * s; f.x += 0.25 * s * f.vx; }
+        else { f.vx *= -1; f.step = 0; }
+        break;
+
+      /* ---- bugs: nervy, never quite on a line ---------------------- */
+      case 'skitter':
+        f.x += (0.7 + Math.sin(t * 2.3) * 0.6) * s * f.vx;
+        f.y += (0.16 + Math.sin(t * 1.7) * 0.34) * s;
+        if (Math.random() < 0.004) f.vx *= -1;
+        break;
+
+      /* ---- radial tires: rolling, bouncing off the band ------------- */
+      case 'bounce':
+        f.x += f.vx * 0.9 * s;
+        f.y += f.vy * s;
+        if (f.y < TOP) { f.y = TOP; f.vy = Math.abs(f.vy); }
+        if (f.y > FLOOR - 22) { f.vy = -Math.abs(f.vy); }
+        if (f.x < 2 || f.x > W - 14) f.vx *= -1;
+        f.vy += 0.012 * s;
+        break;
+
+      /* ---- diamonds: fast and flat ---------------------------------- */
+      case 'sweep':
+        f.x += 1.5 * s * f.vx;
+        if (f.x > W + 14 || f.x < -14) f.y += 11;
+        break;
+
+      /* ---- steam irons: down in discrete steps, pausing between ----- */
+      case 'step':
+        f.step += s;
+        if (f.step > 44) { f.step = 0; f.y += 13; f.vx *= -1; }
+        else f.x += 0.85 * s * f.vx;
+        break;
+
+      /* ---- bow ties: two counter-running lines, weaving -------------- */
+      case 'weave':
+        f.x += f.vx * 1.15 * s;
+        f.y += Math.sin(t * 1.9) * 0.9 * s;
+        break;
+
+      /* ---- space dice: the fastest, and they come down at you ------- */
+      case 'tumble':
+        f.x += (1.2 + Math.sin(t * 1.3) * 0.7) * s * f.vx;
+        f.y += (0.30 + Math.abs(Math.sin(t * 0.9)) * 0.42) * s;
+        break;
+    }
+
+    wrapFoe(f);
+
+    if (Math.random() < d.fire * s) {
+      bombs.push({ x: f.x + 3, y: f.y + 12, vy: 1.35 + G.cycle * 0.16 });
+      SFX.bomb();
+    }
+  }
+
+  if (!live) clearedWave();
+}
+
+/* ==========================================================================
+   THE MISSILE
+   --------------------------------------------------------------------------
+   One on screen. After it leaves the ship you go on steering it, because on
+   the 2600 it stayed tied to the ship's horizontal position. That is why the
+   game is not a Space Invaders clone: a shot you have already taken is still
+   a shot you are aiming, and you cannot take another until it lands or
+   leaves. Holding fire is a real decision.
+   ========================================================================== */
+function fire() {
+  if (!ship.alive || shot) return;
+  shot = { x: ship.x, y: SHIP_Y - 6, vy: -2.6 };
+  SFX.fire();
+}
+
+function updateShot() {
+  if (!shot) return;
+  /* it goes on tracking the ship sideways for as long as it is in the air */
+  shot.x = ship.x;
+  shot.y += shot.vy;
+  if (shot.y < TOP - 14) { shot = null; return; }
+
+  for (var i = 0; i < foes.length; i++) {
+    var f = foes[i];
+    if (!f.alive) continue;
+    if (!hit(f.x + 5, f.y + 6, 6, 6, shot.x + 5, shot.y + 2, 2, 3)) continue;
+    f.alive = false;
+    shot = null;
+    fx.boom(f.x + 5, f.y + 6);
+    SFX.hit();
+    addScore(enemyValue(), f.x + 5, f.y);
+    return;
+  }
+}
+
+function updateBombs() {
+  for (var i = bombs.length - 1; i >= 0; i--) {
+    var b = bombs[i];
+    b.y += b.vy;
+    if (b.y > H) { bombs.splice(i, 1); continue; }
+    if (ship.alive && ship.invuln <= 0 &&
+        hit(b.x + 2, b.y + 2, 2, 3, ship.x + 5, SHIP_Y + 7, 4, 5)) {
+      bombs.splice(i, 1);
+      loseShip();
+      return;
+    }
+  }
+}
+
+function updateShip() {
+  if (!ship.alive) return;
+  if (ship.invuln > 0) ship.invuln--;
+  var ax = input.axis();
+  if (padActive) ax = padAxis;
+  ship.x = clamp(ship.x + ax * 1.6, 0, W - 10);
+  if (input.pressed('fire') || padFire) { fire(); padFire = false; }
+
+  /* an attacker that reaches you takes the ship with it */
+  if (ship.invuln > 0) return;
+  for (var i = 0; i < foes.length; i++) {
+    var f = foes[i];
+    if (!f.alive) continue;
+    if (hit(f.x + 5, f.y + 6, 5, 6, ship.x + 5, SHIP_Y + 7, 4, 5)) { loseShip(); return; }
+  }
+}
+
+/* ==========================================================================
+   ENERGY
+   --------------------------------------------------------------------------
+   The bar is the clock. It drains for as long as the wave is up; running it
+   out costs a ship, and whatever is left when the wave clears is paid as a
+   bonus of one attacker's value per unit.
+   ========================================================================== */
+function updateEnergy() {
+  if (++G.energyT < ENERGY_FRAMES / speedScale()) return;
+  G.energyT = 0;
+  G.energy--;
+  if (G.energy <= 10 && G.energy > 0) SFX.low();
+  if (G.energy <= 0) { G.energy = 0; loseShip(true); }
+}
+
+function clearedWave() {
+  G.mode = 'bonus'; G.modeT = 0;
+  G.bonusLeft = G.energy;
+  G.bonusPaid = 0;
+  bombs.length = 0; shot = null;
+  SFX.clear();
+}
+
+function nextWave() {
+  G.wave++;
+  if (G.wave >= WAVES.length) { G.wave = 0; G.cycle++; }
+  G.mode = 'ready'; G.modeT = 0;
+}
+
+function loseShip(outOfEnergy) {
+  if (!ship.alive) return;
+  ship.alive = false;
+  G.mode = 'dying'; G.modeT = 0;
+  G.shake = 16;
+  G.outOfEnergy = !!outOfEnergy;
+  fx.boom(ship.x + 5, SHIP_Y + 6, true);
+  SFX.die();
+}
+
+function afterDeath() {
+  G.lives--;
+  if (G.lives <= 0) { G.mode = 'over'; G.modeT = 0; return; }
+  /* the wave restarts with a full bar, as the cartridge did */
+  G.mode = 'ready'; G.modeT = 0;
+}
+
+/* ==========================================================================
+   DRAW
+   ========================================================================== */
+function tinted(spr) {
+  /* From the second MegaCycle the attackers come back recoloured. Tinting a
+     built sprite is what the TIA's colour register did for free. */
+  var c = CYCLE_TINTS[G.cycle % CYCLE_TINTS.length];
+  if (!c) return spr;
+  var key = spr._tintKey;
+  if (key !== c) { spr._tinted = A.Sprite.tint(spr, c); spr._tintKey = c; }
+  return spr._tinted;
+}
+
+function drawFoes() {
+  var pair = SP[waveDef().spr];
+  for (var i = 0; i < foes.length; i++) {
+    var f = foes[i];
+    if (!f.alive) continue;
+    A.Sprite.draw(ctx, tinted(pair[f.frame]), Math.round(f.x), Math.round(f.y));
+  }
+}
+
+function drawShip() {
+  if (!ship.alive) return;
+  if (ship.invuln > 0 && ((G.t >> 2) & 1)) return;
+  A.Sprite.draw(ctx, SP.ship, Math.round(ship.x), SHIP_Y);
+}
+
+function drawShot() {
+  if (!shot) return;
+  A.Sprite.draw(ctx, SP.shot, Math.round(shot.x + 4), Math.round(shot.y));
+  /* a thin tether back to the ship, so it is obvious the shot is still yours
+     to steer — the one piece of help the cartridge did not give you */
+  if (((G.t >> 1) & 1)) {
+    ctx.fillStyle = T.blue4;
+    var y0 = Math.round(shot.y) + 6, y1 = SHIP_Y;
+    for (var y = y0; y < y1; y += 4) ctx.fillRect(Math.round(shot.x) + 5, y, 2, 2);
+  }
+}
+
+function drawBombs() {
+  for (var i = 0; i < bombs.length; i++) {
+    A.Sprite.draw(ctx, SP.bomb, Math.round(bombs[i].x), Math.round(bombs[i].y));
+  }
+}
+
+function pad(n, w) {
+  var s = String(n);
+  while (s.length < w) s = '0' + s;
+  return s;
+}
+
+function drawHud() {
+  /* The 8x8 font is a fifth of this screen's width per five characters, so
+     the panel carries the two numbers that have to be on screen at all
+     times and nothing else. The wave's name belongs on the ready card. */
+  font.draw(ctx, pad(G.score, 6), 2, 2, T.goldC);
+  font.right(ctx, pad(G.high, 6), W - 2, 2, T.grey6);
+
+  /* the energy bar: the clock, and the wave bonus waiting to be collected */
+  var bx = 2, by = 152, bw = W - 4, bh = 8;
+  ctx.fillStyle = T.grey2;
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = T.black;
+  ctx.fillRect(bx + 1, by + 1, bw - 2, bh - 2);
+  var inner = bw - 2;
+  var filled = Math.round(inner * (G.energy / ENERGY_MAX));
+  ctx.fillStyle = G.energy > 20 ? T.green8 : (G.energy > 10 ? T.goldC : T.red8);
+  ctx.fillRect(bx + 1, by + 1, filled, bh - 2);
+  /* six divisions, so "units remaining" is something you can read at a
+     glance rather than a smooth bar that tells you nothing */
+  ctx.fillStyle = T.black;
+  for (var u = 1; u < 6; u++) ctx.fillRect(bx + 1 + Math.round(inner * u / 6), by + 1, 1, bh - 2);
+
+  /* ships in hand on the left, the MegaCycle on the right */
+  for (var i = 0; i < Math.min(G.lives - 1, 4); i++) {
+    A.Sprite.draw(ctx, SP.ship, 3 + i * 13, 168);
+  }
+  font.right(ctx, 'X' + (G.cycle + 1), W - 2, 172, T.purpleA);
+}
+
+/* ==========================================================================
+   SCREENS
+   ========================================================================== */
+function drawPlayfield() {
+  screen.clear(T.black);
+  stars.draw();
+  drawFoes();
+  drawBombs();
+  drawShot();
+  drawShip();
+  fx.draw();
+  drawHud();
+}
+
+function drawReady() {
+  drawPlayfield();
+  ctx.fillStyle = 'rgba(0,0,0,0.78)';
+  ctx.fillRect(0, 54, W, 56);
+  font.center(ctx, 'WAVE ' + (G.cycle * 8 + G.wave + 1), W, 58, T.white);
+  font.center(ctx, waveDef().n, W, 72, T.goldC);
+  font.center(ctx, enemyValue() + ' EACH', W, 86, T.grey8);
+  if (G.modeT > 40 && ((G.t >> 3) & 1)) font.center(ctx, 'READY', W, 100, T.red8);
+}
+
+function drawBonus() {
+  drawPlayfield();
+  ctx.fillStyle = 'rgba(0,0,0,0.78)';
+  ctx.fillRect(0, 58, W, 48);
+  font.center(ctx, 'WAVE CLEARED', W, 62, T.white);
+  font.center(ctx, 'ENERGY ' + pad(G.bonusLeft, 2), W, 76, T.green8);
+  font.center(ctx, 'BONUS ' + pad(G.bonusPaid, 5), W, 90, T.goldC);
+}
+
+function drawDying() {
+  drawPlayfield();
+  if (G.outOfEnergy) font.center(ctx, 'OUT OF ENERGY', W, 84, T.red8);
+}
+
+var ATTRACT_PAGES = 3;
+
+function drawAttract() {
+  screen.clear(T.black);
+  stars.draw();
+  var page = Math.floor(G.modeT / 280) % ATTRACT_PAGES;
+
+  font.center(ctx, 'MEGAMANIA', W, 16, T.redC, 1);
+  font.center(ctx, 'ACTIVISION  1982', W, 28, T.grey6);
+
+  if (page === 0) {
+    font.center(ctx, 'A SPACE NIGHTMARE', W, 48, T.cyanA);
+    /* the ship, big, with the eight things that want it */
+    var row = ['burger', 'cookie', 'bug', 'tire', 'diamond', 'iron', 'bow', 'dice'];
+    for (var i = 0; i < 8; i++) {
+      A.Sprite.draw(ctx, SP[row[i]][(G.t >> 3) & 1], 8 + (i % 4) * 38, 64 + Math.floor(i / 4) * 16);
+    }
+    A.Sprite.draw(ctx, SP.ship, W / 2 - 5, 104);
+    font.center(ctx, 'THEY DO NOT LEAVE', W, 124, T.grey8);
+    font.center(ctx, 'THEY COME BACK', W, 136, T.grey8);
+  } else if (page === 1) {
+    font.center(ctx, 'ONE MISSILE', W, 48, T.goldC);
+    font.center(ctx, 'STEER IT AFTER', W, 66, T.white);
+    font.center(ctx, 'YOU FIRE IT', W, 76, T.white);
+    /* a little diagram of the mechanic */
+    A.Sprite.draw(ctx, SP.ship, W / 2 - 5 + Math.round(Math.sin(G.t * 0.04) * 26), 126);
+    var sx = W / 2 - 2 + Math.round(Math.sin(G.t * 0.04) * 26);
+    A.Sprite.draw(ctx, SP.shot, sx, 100);
+    ctx.fillStyle = T.blue4;
+    for (var y = 108; y < 126; y += 4) ctx.fillRect(sx + 1, y, 2, 2);
+    font.center(ctx, 'ONLY ONE AT A TIME', W, 150, T.grey6);
+  } else {
+    font.center(ctx, 'SCORE TABLE', W, 42, T.goldC);
+    for (var k = 0; k < WAVES.length; k++) {
+      var y = 54 + k * 12;
+      A.Sprite.draw(ctx, SP[WAVES[k].spr][0], 14, y - 1);
+      font.draw(ctx, WAVES[k].n, 30, y, T.grey8);
+      font.right(ctx, String(WAVES[k].pts), W - 6, y, T.white);
+    }
+    font.center(ctx, 'THEN 90 EACH', W, 152, T.purpleA);
+  }
+
+  if (((G.t >> 4) & 1)) font.center(ctx, 'PRESS START', W, H - 32, T.goldC);
+  font.center(ctx, 'HIGH ' + pad(G.high, 6), W, H - 21, T.white);
+  font.center(ctx, 'A TRIBUTE ONLY', W, H - 10, '#2a2a38');
+}
+
+function drawOver() {
+  drawPlayfield();
+  font.center(ctx, 'GAME OVER', W, 80, T.redC);
+  if (G.score >= 45000) font.center(ctx, 'MEGAMANIAC', W, 96, ((G.t >> 3) & 1) ? T.goldE : T.orangeA);
+  if (G.modeT > 120 && ((G.t >> 4) & 1)) font.center(ctx, 'PRESS START', W, 118, T.goldC);
+}
+
+/* ==========================================================================
+   LOOP
+   ========================================================================== */
+function startGame() {
+  G.score = 0; G.lives = 3; G.wave = 0; G.cycle = 0;
+  G.nextExtra = EXTRA_LIFE;
+  G.mode = 'ready'; G.modeT = 0;
+}
+
+function update() {
+  G.t++; G.modeT++;
+  if (G.shake > 0) G.shake--;
+  stars.update();
+  fx.update();
+
+  if (input.pressed('p') || input.pressed('P')) {
+    if (G.mode === 'play') G.paused = !G.paused;
+  }
+
+  switch (G.mode) {
+    case 'attract':
+      if (input.pressed('start') || input.pressed('fire') || input.pressed('tap')) {
+        audio.set(true); startGame();
+      }
+      break;
+
+    case 'ready':
+      if (G.modeT === 1) {
+        startWave();
+        ship.x = W / 2 - 5; ship.alive = true; ship.invuln = 70;
+      }
+      if (G.modeT > 90) { G.mode = 'play'; G.modeT = 0; }
+      break;
+
+    case 'play':
+      if (G.paused) break;
+      updateShip();
+      updateShot();
+      updateBombs();
+      updateFoes();
+      if (G.mode === 'play') updateEnergy();
+      break;
+
+    case 'bonus':
+      /* the bar is counted out a unit at a time, the way it was on screen */
+      if (G.modeT > 30 && G.modeT % 4 === 0 && G.bonusLeft > 0) {
+        G.bonusLeft--;
+        G.bonusPaid += enemyValue();
+        addScore(enemyValue());
+        G.energy = G.bonusLeft;
+        SFX.bonus();
+      }
+      if (G.bonusLeft <= 0 && G.modeT > 90) nextWave();
+      break;
+
+    case 'dying':
+      updateBombs();
+      if (G.modeT > 100) afterDeath();
+      break;
+
+    case 'over':
+      if (G.modeT > 120 && (input.pressed('start') || input.pressed('fire') || input.pressed('tap'))) {
+        G.mode = 'attract'; G.modeT = 0;
+        foes.length = 0; bombs.length = 0; shot = null; fx.clear();
+      }
+      break;
+  }
+
+  input.endFrame();
+}
+
+function render() {
+  ctx.save();
+  if (G.shake > 0) ctx.translate(Math.round(rnd(-1, 1) * G.shake * 0.16), Math.round(rnd(-1, 1) * G.shake * 0.16));
+  switch (G.mode) {
+    case 'attract': drawAttract(); break;
+    case 'ready':   drawReady(); break;
+    case 'bonus':   drawBonus(); break;
+    case 'dying':   drawDying(); break;
+    case 'over':    drawOver(); break;
+    default:        drawPlayfield(); break;
+  }
+  if (G.paused && G.mode === 'play') {
+    font.center(ctx, 'PAUSED', W, H / 2, ((G.t >> 3) & 1) ? T.white : T.goldC);
+  }
+  ctx.restore();
+}
+
+/* ==========================================================================
+   CABINET AND TOUCH
+   ========================================================================== */
+var cab = A.Cabinet(document.getElementById('mount'), screen, { crt: false });
+cab.addSoundButton(audio);
+cab.addCrtButton();
+cab.button('Pause', null, function () { if (G.mode === 'play') G.paused = !G.paused; });
+cab.autoFit(210);
+
+/* The 2600 shipped with a joystick, so the touch control is a horizontal
+   slide rather than a pair of buttons: steering the missile wants a
+   proportional input, not a d-pad. */
+var padAxis = 0, padActive = false, padFire = false;
+(function touch() {
+  var sl = document.getElementById('slider');
+  var knob = document.getElementById('knob');
+  var fireBtn = document.getElementById('fire');
+  if (!sl) return;
+  var id = null;
+
+  function set(ev) {
+    var r = sl.getBoundingClientRect();
+    var u = clamp((ev.clientX - r.left) / r.width, 0, 1);
+    /* absolute: the ship goes where your thumb is, which is how you steer a
+       missile you have already fired */
+    ship.x = clamp(u * (W - 10), 0, W - 10);
+    padAxis = 0; padActive = true;
+    knob.style.left = (u * 100) + '%';
+  }
+  sl.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); id = e.pointerId; sl.setPointerCapture(id); audio.resume(); set(e);
+  });
+  sl.addEventListener('pointermove', function (e) { if (e.pointerId === id) { e.preventDefault(); set(e); } });
+  function rel() { id = null; padActive = false; }
+  sl.addEventListener('pointerup', rel);
+  sl.addEventListener('pointercancel', rel);
+
+  fireBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); audio.resume(); padFire = true;
+    if (G.mode === 'attract' || G.mode === 'over') input.tapFire();
+  });
+})();
+
+screen.canvas.addEventListener('pointerdown', function () {
+  audio.resume();
+  if (G.mode === 'attract') { audio.set(true); startGame(); }
+  else if (G.mode === 'over' && G.modeT > 120) { G.mode = 'attract'; G.modeT = 0; }
+});
+
+/* A preview hook and a probe for the headless tests, as in the other
+   cabinets. Nothing in the game reads either. */
+function jumpTo(wave, cycle) {
+  G.wave = wave || 0; G.cycle = cycle || 0;
+  G.lives = 3; G.mode = 'ready'; G.modeT = 0;
+}
+
+window.__mm = {
+  go: jumpTo,
+  state: G,
+  sprites: SP,
+  waves: WAVES,
+  probe: {
+    go: jumpTo,
+    reset: function () { G.score = 0; G.lives = 3; G.wave = 0; G.cycle = 0; G.nextExtra = EXTRA_LIFE; },
+    pump: function (n) { for (var i = 0; i < (n || 1); i++) update(); },
+    fire: fire,
+    shot: function () { return shot; },
+    ship: function () { return ship; },
+    shipX: function (x) { ship.x = x; },
+    invuln: function (v) { ship.invuln = v; },
+    foes: function () { return foes; },
+    bombs: function () { return bombs; },
+    value: enemyValue,
+    energy: function (v) { if (v != null) G.energy = v; return G.energy; },
+    killAll: function () { for (var i = 0; i < foes.length; i++) foes[i].alive = false; }
+  }
+};
+
+A.Loop(update, render, 60).start();
+}
+</script>
+</body>
+</html>
