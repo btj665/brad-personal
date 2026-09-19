@@ -667,7 +667,7 @@ var G = {
   score: 0, high: A.Store.get('gorf.high', 5000),
   lives: 3, rank: 0, tour: 0, mission: 0, nextExtra: EXTRA_LIFE,
   shake: 0, flash: 0,
-  paused: false,
+  paused: false, resume: false,
   attractPhase: 0
 };
 
@@ -1370,7 +1370,7 @@ function clearField() {
 
 function startMission() {
   clearField();
-  ship.x = W / 2; ship.y = H - 34; ship.alive = true; ship.invuln = 90;
+  respawnShip();
   var m = MISSIONS[G.mission];
   if (m.key === 'astro') startAstro();
   else if (m.key === 'laser') startLaser();
@@ -1379,13 +1379,46 @@ function startMission() {
   else startFlag();
 }
 
+function respawnShip() {
+  ship.x = W / 2; ship.y = H - 34; ship.alive = true; ship.invuln = 90;
+}
+
+/* Coming back after a lost ship is not the same as arriving at a mission.
+   The mission carries on against whatever is left of it: the invaders you
+   already shot stay shot, the force field stays where you wore it down, and
+   the Flag Ship keeps the hull you cut off it. */
+function resumeMission() {
+  respawnShip();
+  eshots.length = 0;
+  shot = null;
+  debris.length = 0;
+  fx.clear();
+  /* Whatever killed you is still there. If it killed you by arriving at the
+     bottom of the screen it will do it again the moment the spawn shield
+     drops, and take every remaining ship in a row, so the attack is pushed
+     back up to give you the room the original board gave you. */
+  if (flag) {
+    flag.descend = Math.max(0, flag.descend - 46);
+    flag.y = 62 + flag.descend;
+  }
+  for (var i = 0; i < foes.length; i++) {
+    var f = foes[i];
+    if (!f.alive) continue;
+    if (f.kind === 'inv' && f.y > H - 96) f.y -= 34;
+    if (f.state === 'dive') { f.state = 'formation'; f.y = -14; }
+    if (f.kind === 'warper' && f.y > H * 0.7) f.alive = false;
+  }
+}
+
 function missionCleared() {
+  G.resume = false;
   G.mode = 'clear'; G.modeT = 0;
   SFX.clear();
   if (MISSIONS[G.mission].key !== 'flag') taunt('clear');
 }
 
 function advanceMission() {
+  G.resume = false;
   G.mission++;
   if (G.mission >= MISSIONS.length) {
     G.mission = 0; G.tour++;
@@ -1416,7 +1449,7 @@ function afterDeath() {
     taunt('over');
     return;
   }
-  /* the mission restarts from the top, as it did on the board */
+  G.resume = true;
   G.mode = 'brief'; G.modeT = 0;
 }
 
@@ -1780,6 +1813,7 @@ function drawOver() {
    ========================================================================== */
 function startGame() {
   G.score = 0; G.lives = 3; G.rank = 0; G.tour = 0; G.mission = 0;
+  G.resume = false;
   G.nextExtra = EXTRA_LIFE;
   G.mode = 'brief'; G.modeT = 0;
   taunt('start');
@@ -1805,7 +1839,10 @@ function update() {
       break;
 
     case 'brief':
-      if (G.modeT === 1) startMission();
+      if (G.modeT === 1) {
+        if (G.resume) { G.resume = false; resumeMission(); }
+        else startMission();
+      }
       if (G.modeT > 110) { G.mode = 'play'; G.modeT = 0; }
       break;
 
@@ -1945,13 +1982,15 @@ window.__gorf = {
   say: function (t) { audio.set(true); voice.say(t); },
   probe: {
     go: jumpTo,
-    reset: function () { G.score = 0; G.lives = 3; G.rank = 0; G.tour = 0; G.mission = 0; },
+    reset: function () { G.score = 0; G.lives = 3; G.rank = 0; G.tour = 0; G.mission = 0; G.resume = false; },
     pump: function (n) { for (var i = 0; i < (n || 1); i++) update(); },
     fire: fire,
     shot: function () { return shot; },
     shotAt: function (x, y) { shot = { x: x, y: y, vy: -4.2 }; },
     shipY: function () { return ship.y; },
     shipAt: function (x, y) { ship.x = x; ship.y = y; ship.invuln = 9999; },
+    invuln: function (v) { ship.invuln = v; },
+    lives: function (v) { if (v != null) G.lives = v; return G.lives; },
     fieldSeg: function (i) { return field ? field.segs[i] : null; },
     enemyShotAt: function (x, y, vy) { enemyShot(x, y, 0, vy == null ? 1.5 : vy); },
     eshots: function () { return eshots; },

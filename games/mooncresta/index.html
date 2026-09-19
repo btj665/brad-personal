@@ -423,7 +423,7 @@ var G = {
   wave: 0, lap: 0,
   nextExtra: 30000,
   shake: 0, paused: false,
-  dockT: 0, dockBonus: 0, dockOk: false,
+  dockT: 0, dockBonus: 0, dockOk: false, resume: false,
   waveTimer: 0
 };
 
@@ -566,16 +566,22 @@ function layout(f, i, d) {
 function updateWave() {
   var d = waveDef(), s = speed();
   G.waveTimer++;
-  var live = 0, k = d.k;
+  var live = 0;
 
   for (var i = 0; i < foes.length; i++) {
     var f = foes[i];
     if (!f.alive) continue;
     live++;
+    /* Switch on what this thing is, not on what the wave is. A Cold Eye
+       that has been shot leaves behind halves, and running those through
+       the Cold Eye case sent them into the dive code, which reads fields a
+       half does not have: they went to NaN, became invisible and
+       unkillable, and the wave could never end. */
+    if (f.kind === 'eyeHalf') continue;      /* updateHalves moves these */
     f.t += s;
     f.frame = (G.t >> 3) & 1;
 
-    switch (k) {
+    switch (f.kind) {
       /* ---- Cold Eyes: slide into the block, hold, then peel off ------ */
       case 'eye':
         if (f.state === 'enter') {
@@ -768,6 +774,7 @@ function failDock(why) {
 }
 
 function afterDocking() {
+  G.resume = false;
   G.wave++;
   if (G.wave >= WAVES.length) rollLap();
   else { G.mode = 'ready'; G.modeT = 0; }
@@ -776,6 +783,7 @@ function afterDocking() {
 /* At the end of a lap the rocket comes apart again and you fly the sections
    one at a time from the nose, exactly as at the start. */
 function rollLap() {
+  G.resume = false;
   var all = rocket.stack.concat(rocket.reserve);
   rocket.stack = [all[0]];
   rocket.reserve = all.slice(1);
@@ -889,6 +897,9 @@ function afterDeath() {
   }
   rocket.alive = true; rocket.invuln = 90;
   rocket.x = W / 2;
+  /* You come back into the wave you were in, against what is left of it.
+     Losing a section is not a reason for the survivors to be replaced. */
+  G.resume = true;
   G.mode = 'ready'; G.modeT = 0;
 }
 
@@ -913,6 +924,7 @@ function clearedWave() {
 }
 
 function advance() {
+  G.resume = false;
   if (DOCK_AFTER.indexOf(G.wave) >= 0 && rocket.reserve.length) { startDocking(); return; }
   G.wave++;
   if (G.wave >= WAVES.length) rollLap();
@@ -1130,6 +1142,7 @@ function drawAttract() {
    ========================================================================== */
 function startGame() {
   G.score = 0; G.wave = 0; G.lap = 0; G.nextExtra = 30000;
+  G.resume = false;
   rocket.stack = [0]; rocket.reserve = [1, 2];
   rocket.x = W / 2; rocket.alive = true; rocket.invuln = 90;
   shots.length = 0; bolts.length = 0; foes.length = 0;
@@ -1156,7 +1169,24 @@ function update() {
 
     case 'ready':
       if (G.modeT === 1) {
-        startWave();
+        if (G.resume) {
+          /* Coming back after a lost section: the survivors stay, but a
+             diver already on top of you is sent back to its slot rather
+             than being allowed to take the next section too. */
+          G.resume = false;
+          bolts.length = 0; shots.length = 0;
+          for (var q = 0; q < foes.length; q++) {
+            var fq = foes[q];
+            if (!fq.alive) continue;
+            if (fq.kind === 'eyeHalf') { if (fq.y > 150) fq.alive = false; continue; }
+            if (fq.state === 'dive' || fq.y > 150) {
+              fq.state = 'hold'; fq.dt = 0; fq.t = 0;
+              fq.x = fq.hx; fq.y = fq.hy;
+            }
+          }
+        } else {
+          startWave();
+        }
         rocket.alive = true;
         if (rocket.invuln < 60) rocket.invuln = 60;
       }
@@ -1297,7 +1327,7 @@ window.__mc = {
   probe: {
     go: jumpTo,
     reset: function () {
-      G.score = 0; G.wave = 0; G.lap = 0; G.nextExtra = 30000;
+      G.score = 0; G.wave = 0; G.lap = 0; G.nextExtra = 30000; G.resume = false;
       rocket.stack = [0]; rocket.reserve = [1, 2];
       rocket.x = W / 2; rocket.alive = true; rocket.invuln = 0;
       shots.length = 0; bolts.length = 0; foes.length = 0; dockUnit = null;

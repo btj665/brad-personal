@@ -90,6 +90,17 @@ in challenging stages as first assumed, and the squadron bonuses are
    just the title screen. Both real bugs in the Galaga build — sprites reading
    as thin X shapes, a tractor beam hovering at the wrong height — were
    invisible in the code and obvious in one frame.
+8. **Clear every wave the way a player does.** Not with a `killAll` helper.
+   Moon Cresta shipped with its first wave unclearable: a shot Cold Eye
+   leaves two halves behind, the wave update switched on the *wave's* kind
+   rather than each attacker's own, so the halves ran the Cold Eye dive code,
+   read fields they do not have, went to `NaN`, and became invisible and
+   unkillable. Every mechanics test passed, because every one of them cleared
+   waves by setting `alive = false` in a loop.
+9. **Lose a life on purpose and look at what comes back.** All three of
+   Gorf, Megamania and Moon Cresta rebuilt the entire wave when the player
+   died, so shooting two thirds of a formation and then getting hit put all
+   of it back. None of the tests covered dying, so none of them caught it.
 
 ## Engine reference
 
@@ -142,6 +153,26 @@ art:
 Find that rule in the research before writing the wave code, because the
 rest of the game is built around it. In all three cases it was the thing
 most easily missed and the thing that makes the game feel like itself.
+
+## Dying is not restarting
+
+Losing a ship returns you to the wave you were in, against whatever is left
+of it. The attackers you already shot stay shot; Gorf's force field stays
+worn where you wore it; the Flag Ship keeps the hull you cut off it;
+Megamania's energy bar is *not* refilled, because it refills when a wave is
+cleared and not when a ship is lost.
+
+Two things this does need:
+
+- **Clear the resume flag on every path into a fresh wave** — new game, next
+  wave, next lap, after a docking. A stale flag skips building the wave and
+  the game clears an empty screen.
+- **Make room for the ship that is coming back.** Whatever killed you is
+  still there, and if it killed you by reaching the bottom of the screen it
+  will do it again the moment the spawn shield drops and take every
+  remaining life in a row. Push the attack back up: Gorf backs the Flag
+  Ship's descent off and lifts the invader block, Moon Cresta sends divers
+  back to their slots, Megamania returns anything near the floor to the top.
 
 ## Pixels that are not square
 

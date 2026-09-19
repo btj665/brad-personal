@@ -478,7 +478,7 @@ var G = {
   energy: ENERGY_MAX, energyT: 0,
   nextExtra: EXTRA_LIFE,
   shake: 0, bonusLeft: 0, bonusPaid: 0,
-  paused: false
+  paused: false, resume: false, outOfEnergy: false
 };
 
 var ship = { x: W / 2, alive: true, invuln: 0 };
@@ -742,6 +742,7 @@ function updateEnergy() {
 }
 
 function clearedWave() {
+  G.resume = false;
   G.mode = 'bonus'; G.modeT = 0;
   G.bonusLeft = G.energy;
   G.bonusPaid = 0;
@@ -750,6 +751,7 @@ function clearedWave() {
 }
 
 function nextWave() {
+  G.resume = false;
   G.wave++;
   if (G.wave >= WAVES.length) { G.wave = 0; G.cycle++; }
   G.mode = 'ready'; G.modeT = 0;
@@ -768,7 +770,13 @@ function loseShip(outOfEnergy) {
 function afterDeath() {
   G.lives--;
   if (G.lives <= 0) { G.mode = 'over'; G.modeT = 0; return; }
-  /* the wave restarts with a full bar, as the cartridge did */
+  /* The wave carries on against what is left of it. The attackers you
+     already shot stay shot, and the bar is not refilled — it refills when
+     the wave is cleared, not when a ship is lost. The one exception is
+     running the bar to empty, which would otherwise put you straight back
+     into an empty bar and take every remaining ship in a row. */
+  G.resume = true;
+  if (G.outOfEnergy) { G.energy = ENERGY_MAX; G.energyT = 0; }
   G.mode = 'ready'; G.modeT = 0;
 }
 
@@ -950,6 +958,7 @@ function drawOver() {
    ========================================================================== */
 function startGame() {
   G.score = 0; G.lives = 3; G.wave = 0; G.cycle = 0;
+  G.resume = false;
   G.nextExtra = EXTRA_LIFE;
   G.mode = 'ready'; G.modeT = 0;
 }
@@ -973,7 +982,16 @@ function update() {
 
     case 'ready':
       if (G.modeT === 1) {
-        startWave();
+        if (G.resume) {
+          G.resume = false;
+          bombs.length = 0; shot = null; fx.clear();
+          /* the survivors stay, but nothing gets to be sitting on the spawn
+             point when the shield drops */
+          for (var q = 0; q < foes.length; q++) {
+            if (foes[q].alive && foes[q].y > FLOOR - 40) foes[q].y = TOP;
+          }
+        }
+        else startWave();
         ship.x = W / 2 - 5; ship.alive = true; ship.invuln = 70;
       }
       if (G.modeT > 90) { G.mode = 'play'; G.modeT = 0; }
@@ -1096,7 +1114,7 @@ window.__mm = {
   waves: WAVES,
   probe: {
     go: jumpTo,
-    reset: function () { G.score = 0; G.lives = 3; G.wave = 0; G.cycle = 0; G.nextExtra = EXTRA_LIFE; },
+    reset: function () { G.score = 0; G.lives = 3; G.wave = 0; G.cycle = 0; G.nextExtra = EXTRA_LIFE; G.resume = false; },
     pump: function (n) { for (var i = 0; i < (n || 1); i++) update(); },
     fire: fire,
     shot: function () { return shot; },
