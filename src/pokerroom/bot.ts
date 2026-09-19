@@ -23,7 +23,8 @@ import { rankValue } from '../poker/eval'
 import type { Card } from '../engine/types'
 import type { BotBrain, BotDraw, PokerGame } from './engine'
 import { estimateEquity } from './equity'
-import type { Action, BotProfile, Options, Seat } from './types'
+import { ranker } from './ranker'
+import type { Action, BotProfile, Options, Seat, Variant } from './types'
 
 /** Sample budgets, exposed so tests can turn them down for speed. Higher is
  *  steadier; the defaults keep a full autonomous table brisk. */
@@ -106,15 +107,53 @@ interface SizingCtx {
   aggression: number
 }
 
-/** A pot-proportional bet or raise, clamped into the legal window (which also
- *  makes it exactly the fixed increment in a limit game and caps it at the pot in
- *  pot-limit). `to` is the total street commitment, as the engine expects. */
-function sized(opt: Options, ctx: SizingCtx, mode: 'value' | 'bluff'): Action {
+/** Only jam the stack in with a near-lock. Below this, a bot caps how much of its
+ *  stack a single raise commits, so a pot-sized bet on a short stack turns into a
+ *  measured raise instead of an all-in shove of a hand it has no business shoving. */
+const SHOVE_STRENGTH = 0.82
+
+/** A pot-proportional bet or raise, clamped into the legal window AND capped by how
+ *  much of the stack the hand's strength justifies committing. Returns null when a
+ *  legal raise couldn't be made without over-committing — the caller then just
+ *  calls or checks rather than being forced all-in. `to` is the total street
+ *  commitment, as the engine expects. */
+function sizedOrNull(
+  opt: Options,
+  ctx: SizingCtx,
+  mode: 'value' | 'bluff',
+  seat: Seat,
+  strength: number,
+): Action | null {
   const potAfterCall = ctx.pot + ctx.callAmount
   const frac = mode === 'value' ? 0.5 + 0.25 * ctx.aggression : 0.45 + 0.1 * ctx.aggression
   const raiseBy = Math.max(1, Math.round(frac * potAfterCall))
-  const to = clamp(ctx.currentBet + raiseBy, opt.minTo, opt.maxTo)
+  let to = clamp(ctx.currentBet + raiseBy, opt.minTo, opt.maxTo)
+
+  // How much of the stack this hand is willing to put in on this raise: a bluff
+  // risks little, a strong hand more, and only a near-lock the whole stack.
+  const commitCap =
+    mode === 'bluff'
+      ? 0.35
+      : strength >= SHOVE_STRENGTH
+        ? 1
+        : clamp((strength - 0.45) * 1.7, 0.3, 0.9)
+  const capTo = seat.streetCommitted + Math.round(commitCap * seat.stack)
+  to = Math.min(to, capTo)
+
+  // If even the minimum legal raise would blow past the cap, don't raise at all.
+  if (to < opt.minTo) return null
+  to = clamp(to, opt.minTo, opt.maxTo)
   return { kind: opt.canBet ? 'bet' : 'raise', to }
+}
+
+/** True when the hero is "playing the board": its two hole cards add nothing to
+ *  the best five the community already makes, so at showdown it can only chop.
+ *  A hand like this should never build a pot — the shove-with-a-board-pair play a
+ *  human would wince at. Only meaningful in Hold'em with a complete board; in
+ *  Omaha you must use two hole cards, and Stud and Draw have no shared board. */
+function playsBoard(hole: Card[], board: Card[], variant: Variant): boolean {
+  if (variant.family !== 'holdem' || board.length < 5) return false
+  return ranker.score(hole, board, variant).rank <= ranker.score([], board, variant).rank
 }
 
 /** When nothing else is right, check if it's free, otherwise fold — the play
@@ -137,7 +176,11 @@ export const pokerBrain: BotBrain = (game, seat, opt) => {
   const profile: BotProfile = seat.bot ?? { looseness: 0.4, aggression: 0.3, bluff: 0.05, quips: [] }
   const rng = makeRng(decisionSeed(game, seat, 1))
   const nOpp = liveOpponents(game, seat)
+  const hole = seat.cards.map((c) => c.card)
   const { strength, junk } = assess(game, seat, nOpp, profile)
+  // A hand is weak — never worth building a pot with — when it's trash, near-dead,
+  // or nothing but the community cards. Weak hands only ever check or fold.
+  const weak = junk || playsBoard(hole, game.board, game.variant)
 
   const price = opt.callAmount > 0 ? opt.callAmount / (game.pot + opt.callAmount) : 0
   const ctx: SizingCtx = {
@@ -151,22 +194,26 @@ export const pokerBrain: BotBrain = (game, seat, opt) => {
   // aggression means it needs to be a touch less strong.
   const valueThresh = clamp(0.6 + 0.05 * (nOpp - 1) - profile.aggression * 0.12, 0.5, 0.9)
   const callSlack = 0.02 + profile.looseness * 0.07
+  const canAggress = opt.canBet || opt.canRaise
 
-  if (opt.canCheck) {
-    if (!junk && strength >= valueThresh && (opt.canBet || opt.canRaise)) return sized(opt, ctx, 'value')
-    if (!junk && (opt.canBet || opt.canRaise) && strength >= 0.35 && rng.next() < profile.bluff) {
-      return sized(opt, ctx, 'bluff')
-    }
-    return { kind: 'check' }
+  // Raise for value when strong enough — but only at a size the hand justifies. If
+  // the sizing would force an over-commitment, fall through to a call or check.
+  if (!weak && strength >= valueThresh && canAggress) {
+    const bet = sizedOrNull(opt, ctx, 'value', seat, strength)
+    if (bet) return bet
+  }
+  // A disciplined bluff now and then — never a shove (its cap is small), and never
+  // with nothing but the board.
+  if (!weak && canAggress && strength >= 0.4 && rng.next() < profile.bluff) {
+    const bluff = sizedOrNull(opt, ctx, 'bluff', seat, strength)
+    if (bluff) return bluff
   }
 
-  // Facing a bet: raise the strong, call when the price is right, and fold the
-  // rest — with the occasional bluff-raise so we're not transparent.
-  if (!junk && strength >= valueThresh && opt.canRaise) return sized(opt, ctx, 'value')
-  if (!junk && strength >= price - callSlack) return { kind: 'call' }
-  if (!junk && opt.canRaise && strength >= 0.3 && rng.next() < profile.bluff * 0.7) {
-    return sized(opt, ctx, 'bluff')
-  }
+  // Nothing to raise: take the free card if there is one.
+  if (opt.canCheck) return { kind: 'check' }
+
+  // Facing a bet: call when the hand can continue at the price, otherwise fold.
+  if (!weak && strength >= price - callSlack) return { kind: 'call' }
   return opt.canFold ? { kind: 'fold' } : fallback(opt)
 }
 

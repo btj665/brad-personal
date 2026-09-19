@@ -60,6 +60,16 @@ describe('the bot — hand reading', () => {
     // No pair, no draw, worst kicker, board threatening a flush and a straight.
     expect(spot('3h4d', 'AsKsQsJs2h', 200, 600, 'river').action.kind).toBe('fold')
   })
+
+  it('will not build a pot with nothing but the board', () => {
+    // The board is two pair, kings and queens with a seven; the 2-3 in hand can't
+    // beat the seven, so the hero is playing the board — a chop at best. Facing a
+    // bet it folds rather than calling off, and it never raises (let alone shoves).
+    const facing = spot('2c3d', 'KsKdQhQc7s', 200, 600, 'river').action
+    expect(facing.kind).toBe('fold')
+    const open = spot('2c3d', 'KsKdQhQc7s', 0, 200, 'river').action
+    expect(open.kind).toBe('check')
+  })
 })
 
 describe('the bot — legality', () => {
