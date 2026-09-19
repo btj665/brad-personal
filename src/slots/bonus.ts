@@ -110,6 +110,39 @@ function playHoldSpin(
   }
 }
 
+/** The banker calls with an offer, then another, then another. Every offer in the
+ *  run is drawn up front, off the seeded stream, before the player is asked
+ *  anything — so like every other round in here the total is already decided and
+ *  the clicks only choose where the reveal stops. The take/pass decision is then
+ *  made for the player by the optimal rule (`offerStageValues`), which is what lets
+ *  the round quote a return the way video poker does: under best play. */
+function playOffer(bonus: Extract<Bonus, { kind: 'offer' }>, stake: number, rng: Rng): BonusPlay {
+  // Pre-draw the whole run. `weighted` reads the same stream the rest of the
+  // cabinet does, so an offer round replays exactly with the spin that bought it.
+  const drawn: number[] = []
+  for (let i = 0; i < bonus.offers; i++) drawn.push(weighted(bonus.pool, rng))
+
+  // Where optimal play stops: take the first offer that is at least what passing
+  // is worth (the value of continuing, `stage[i + 1]`); the last offer is forced.
+  const stage = offerStageValues(bonus)
+  let taken = bonus.offers - 1
+  for (let i = 0; i < bonus.offers - 1; i++) {
+    if (drawn[i] >= stage[i + 1]) {
+      taken = i
+      break
+    }
+  }
+
+  return {
+    kind: 'offer',
+    paid: drawn[taken] * stake,
+    // Everything the banker put on the table up to and including the one taken,
+    // then the offers the player walked away from — the sting playPick shows too.
+    reveals: drawn.slice(0, taken + 1).map((v) => v * stake),
+    missed: drawn.slice(taken + 1).map((v) => v * stake),
+  }
+}
+
 /** Play whichever bonus this is. `seeded` is how many trigger symbols were on the
  *  screen, which hold-and-spin starts from and the others ignore. */
 export function playBonus(
@@ -126,6 +159,8 @@ export function playBonus(
       return playPick(bonus, stake, rng)
     case 'holdSpin':
       return playHoldSpin(bonus, stake, cells, seeded, rng)
+    case 'offer':
+      return playOffer(bonus, stake, rng)
   }
 }
 
@@ -148,4 +183,36 @@ export function wheelValue(bonus: Extract<Bonus, { kind: 'wheel' }>): number {
 export function pickValue(bonus: Extract<Bonus, { kind: 'pick' }>): number {
   const pool = bonus.prizes.reduce((a, b) => a + b, 0)
   return pool / (bonus.enders + 1)
+}
+
+/** The value of an offer round from each stage onward, under optimal stopping, in
+ *  multiples of the stake. `stage[i]` is what the round is worth to a player about
+ *  to see the (i + 1)-th offer.
+ *
+ *  Backward induction. The last offer cannot be passed, so the final stage is
+ *  worth the pool's mean whatever shows. One offer earlier the player sees a value
+ *  v and, playing optimally, takes it exactly when it is at least what one more
+ *  offer is worth on average — so that stage is worth Σ_v p(v)·max(v, stage[i+1]).
+ *  Both `offerValue` (the round's price) and `playOffer` (the take/pass rule) read
+ *  off this one array, so the coach and the coached game can never disagree. */
+export function offerStageValues(bonus: Extract<Bonus, { kind: 'offer' }>): number[] {
+  let weight = 0
+  for (const o of bonus.pool) weight += o.weight
+  const mean = bonus.pool.reduce((a, o) => a + o.value * o.weight, 0) / weight
+
+  const stage = new Array<number>(bonus.offers)
+  stage[bonus.offers - 1] = mean
+  for (let i = bonus.offers - 2; i >= 0; i--) {
+    let sum = 0
+    for (const o of bonus.pool) sum += o.weight * Math.max(o.value, stage[i + 1])
+    stage[i] = sum / weight
+  }
+  return stage
+}
+
+/** The exact expected award of an offer round, in multiples of the stake, under
+ *  optimal play — the price the cabinet is held to. It is the value at the first
+ *  stage, before any offer has been shown. */
+export function offerValue(bonus: Extract<Bonus, { kind: 'offer' }>): number {
+  return offerStageValues(bonus)[0]
 }
