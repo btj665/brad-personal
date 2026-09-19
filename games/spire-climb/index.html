@@ -200,7 +200,8 @@ h3 { font-size: 16px; letter-spacing: .04em; }
 /* ---------- the climb screen -------------------------------------------- */
 #climb.on { display: grid; grid-template-columns: 1fr var(--rail); grid-template-rows: 1fr var(--bar); }
 #viewport { position: relative; overflow: hidden; grid-row: 1 / 3; background: #05050a; }
-#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair;
+  touch-action: none; }
 #viewport.pointer #game { cursor: pointer; }
 
 .plaque {
@@ -388,9 +389,50 @@ h3 { font-size: 16px; letter-spacing: .04em; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
-@media (max-width: 760px) {
-  :root { --rail: 190px; --bar: 128px; }
-  .slot { width: 38px; height: 38px; }
+#btnLog { display: none; }
+
+@media (max-width: 860px) {
+  /* Stack the climb screen. Side-by-side gave the room 46% of a phone and
+     made it unplayable; here the room takes the whole width, the party
+     becomes a strip beneath it, and the log opens over the top on demand. */
+  #climb.on { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  #viewport { grid-column: 1; grid-row: 1; }
+
+  #rail {
+    grid-column: 1; grid-row: 2;
+    flex-direction: row; flex-wrap: nowrap; align-items: stretch;
+    gap: 6px; padding: 6px; max-height: 148px;
+    overflow-x: auto; overflow-y: hidden;
+    border-left: 0; border-top: 1px solid #000;
+    -webkit-overflow-scrolling: touch;
+  }
+  #rail .rail-head { display: none; }
+  #rail .pc { width: 186px; flex: 0 0 auto; }
+  #rail > .row, #rail > #consumRow { flex: 0 0 auto; flex-direction: column; align-content: start; }
+
+  /* the log becomes a sheet over the room rather than a permanent column */
+  #bottom {
+    display: none;
+    position: fixed; left: 0; right: 0; bottom: 0; height: 46vh; z-index: 30;
+    border-left: 0; border-top: 1px solid var(--brass-deep);
+    box-shadow: 0 -8px 30px rgba(0,0,0,.7);
+  }
+  #climb.log-open #bottom { display: block; }
+  #btnLog { display: inline-flex; }
+
+  .vp-tools { gap: 4px; max-width: 64vw; flex-wrap: wrap; justify-content: flex-end; }
+  .vp-tools .btn.tiny { padding: 6px 8px; font-size: 10px; letter-spacing: .04em; }
+  #btnFollow, #btnQuality { display: none; }
+
+  .plaque { max-width: 32vw; padding: 6px 9px; }
+  .plaque .where { font-size: 11.5px; }
+  .plaque .what { font-size: 9px; letter-spacing: .06em; }
+
+  #hotbar { bottom: 6px; gap: 3px; padding: 4px; max-width: 94vw; overflow-x: auto; }
+  .slot { width: 40px; height: 40px; flex: 0 0 auto; }
+
+  .modal { padding: 16px 15px; }
+  .cs-grid, .forge-grid { grid-template-columns: 1fr; }
 }
 
 </style>
@@ -480,6 +522,7 @@ h3 { font-size: 16px; letter-spacing: .04em; }
       <button class="btn tiny" id="btnFollow" title="Camera follows the selected climber (F)">Follow: off</button>
       <button class="btn tiny" id="btnQuality" title="Atmospheric effects: auto / high / low (G)">Effects: auto</button>
       <button class="btn tiny" id="btnMap" title="Floor route (M)">Floor</button>
+      <button class="btn tiny" id="btnLog" title="Message log">Log</button>
     </div>
     <div class="vp-badge hidden" id="pausedBadge">Paused</div>
     <div id="hotbar"></div>
@@ -8307,92 +8350,43 @@ function drawPortrait(cv, ch, size) {
   const c = cv.getContext('2d');
   const S = size || cv.width;
   cv.width = S; cv.height = S;
-  /* One appearance record per seed, shared with the in-room sprite. */
   const look = faceOf(ch.portrait);
-  const r = makeRng(ch.portrait + 7771);
   const atn = ATTUNEMENTS[ch.atn[0].key];
+  const garb = garbFor(ch.atn[0].key);
 
   /* backdrop: attunement hue, vignetted */
-  const bg = c.createRadialGradient(S * 0.5, S * 0.35, 0, S * 0.5, S * 0.5, S * 0.75);
-  bg.addColorStop(0, mixHex(atn.hex, '#000000', 0.55));
+  const bg = c.createRadialGradient(S * 0.5, S * 0.34, 0, S * 0.5, S * 0.52, S * 0.78);
+  bg.addColorStop(0, mixHex(atn.hex, '#000000', 0.52));
   bg.addColorStop(1, '#0b0907');
   c.fillStyle = bg; c.fillRect(0, 0, S, S);
+  /* a faint arch behind the sitter, so the frame reads as a niche */
+  c.strokeStyle = rgba(atn.hex, 0.13);
+  c.lineWidth = Math.max(1, S * 0.012);
+  c.beginPath(); c.arc(S * 0.5, S * 0.60, S * 0.34, Math.PI, TAU); c.stroke();
 
-  /* shoulders */
-  c.fillStyle = mixHex(atn.hex, '#000000', 0.45);
-  c.beginPath();
-  c.moveTo(S * 0.06, S);
-  c.quadraticCurveTo(S * 0.20, S * 0.70, S * 0.5, S * 0.68);
-  c.quadraticCurveTo(S * 0.80, S * 0.70, S * 0.94, S);
-  c.closePath(); c.fill();
-  /* collar trim */
-  c.strokeStyle = rgba('#c9a227', 0.4); c.lineWidth = Math.max(1, S * 0.014);
-  c.beginPath(); c.moveTo(S * 0.28, S * 0.86); c.lineTo(S * 0.5, S * 0.70); c.lineTo(S * 0.72, S * 0.86); c.stroke();
+  /* The portrait is the same figure the room draws, framed as a bust.
+     Two renderers meant the rail and the sprite disagreed about who a
+     climber was; now a guardian wears their helm in both. */
+  c.save();
+  c.beginPath(); c.rect(0, 0, S, S); c.clip();
+  const H = S * 3.0;
+  c.translate(S * 0.5, S * 0.08 + 0.968 * H);
+  drawFigure(c, {
+    H, view: 'front', mirror: false, build: look.build, gait: null, t: 0, phase: 0,
+    skin: look.skin, hair: look.hair, hairStyle: look.style, eye: look.eye, smile: look.smile,
+    cloth: atn.hex, trim: mixHex(atn.hex, '#e8dcc0', 0.42),
+    garb, armour: 0, helm: garb.helm,
+    markHex: null, markLv: 0, cloak: false,
+  });
+  c.restore();
 
-  /* neck + head */
-  const skin = look.skin;
-  c.fillStyle = mixHex(skin, '#000000', 0.2);
-  c.fillRect(S * 0.42, S * 0.60, S * 0.16, S * 0.14);
-  c.fillStyle = skin;
-  c.beginPath();
-  c.ellipse(S * 0.5, S * 0.46, S * 0.175, S * 0.215, 0, 0, TAU);
-  c.fill();
-  /* jaw shadow */
-  c.fillStyle = 'rgba(0,0,0,0.16)';
-  c.beginPath(); c.ellipse(S * 0.5, S * 0.60, S * 0.14, S * 0.07, 0, 0, TAU); c.fill();
+  /* a soft floor shadow so the bust sits in the niche */
+  const fade = c.createLinearGradient(0, S * 0.72, 0, S);
+  fade.addColorStop(0, 'rgba(0,0,0,0)');
+  fade.addColorStop(1, 'rgba(0,0,0,0.55)');
+  c.fillStyle = fade; c.fillRect(0, S * 0.72, S, S * 0.28);
 
-  /* hair. The hood is a role signal now, so the portrait takes it from the
-     same garb table as the in-room sprite rather than from a hair roll. */
-  const hair = look.hair;
-  const pGarb = garbFor(ch.atn[0].key);
-  const style = pGarb.hood ? 2 : (look.style === 2 ? 0 : look.style);
-  c.fillStyle = hair;
-  if (style === 0) { /* short */
-    c.beginPath(); c.ellipse(S * 0.5, S * 0.38, S * 0.185, S * 0.16, 0, Math.PI, TAU); c.fill();
-  } else if (style === 1) { /* long */
-    c.beginPath();
-    c.moveTo(S * 0.31, S * 0.42);
-    c.quadraticCurveTo(S * 0.30, S * 0.72, S * 0.36, S * 0.78);
-    c.lineTo(S * 0.64, S * 0.78);
-    c.quadraticCurveTo(S * 0.70, S * 0.72, S * 0.69, S * 0.42);
-    c.quadraticCurveTo(S * 0.5, S * 0.20, S * 0.31, S * 0.42);
-    c.closePath(); c.fill();
-    c.fillStyle = skin;
-    c.beginPath(); c.ellipse(S * 0.5, S * 0.47, S * 0.145, S * 0.185, 0, 0, TAU); c.fill();
-  } else if (style === 2) { /* hood */
-    c.fillStyle = mixHex(atn.hex, '#0a0a0c', 0.55);
-    c.beginPath();
-    c.moveTo(S * 0.24, S * 0.74);
-    c.quadraticCurveTo(S * 0.20, S * 0.24, S * 0.5, S * 0.20);
-    c.quadraticCurveTo(S * 0.80, S * 0.24, S * 0.76, S * 0.74);
-    c.quadraticCurveTo(S * 0.5, S * 0.62, S * 0.24, S * 0.74);
-    c.closePath(); c.fill();
-  } else { /* tied back */
-    c.beginPath(); c.ellipse(S * 0.5, S * 0.37, S * 0.18, S * 0.14, 0, Math.PI, TAU); c.fill();
-    c.beginPath(); c.ellipse(S * 0.5, S * 0.30, S * 0.07, S * 0.06, 0, 0, TAU); c.fill();
-  }
-
-  /* eyes */
-  const ex = S * 0.068, ey = S * 0.47;
-  c.fillStyle = '#f2eee4';
-  c.beginPath(); c.ellipse(S * 0.5 - ex, ey, S * 0.030, S * 0.020, 0, 0, TAU); c.fill();
-  c.beginPath(); c.ellipse(S * 0.5 + ex, ey, S * 0.030, S * 0.020, 0, 0, TAU); c.fill();
-  const eyeHex = look.eye;
-  c.fillStyle = eyeHex;
-  c.beginPath(); c.arc(S * 0.5 - ex, ey, S * 0.016, 0, TAU); c.fill();
-  c.beginPath(); c.arc(S * 0.5 + ex, ey, S * 0.016, 0, TAU); c.fill();
-  /* brows */
-  c.strokeStyle = mixHex(hair, '#000000', 0.25); c.lineWidth = Math.max(1, S * 0.018);
-  c.beginPath(); c.moveTo(S * 0.5 - ex * 1.6, ey - S * 0.055); c.lineTo(S * 0.5 - ex * 0.4, ey - S * 0.062); c.stroke();
-  c.beginPath(); c.moveTo(S * 0.5 + ex * 0.4, ey - S * 0.062); c.lineTo(S * 0.5 + ex * 1.6, ey - S * 0.055); c.stroke();
-  /* mouth */
-  c.strokeStyle = mixHex(skin, '#7a2a26', 0.45); c.lineWidth = Math.max(1, S * 0.016);
-  c.beginPath();
-  c.moveTo(S * 0.455, S * 0.555);
-  c.quadraticCurveTo(S * 0.5, S * 0.565 + (look.smile ? -S * 0.012 : S * 0.006), S * 0.545, S * 0.555);
-  c.stroke();
-
-  /* the attunement mark on the hand, shown at the corner as a sigil */
+  /* the attunement mark, shown at the corner as a rank sigil */
   const lv = ch.atn[0].lv;
   c.globalCompositeOperation = 'lighter';
   const mg = c.createRadialGradient(S * 0.86, S * 0.86, 0, S * 0.86, S * 0.86, S * 0.22);
@@ -8538,7 +8532,8 @@ const HUD = {
       });
       n.addEventListener('dblclick', () => g.openSheet(i));
       this.rail.appendChild(n);
-      return { node:n, body, cv, ch, lastPortrait: ch.atn[0].lv };
+      return { node:n, body, cv, ch,
+               lastPortrait: ch.atn[0].lv + ':' + ch.atn[0].key + ':' + ch.portrait };
     });
 
     const tools = el('div', 'row');
@@ -8631,7 +8626,8 @@ const HUD = {
           st.appendChild(c2);
         }
       }
-      if (p.lastPortrait !== ch.atn[0].lv) { p.lastPortrait = ch.atn[0].lv; drawPortrait(p.cv, ch, 52); }
+      const psig = ch.atn[0].lv + ':' + ch.atn[0].key + ':' + ch.portrait;
+      if (p.lastPortrait !== psig) { p.lastPortrait = psig; drawPortrait(p.cv, ch, 52); }
     }
     /* hotbar state */
     const ch = g.party[g.selection[0] ?? 0];
@@ -9667,7 +9663,7 @@ const Game = {
   cam: { x:0, y:0, z:1, vw:100, vh:100, tx:0, ty:0 },
   stats: null, history: [], sealed: [], edicts: [], stealth: false,
   rng: RNG, chosenSpire: null, draft: null, draftSel: 0,
-  hover: null, mouse: { x:0, y:0, wx:0, wy:0 }, keysDown: {},
+  hover: null, mouse: { x:0, y:0, wx:0, wy:0 }, keysDown: {}, hasMouse: false,
   running: false, lastT: 0, roomsThisFloor: 0,
   /* The camera is free by default, as in the Infinity Engine: it stays
      where you leave it and never drags itself back to the party. */
@@ -9822,6 +9818,10 @@ const Game = {
     if (room.puzzle && room.puzzle.dialog) setTimeout(() => this.openPuzzleDialog(), 700);
     this.checkRoomClear();
     HUD.buildHotbar();
+    if (!this._touchHinted && matchMedia('(pointer: coarse)').matches) {
+      this._touchHinted = true;
+      setTimeout(() => toast('Drag to look around · tap to move · hold to interact'), 1500);
+    }
   },
 
   updatePlaque() {
@@ -10386,6 +10386,7 @@ const Game = {
     const cv = this.canvas;
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
     cv.addEventListener('mouseenter', () => { this.mouseInView = true; });
+    cv.addEventListener('pointermove', (ev) => { if (ev.pointerType === 'mouse') this.hasMouse = true; });
     cv.addEventListener('mouseleave', () => { this.mouseInView = false; Tip.hide(); });
     cv.addEventListener('mousemove', (ev) => {
       const r = cv.getBoundingClientRect();
@@ -10459,6 +10460,106 @@ const Game = {
     $('#btnMap').onclick = () => openRouteMap(this);
     $('#btnFollow').onclick = () => this.toggleFollow();
     $('#btnQuality').onclick = () => this.cycleQuality();
+    const lb = $('#btnLog');
+    if (lb) lb.onclick = () => {
+      const on = $('#climb').classList.toggle('log-open');
+      lb.classList.toggle('primary', on);
+      if (on) { const l = $('#log'); l.scrollTop = l.scrollHeight; }
+    };
+    this.bindTouch();
+  },
+
+  /* ---------- touch ----------------------------------------------------
+     There was no way to move the camera without a mouse: edge-scroll,
+     middle-drag and the arrow keys all need one, so on a phone the room
+     could not be looked at. One finger drags the view, a tap gives the
+     order a left click would, a press-and-hold does what a right click
+     does, and two fingers pinch to zoom.
+  ------------------------------------------------------------------- */
+  bindTouch() {
+    const cv = this.canvas;
+    const pts = new Map();
+    let mode = null, startCam = null, startDist = 0, startZ = 1;
+    let downAt = 0, downPos = null, moved = 0, longTimer = null;
+    const TAP_SLOP = 12, HOLD_MS = 450;
+    const pos = (e) => { const r = cv.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+
+    cv.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') return;
+      /* suppresses the compatibility mouse events, so a tap is not also
+         delivered to the mouse handlers as a second, different order */
+      e.preventDefault();
+      /* a finger is driving now: stop the mouse path steering the camera */
+      this.hasMouse = false; this.mouseInView = false;
+      try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+      pts.set(e.pointerId, pos(e));
+      if (this.screen !== 'climb' || !this.field || Dialog.isOpen()) return;
+      if (pts.size === 1) {
+        mode = 'pan'; moved = 0; downAt = performance.now(); downPos = pos(e);
+        startCam = { x: this.cam.tx, y: this.cam.ty };
+        clearTimeout(longTimer);
+        longTimer = setTimeout(() => {
+          if (mode !== 'pan' || moved > TAP_SLOP) return;
+          mode = 'held';
+          const w = screenToWorld(this.cam, downPos.x, downPos.y);
+          this.rightClick(w, {});
+          if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) {} }
+        }, HOLD_MS);
+      } else if (pts.size === 2) {
+        mode = 'pinch';
+        clearTimeout(longTimer);
+        const v = Array.from(pts.values());
+        startDist = Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y) || 1;
+        startZ = this.cam.z;
+      }
+    }, { passive: false });
+
+    cv.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'mouse' || !pts.has(e.pointerId)) return;
+      e.preventDefault();
+      const p = pos(e);
+      pts.set(e.pointerId, p);
+      if (!this.field) return;
+      if (mode === 'pinch' && pts.size >= 2) {
+        const v = Array.from(pts.values());
+        const d = Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y) || 1;
+        this.cam.z = clamp(startZ * (d / startDist), 0.55, 2.0);
+        this.clampCamera();
+        return;
+      }
+      if (mode !== 'pan' || !downPos) return;
+      moved = Math.max(moved, Math.hypot(p.x - downPos.x, p.y - downPos.y));
+      if (moved <= 8) return;
+      clearTimeout(longTimer);
+      this.cam.tx = startCam.x - (p.x - downPos.x) / this.cam.z;
+      this.cam.ty = startCam.y - (p.y - downPos.y) / this.cam.z;
+      this.userPanned = true;
+      this.clampCamera();
+      /* follow the finger exactly rather than easing behind it */
+      this.cam.x = this.cam.tx; this.cam.y = this.cam.ty;
+    }, { passive: false });
+
+    const end = (e) => {
+      if (e.pointerType === 'mouse') return;
+      clearTimeout(longTimer);
+      pts.delete(e.pointerId);
+      const tapped = mode === 'pan' && moved <= TAP_SLOP
+                  && performance.now() - downAt < HOLD_MS;
+      if (tapped && this.field && !Dialog.isOpen()) {
+        const w = screenToWorld(this.cam, downPos.x, downPos.y);
+        this.leftClick(w, {});
+      }
+      if (pts.size === 0) { mode = null; downPos = null; }
+      else if (pts.size === 1) {
+        /* one finger lifted out of a pinch: carry on panning with the other */
+        mode = 'pan'; moved = TAP_SLOP + 1;
+        downPos = Array.from(pts.values())[0];
+        startCam = { x: this.cam.tx, y: this.cam.ty };
+      }
+    };
+    cv.addEventListener('pointerup', end);
+    cv.addEventListener('pointercancel', end);
   },
 
   updateHover() {
@@ -10737,7 +10838,11 @@ const Game = {
     if (this.keysDown['arrowright']) ex += 1;
     if (this.keysDown['arrowup']) ey -= 1;
     if (this.keysDown['arrowdown']) ey += 1;
-    if (this.edgeScroll && this.mouseInView && !this.dragging && !Dialog.isOpen()) {
+    /* Edge-scroll needs a real mouse. Without this gate the default mouse
+       position of {0,0} reads as "parked in the top-left corner" on any
+       touch device, and the camera is dragged into that corner and held
+       there — which is what made the room impossible to look at. */
+    if (this.edgeScroll && this.hasMouse && this.mouseInView && !this.dragging && !Dialog.isOpen()) {
       const EDGE = 34;
       const { x, y } = this.mouse, vw = this.cam.vw, vh = this.cam.vh;
       if (x < EDGE) ex -= (EDGE - x) / EDGE;
