@@ -3,6 +3,10 @@
 :root {
   --felt: #0e6b40;
   --felt-dark: #063a22;
+  /* The betting layouts (roulette, sic bo, big six) use a slightly brighter felt
+   *  than the seated tables — a deliberate second tier, named here so the two
+   *  greens stay intentional instead of drifting as loose hex values. */
+  --felt-layout: #0d5c34;
   --felt-line: rgba(255, 255, 255, 0.28);
   --rail: #3f2a1c;
   --rail-light: #5c3f2b;
@@ -2052,7 +2056,7 @@ main.main {
     'zeros dozens'
     'outside outside';
   gap: 4px;
-  background: #0d5c34;
+  background: var(--felt-layout);
   padding: 8px;
   border-radius: 12px;
   border: 3px solid var(--rail);
@@ -2113,7 +2117,7 @@ main.main {
 
 .rl-outside.rl-bet,
 .rl-bet.rl-outside {
-  background: #0d5c34;
+  background: var(--felt-layout);
 }
 
 .rl-dozens .rl-bet,
@@ -2589,7 +2593,7 @@ main.main {
   display: block;
   border-radius: 10px;
   border: 3px solid var(--rail);
-  background: #0d5c34;
+  background: var(--felt-layout);
 }
 
 .rl2-locked .rl2-cell,
@@ -2612,7 +2616,7 @@ main.main {
   fill: #157a46;
 }
 .rl2-felt {
-  fill: #0d5c34;
+  fill: var(--felt-layout);
 }
 
 .rl2-num {
@@ -4088,7 +4092,7 @@ main.main {
   border: 3px solid var(--rail);
   background:
     radial-gradient(90% 70% at 50% 0%, rgba(255, 255, 255, 0.07), transparent 65%),
-    #0d5c34;
+    var(--felt-layout);
   box-shadow: inset 0 0 0 1px rgba(200, 160, 74, 0.28);
 }
 
@@ -5325,7 +5329,7 @@ main.main {
   gap: 5px;
   padding: 8px;
   border-radius: 12px;
-  background: #0d5c34;
+  background: var(--felt-layout);
   border: 3px solid var(--rail);
 }
 
