@@ -7,7 +7,7 @@
 // every pot or folding aces.
 
 import type { Card } from '../engine/types'
-import { bestOf, Category, compare, rankValue, score5 } from '../poker/eval'
+import { Category, rankValue, score5 } from '../poker/eval'
 import type { UthRules } from './types'
 
 const suit = (c: Card) => c.suit
@@ -78,11 +78,137 @@ function fourToFlushWithHighHole(hole: Card[], five: Card[]): boolean {
  *
  *  This is the standard simple river rule. The `rules` argument is accepted for
  *  symmetry with the other streets and isn't needed here. */
-export function riverRaise(hole: Card[], board: Card[], _rules?: UthRules): boolean {
-  const best = bestOf([...hole, ...board], {})
-  const boardOnly = score5(board, {})
+// A compact 7-card hand strength as one comparable integer — fast enough to weigh
+// every dealer holding at the river, which the shared evaluator (built for
+// correctness and the joker, not speed) is far too slow to do. UTH is a plain
+// 52-card deck, so this needs no joker, and it only has to rank hands
+// consistently against itself; a fuzz test pins it to the shared evaluator.
+const SUIT_IX: Record<string, number> = { S: 0, H: 1, D: 2, C: 3 }
 
-  if (best.category >= Category.Pair && compare(best, boardOnly) > 0) return true
-  if (boardOnly.category >= Category.Straight) return true
-  return false
+// Reused across calls — rank7 runs 990 times per river decision, so allocating
+// fresh count arrays each time is the whole cost. Single-threaded and reset at
+// the top of every call, so sharing is safe.
+const _count = new Int8Array(15)
+const _suitCount = new Int8Array(4)
+const _suitMask = new Int32Array(4)
+
+export function rank7(cards: Card[]): number {
+  const count = _count
+  const suitCount = _suitCount
+  const suitMask = _suitMask
+  count.fill(0)
+  suitCount.fill(0)
+  suitMask.fill(0)
+  let mask = 0
+  for (const c of cards) {
+    const r = val(c)
+    const s = SUIT_IX[c.suit]
+    count[r]++
+    suitCount[s]++
+    suitMask[s] |= 1 << r
+    mask |= 1 << r
+  }
+  const straightTop = (m: number): number => {
+    if (m & (1 << 14)) m |= 1 << 1 // ace plays low for the wheel
+    for (let hi = 14; hi >= 5; hi--) {
+      const run = (1 << hi) | (1 << (hi - 1)) | (1 << (hi - 2)) | (1 << (hi - 3)) | (1 << (hi - 4))
+      if ((m & run) === run) return hi
+    }
+    return 0
+  }
+
+  let sf = 0
+  let flush: number[] | null = null
+  for (let s = 0; s < 4; s++) {
+    if (suitCount[s] < 5) continue
+    sf = Math.max(sf, straightTop(suitMask[s]))
+    const rs: number[] = []
+    for (let r = 14; r >= 2; r--) if (suitMask[s] & (1 << r)) rs.push(r)
+    if (!flush || rs[0] > flush[0]) flush = rs.slice(0, 5)
+  }
+
+  let quad = 0
+  const trips: number[] = []
+  const pairs: number[] = []
+  for (let r = 14; r >= 2; r--) {
+    if (count[r] === 4) quad = r
+    else if (count[r] === 3) trips.push(r)
+    else if (count[r] === 2) pairs.push(r)
+  }
+  const straight = straightTop(mask)
+  const kickers = (used: Set<number>, n: number): number[] => {
+    const out: number[] = []
+    for (let r = 14; r >= 2 && out.length < n; r--) if (count[r] > 0 && !used.has(r)) out.push(r)
+    return out
+  }
+
+  let cat: number
+  let tb: number[]
+  if (sf) {
+    cat = 8
+    tb = [sf]
+  } else if (quad) {
+    cat = 7
+    tb = [quad, kickers(new Set([quad]), 1)[0] ?? 0]
+  } else if (trips.length >= 1 && (pairs.length >= 1 || trips.length >= 2)) {
+    cat = 6
+    tb = [trips[0], pairs.length ? pairs[0] : trips[1]]
+  } else if (flush) {
+    cat = 5
+    tb = flush
+  } else if (straight) {
+    cat = 4
+    tb = [straight]
+  } else if (trips.length >= 1) {
+    cat = 3
+    tb = [trips[0], ...kickers(new Set([trips[0]]), 2)]
+  } else if (pairs.length >= 2) {
+    cat = 2
+    tb = [pairs[0], pairs[1], kickers(new Set([pairs[0], pairs[1]]), 1)[0] ?? 0]
+  } else if (pairs.length === 1) {
+    cat = 1
+    tb = [pairs[0], ...kickers(new Set([pairs[0]]), 3)]
+  } else {
+    cat = 0
+    tb = kickers(new Set(), 5)
+  }
+  let v = cat
+  for (let i = 0; i < 5; i++) v = v * 15 + (tb[i] ?? 0)
+  return v
+}
+
+const ALL_CARDS: Card[] = (() => {
+  const suits = ['S', 'H', 'D', 'C'] as Card['suit'][]
+  const ranks: Card['rank'][] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+  const out: Card[] = []
+  let uid = 0
+  for (const s of suits) for (const r of ranks) out.push({ uid: uid++, rank: r, suit: s })
+  return out
+})()
+
+/** Fraction of a fifth: bet the 1x when you beat this share of dealer holdings.
+ *  By the river the ante and the blind are already posted, so folding forfeits
+ *  two units and the 1x bet risks only one — the break-even is a little over a
+ *  fifth, so all but the hopeless hands are a bet. */
+const RIVER_BET = 0.21
+
+export function riverRaise(hole: Card[], board: Card[], _rules?: UthRules): boolean {
+  const key = (c: Card) => c.rank + c.suit
+  const seen = new Set([...hole, ...board].map(key))
+  const deck = ALL_CARDS.filter((c) => !seen.has(key(c)))
+  const me = rank7([...hole, ...board])
+
+  // Weigh every two-card holding the dealer could have. A tie is a push, so it
+  // counts as half — folding loses outright, a chop does not.
+  let good = 0
+  let total = 0
+  for (let i = 0; i < deck.length; i++) {
+    for (let j = i + 1; j < deck.length; j++) {
+      const d = rank7([deck[i], deck[j], ...board])
+      if (me > d) good += 1
+      else if (me === d) good += 0.5
+      total += 1
+    }
+  }
+  return good / total >= RIVER_BET
 }

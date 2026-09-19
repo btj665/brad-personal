@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { RANKS } from '../engine/cards'
+import { makeRng } from '../engine/rng'
+import { bestOf, compare } from '../poker/eval'
 import type { Card, Rank, Suit } from '../engine/types'
-import { flopRaise, preflopRaise, riverRaise } from './strategy'
+import { flopRaise, preflopRaise, rank7, riverRaise } from './strategy'
 import { UthGame } from './engine'
 import type { Beat } from './engine'
 
@@ -89,6 +92,35 @@ describe('river: raise 1x or fold', () => {
   })
 })
 
+describe('the fast river evaluator', () => {
+  it('ranks any two seven-card hands exactly like the shared evaluator', () => {
+    // rank7 exists only for speed; it must agree with bestOf/compare on every
+    // hand, or the river decision is weighing hands wrong.
+    const rng = makeRng(9876)
+    const deck = () => {
+      const d: Card[] = []
+      let u = 0
+      for (const s of ['S', 'H', 'D', 'C'] as Card['suit'][])
+        for (const r of RANKS) d.push({ uid: u++, rank: r, suit: s })
+      return d
+    }
+    let mismatches = 0
+    for (let t = 0; t < 4000; t++) {
+      const d = deck()
+      for (let i = d.length - 1; i > 0; i--) {
+        const j = rng.int(i + 1)
+        ;[d[i], d[j]] = [d[j], d[i]]
+      }
+      const a = d.slice(0, 7)
+      const b = d.slice(7, 14)
+      const fast = Math.sign(rank7(a) - rank7(b))
+      const slow = Math.sign(compare(bestOf(a), bestOf(b)))
+      if (fast !== slow) mismatches++
+    }
+    expect(mismatches).toBe(0)
+  })
+})
+
 // --- the table -------------------------------------------------------------
 
 function autoGame(seed: number) {
@@ -122,7 +154,9 @@ describe('a hand of UTH', () => {
     const game = autoGame(2024)
     for (let i = 0; i < 1000; i++) game.playRound()
     expect(game.round).toBe(1000)
-  })
+    // The river decision now weighs every dealer holding, so a full table of
+    // bots is real work; the generous timeout is for that, not a slow engine.
+  }, 30000)
 
   it('replays identically from the same seed', () => {
     const a = autoGame(77)
