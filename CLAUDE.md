@@ -46,6 +46,44 @@ would have produced — the user knew the game and the internet did not.
 A blocked proxy, a paywalled manual or a contradictory wiki is a reason to
 ask, not a reason to invent.
 
+## What this session can actually reach
+
+Measured in this container, not assumed. The environment's network access
+level is **Trusted**, which allows only the default list: `api.anthropic.com`,
+`registry.npmjs.org`, `jsr.io`, `npm.jsr.io`, `pypi.org`,
+`files.pythonhosted.org`, `index.crates.io`, `proxy.golang.org`, plus GitHub
+through its own proxy and `raw.githubusercontent.com`, and `code.claude.com`.
+
+Reachable, tested: `github.com`, `raw.githubusercontent.com`,
+`api.github.com`, `codeload.github.com`, `code.claude.com`.
+
+Blocked, tested: `en.wikipedia.org`, `atariage.com`, `archive.org`,
+`gamefaqs.gamespot.com`, `strategywiki.org`, `arcade-history.com`,
+`mobygames.com`, `atarionline.org`, `gist.githubusercontent.com`,
+`google.com`.
+
+WebSearch still works, because it does not go through this proxy. That is
+why search snippets arrive but the pages behind them do not — and snippets
+are exactly the secondary sources the rule above says not to trust.
+
+A URL does not grant access. The block is per host, so pasting a link to a
+blocked host changes nothing. Three things that do work, in order of how
+little they cost you:
+
+1. **Paste the text, or attach the file.** Always works, no configuration.
+   PDFs and images of manual pages are readable.
+2. **Put the document in a GitHub repository.** Committed files are
+   reachable through `raw.githubusercontent.com` right now.
+3. **Change the environment's network access.** Open the environment for
+   editing and use the **Network access** selector: **Custom** with a list
+   of hosts, with *Also include default list of common package managers*
+   checked so GitHub and the registries keep working, or **Full** for any
+   domain.
+
+Never route around a block. The proxy README is explicit: a 403 or 407 is an
+organization policy denial, and the instruction is to report the blocked
+host rather than retry or find another way to the content.
+
 ## Verifying games
 
 Two failures that got past a suite that looked thorough, both now standing
