@@ -10966,3 +10966,17 @@ main.main {
     padding-top: 8px;
   }
 }
+
+/* ================================================================ slots on phones */
+/* These override the base slot rules above, so they must come last in the file to
+   win the cascade. On a phone the inline top-pays rail buried the reels below the
+   fold; hide it (the "Pays" button opens the full table) and let the reels and the
+   spin controls be the whole screen. */
+@media (max-width: 900px) {
+  .slp-strip {
+    display: none;
+  }
+  .sl-tagline {
+    display: none;
+  }
+}
