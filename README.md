@@ -1,8 +1,9 @@
 # The Tables
 
-Sixteen casino games — including a slot floor of four cabinets — plus a
-**35-variant solitaire room**, all sharing one deterministic engine core, two
-poker-hand evaluators, and one deck of hand-drawn SVG cards.
+Seventeen casino games — including a slot floor of four cabinets and a
+**six-handed poker room** of six variants — plus a **35-variant solitaire
+room**, all sharing one deterministic engine core, two poker-hand evaluators,
+and one deck of hand-drawn SVG cards.
 
 **Card tables**
 
@@ -27,6 +28,16 @@ poker-hand evaluators, and one deck of hand-drawn SVG cards.
   comes out, and no dealer hand to beat.
 - **Casino War** — one card each, and the only decision in the building that
   matters: surrender half, or go to war.
+
+**Poker room**
+
+- **Poker** — a six-handed table against five bots, dealing six variants off
+  one engine that holds no game-specific rules of its own: **No-Limit** and
+  **Limit Hold'em**, **Pot-Limit** and **Limit Omaha** (use exactly two of your
+  four), **Seven-Card Stud**, and **Five-Card Draw**. Real side pots, all-ins,
+  min-raises, fixed-limit bet steps and a capped round; bots that decide on
+  Monte Carlo equity and pot odds, with distinct styles from a 25%-VPIP rock to
+  an 82% station.
 
 **Dice & wheels**
 
@@ -88,6 +99,7 @@ npm run vp:return     # video poker return, 1 / 3 / 5 / 10 hands
 npm run slots:rtp     # every cabinet's return, exact base + measured feature
 npm run keno:return   # keno, exact hypergeometric
 npm run poker:freq    # the poker evaluator vs. textbook hand frequencies
+npm run poker:equity  # the poker room's equities vs. published, and bot styles
 npm run sol:solve     # solitaire winnability, per variant, by an auto-player
 ```
 
@@ -134,6 +146,30 @@ And the games that are still simulated:
 | Craps — pass line | 1.458% | 1.41% |
 | Craps — field (2×/3×) | 2.744% | 2.78% |
 | Ultimate Hold'em (Trips side bet) | 3.64% | pay-table dependent |
+
+### The poker room is measured differently — there's no house edge
+
+Multiplayer poker has no house edge to hit; a hand is settled among the players,
+so its known truths are **hand equities** and **chip conservation**. The room is
+validated against both. The side-pot split is proven by a 1,000-case
+chip-conservation fuzz, and the engine conserves chips to the chip over hundreds
+of autonomous hands in every variant. The Monte Carlo equity engine — the same
+one the bots think with — lands within a point of published heads-up numbers:
+
+| Match-up | Measured | Published |
+|---|---|---|
+| AA vs KK | 82.4% | 82.0% |
+| AKs vs 22 (the classic coin flip) | 49.6% | 50.0% |
+| 72o vs AA | 12.7% | 12.0% |
+| QQ vs AKs | 53.7% | 54.0% |
+
+Worst deviation 0.7 of a point, inside Monte Carlo error. The bots then decide on
+that equity plus pot odds, and their styles come apart the way they should:
+voluntarily-in-pot runs from a 25% rock to an 82% station. What can't be pinned
+to a published point — the Omaha, Stud and Draw equities, which aren't tabulated
+the way Hold'em's are — rides on the evaluator underneath, which *is* checked
+exactly (Omaha's exactly-two rule against flush and quads traps, hand names, and
+the poker evaluator against textbook frequencies via `poker:freq`).
 
 ### Slots are the exception, and the interesting one
 
@@ -244,7 +280,8 @@ suggests, and the 10× rung is reached on 0.18% of spins.
 
 The poker evaluator is checked a second way: deal two million five-card hands and
 its category frequencies match the textbook odds to four decimal places (`npm run
-poker:freq`). That matters because seven of the fifteen games settle on it. The
+poker:freq`). That matters because eight of the seventeen games settle on it,
+the poker room most of all. The
 three-card evaluator in `poker/eval3.ts` is checked harder still — a census over
 all 22,100 three-card hands, which is the only real proof that a straight
 outranks a flush when you only hold three cards.
@@ -395,6 +432,19 @@ src/
   mstud/          three streets of 1x–3x, paid on the total wagered.
   letitride/      three bets, two pull-backs, both published charts.
   war/            high card, then surrender or war.
+
+  pokerroom/      The multiplayer room. types.ts is the contract; a Variant is
+                  data (its deal, how a hand forms, how bets are sized), so a new
+                  game is a row, not code. engine.ts is one state machine that
+                  plays them all — forced bets, betting rounds with min-raise and
+                  the cap, the draw, showdown — asking the ranker who won.
+    pots.ts       Side pots by commitment level with uncalled-bet refunds; the
+                  invariant it's fuzzed against is that chips are conserved.
+    ranker.ts     Scores a hand per family through poker/eval — including Omaha's
+                  exactly-two-of-four rule — folded to one comparable number.
+    equity.ts     Monte Carlo equity, scored through that same ranker so a bot's
+                  read and the showdown never disagree. bot.ts decides on it.
+
   craps/          come-out and point rolls; pass/come/odds/place/field.
   roulette/       three wheels; every bet as the numbers it covers.
   sicbo/          52 spots as coverage plus price, and the exact edge of each.
