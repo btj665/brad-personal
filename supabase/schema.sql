@@ -199,6 +199,47 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------- login by name
+
+-- Let players log in with either their username or their email. Supabase signs in
+-- by email, so the client calls this first to turn whatever was typed into the
+-- account's email. It returns the email ONLY when the password also matches, so it
+-- can't be used to discover which usernames map to which emails — a wrong password
+-- looks exactly like a missing account. Runs before sign-in, so anon may call it.
+create or replace function public.email_for_login(p_login text, p_password text)
+returns text
+language plpgsql
+security definer
+set search_path = extensions, public
+as $$
+declare
+  uid uuid;
+  em text;
+  ok boolean;
+begin
+  select u.id, u.email into uid, em
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+  where lower(u.email) = lower(trim(p_login)) or lower(p.username) = lower(trim(p_login))
+  order by (lower(u.email) = lower(trim(p_login))) desc
+  limit 1;
+
+  if uid is null then
+    return null;
+  end if;
+
+  select (u.encrypted_password = crypt(p_password, u.encrypted_password))
+    into ok from auth.users u where u.id = uid;
+
+  if coalesce(ok, false) then
+    return em;
+  end if;
+  return null;
+end;
+$$;
+
+grant execute on function public.email_for_login(text, text) to anon, authenticated;
+
 -- ---------------------------------------------------------------- admin
 
 -- Is the caller the admin? Used by the admin functions and readable by the client

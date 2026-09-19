@@ -35,6 +35,7 @@ function Gate() {
   const [panel, setPanel] = useState<Panel>('login')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
+  const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -63,7 +64,16 @@ function Gate() {
           setPanel('login')
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        // Log in with either a username or an email: resolve it to the account's
+        // email server-side (only when the password matches), then sign in.
+        const { data: resolved, error: rpcErr } = await supabase.rpc('email_for_login', {
+          p_login: loginId.trim(),
+          p_password: password,
+        })
+        if (rpcErr) throw rpcErr
+        const loginEmail = (resolved as string | null) ?? null
+        if (!loginEmail) throw new Error('Wrong username/email or password.')
+        const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
         if (error) throw error
       }
       await refresh()
@@ -93,28 +103,40 @@ function Gate() {
         </button>
       </div>
 
-      {panel === 'signup' && (
+      {panel === 'signup' ? (
+        <>
+          <label className="auth-field">
+            <span>Username</span>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              placeholder="how you'll show at the table"
+              required
+            />
+          </label>
+          <label className="auth-field">
+            <span>Email</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+          </label>
+        </>
+      ) : (
         <label className="auth-field">
-          <span>Username</span>
+          <span>Username or email</span>
           <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            value={loginId}
+            onChange={(e) => setLoginId(e.target.value)}
             autoComplete="username"
-            placeholder="how you'll show at the table"
             required
           />
         </label>
       )}
-      <label className="auth-field">
-        <span>Email</span>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          required
-        />
-      </label>
       <label className="auth-field">
         <span>Password</span>
         <input
