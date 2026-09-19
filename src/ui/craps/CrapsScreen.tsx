@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 
 import { randomSeed } from '../../engine/rng'
 import { CrapsGame, type Point } from '../../craps/engine'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { WinToast } from '../WinToast'
 
-const START = 500
 const CHIPS = [5, 25, 100]
 const BOX: Point[] = [4, 5, 6, 8, 9, 10]
 const BOX_LABEL: Record<Point, string> = { 4: '4', 5: '5', 6: 'SIX', 8: '8', 9: 'NINE', 10: '10' }
@@ -34,7 +35,7 @@ function Chip({ amount, kind = 'flat' }: { amount: number; kind?: 'flat' | 'odds
 }
 
 export function CrapsScreen() {
-  const [game, setGame] = useState(() => new CrapsGame({ seed: randomSeed(), bankroll: START }))
+  const { game, newGame } = useSharedBankroll('craps', (bankroll) => new CrapsGame({ seed: randomSeed(), bankroll }))
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   const [rolling, setRolling] = useState(false)
@@ -44,7 +45,7 @@ export function CrapsScreen() {
     return () => window.clearTimeout(t)
   }, [rolling])
 
-  const rebuy = useCallback(() => setGame(new CrapsGame({ seed: randomSeed(), bankroll: START })), [])
+  const rebuy = useCallback(() => newGame(), [newGame])
   const roll = useCallback(() => {
     if (!game.canRoll()) return
     game.roll()
@@ -205,7 +206,7 @@ export function CrapsScreen() {
               )}
               {broke ? (
                 <button className="btn btn-primary" onClick={rebuy}>
-                  Buy in for {START}
+                  Add {BASE_STAKE}
                 </button>
               ) : (
                 <button className="btn btn-primary btn-big" disabled={!game.canRoll() || rolling} onClick={roll}>

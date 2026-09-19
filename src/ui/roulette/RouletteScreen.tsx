@@ -13,10 +13,11 @@ import {
 } from '../../roulette/bets'
 import { RouletteGame } from '../../roulette/engine'
 import { colourOf, pocketOrder, VARIANT_EDGE, VARIANT_LABEL, type Variant } from '../../roulette/wheel'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { WinToast } from '../WinToast'
 import { RouletteWheel } from './RouletteWheel'
 
-const START = 500
 const CHIPS = [1, 5, 25, 100]
 
 // The number grid, laid out the way a real layout is: three rows of twelve, the
@@ -201,7 +202,7 @@ function Board({
 }
 
 export function RouletteScreen() {
-  const [game, setGame] = useState(() => new RouletteGame({ seed: randomSeed(), bankroll: START }))
+  const { game, replace } = useSharedBankroll('roulette', (bankroll) => new RouletteGame({ seed: randomSeed(), bankroll }))
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   // The spin animation is driven here: spin the engine to learn the pocket, then
@@ -220,10 +221,10 @@ export function RouletteScreen() {
     [game, busy],
   )
   const rebuy = useCallback(() => {
-    setGame(new RouletteGame({ seed: randomSeed(), variant: game.variant, bankroll: START }))
+    replace((bankroll) => new RouletteGame({ seed: randomSeed(), variant: game.variant, bankroll }))
     setAnim(null)
     setRevealed(true)
-  }, [game])
+  }, [replace, game])
 
   const spin = useCallback(() => {
     if (!game.canSpin() || busy) return
@@ -330,7 +331,7 @@ export function RouletteScreen() {
               <span className="rl-staked">On table: {game.staked}</span>
               {broke ? (
                 <button className="btn btn-primary" onClick={rebuy}>
-                  Buy in for {START}
+                  Add {BASE_STAKE}
                 </button>
               ) : game.phase === 'result' && revealed ? (
                 <>

@@ -5,11 +5,11 @@ import { MStudGame, MAX_EXPOSURE } from '../../mstud/engine'
 import { payLabel } from '../../mstud/rules'
 import { raiseUnits } from '../../mstud/strategy'
 import type { MStudAction, Street } from '../../mstud/types'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { PlayingCard } from '../Card'
 import { Chip, ChipStack } from '../Chips'
 import { WinToast } from '../WinToast'
-
-const START = 1000
 
 /** The three decision points, and what each one is called at the table. */
 const STREETS: Array<{ street: Street; label: string }> = [
@@ -27,7 +27,7 @@ function make(bankroll: number, ante: number): MStudGame {
 }
 
 export function MStudScreen() {
-  const [game, setGame] = useState(() => make(START, 5))
+  const { game, newGame } = useSharedBankroll('mstud', (bankroll) => make(bankroll, 5))
   const [coach, setCoach] = useState(false)
   useSyncExternalStore(game.subscribe, game.getVersion)
 
@@ -44,7 +44,7 @@ export function MStudScreen() {
     [coach, live, game, game.version],
   )
 
-  const rebuy = useCallback(() => setGame(make(START, 5)), [])
+  const rebuy = useCallback(() => newGame(), [newGame])
 
   const ante = game.ante
   const wagered = hand?.wagered ?? 0
@@ -210,7 +210,7 @@ export function MStudScreen() {
               </div>
               <div className="button-row">
                 <button className="btn btn-primary" onClick={rebuy}>
-                  Buy in for {START}
+                  Add {BASE_STAKE}
                 </button>
               </div>
             </div>

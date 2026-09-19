@@ -6,13 +6,13 @@ import { SlotGame } from '../../slots/machine'
 import { MACHINES } from '../../slots/machines'
 import { exactBaseReturn } from '../../slots/rtp'
 import type { Machine, Step, Win } from '../../slots/types'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { BigWin, CabinetFrame, TopBox } from './Cabinet'
 import { BonusRound } from './BonusRound'
 import { PayScreen, PayStrip } from './PayScreen'
 import { Reels, prefersReducedMotion, spinTiming } from './Reels'
 import * as sound from './sound'
-
-const START = 500
 
 /** How long each winning line is held up on its own, how long a crumbling screen
  *  takes to clear, and how long replacements take to fall. Tuned so a long
@@ -81,8 +81,9 @@ function useRollup(target: number): number {
 
 export function SlotsScreen() {
   const [machine, setMachine] = useState<Machine>(MACHINES[0])
-  const [game, setGame] = useState(
-    () => new SlotGame({ machine: MACHINES[0], seed: randomSeed(), bankroll: START }),
+  const { game, replace } = useSharedBankroll(
+    'slots',
+    (bankroll) => new SlotGame({ machine, seed: randomSeed(), bankroll }),
   )
   useSyncExternalStore(game.subscribe, game.getVersion)
 
@@ -282,14 +283,16 @@ export function SlotsScreen() {
   )
 
   const rebuy = useCallback(() => {
-    const g = new SlotGame({ machine, seed: randomSeed(), bankroll: START })
-    g.setCoinsPerLine(game.coinsPerLine)
-    setGame(g)
+    replace((bankroll) => {
+      const g = new SlotGame({ machine, seed: randomSeed(), bankroll })
+      g.setCoinsPerLine(game.coinsPerLine)
+      return g
+    })
     setStepIndex(0)
     setRunning(0)
     setBonusSettled(true)
     setPhase('idle')
-  }, [machine, game.coinsPerLine])
+  }, [machine, game.coinsPerLine, replace])
 
   // --- what to light -------------------------------------------------------
 
@@ -516,8 +519,8 @@ export function SlotsScreen() {
 
                 {broke ? (
                   <button className="sl-spin" onClick={rebuy}>
-                    Buy in
-                    <i>{START} credits</i>
+                    Add
+                    <i>{BASE_STAKE} credits</i>
                   </button>
                 ) : (
                   <button className="sl-spin" disabled={busy} onClick={spin}>

@@ -5,6 +5,7 @@ import { PokerGame } from '../../pokerroom/engine'
 import { ranker } from '../../pokerroom/ranker'
 import { VARIANTS, variantById } from '../../pokerroom/variants'
 import { pokerBrain, pokerDraw } from '../../pokerroom/bot'
+import { ensureFunds, getBalance, recordDelta } from '../../wallet/wallet'
 import type { Beat, BotProfile } from '../../pokerroom/types'
 import { WinToast } from '../WinToast'
 import { PokerTable } from './PokerTable'
@@ -38,7 +39,7 @@ const BEAT_MS: Partial<Record<Beat['type'], number>> = {
   handOver: 500,
 }
 
-function make(variantId: string): PokerGame {
+function make(variantId: string, buyIn: number): PokerGame {
   return new PokerGame({
     variant: variantById(variantId),
     ranker,
@@ -46,20 +47,40 @@ function make(variantId: string): PokerGame {
     botDraw: pokerDraw,
     seed: randomSeed(),
     bigBlind: BIG_BLIND,
-    buyIn: BUY_IN,
+    buyIn,
     humanSeat: HUMAN,
     seats: SEATS,
     bots: BOTS,
   })
 }
 
+/** What to buy in for: the standard stack, but never more than the wallet holds.
+ *  Poker chips are your money on the felt — drawn from the wallet when you sit and
+ *  racked back when you leave — so this is capped, not your whole balance. */
+function sizeBuyIn(): number {
+  return Math.min(BUY_IN, Math.max(0, getBalance()))
+}
+
 export function PokerScreen() {
   const [variantId, setVariantId] = useState(VARIANTS[0].id)
-  const [game, setGame] = useState(() => make(VARIANTS[0].id))
+  const [game, setGame] = useState(() => make(VARIANTS[0].id, sizeBuyIn()))
   const [lastBeat, setLastBeat] = useState<Beat | null>(null)
 
   useSyncExternalStore(game.subscribe, game.getVersion)
   const pending = game.pending()
+
+  // The wallet accounting for the table. Sitting down draws the buy-in off the
+  // wallet; leaving racks whatever chips remain back onto it. The effect's cleanup
+  // is what returns them, so switching games or closing the tab settles up. (Under
+  // StrictMode's double-mount the deduct/return/deduct cancels to a single buy-in.)
+  const gameRef = useRef(game)
+  gameRef.current = game
+  useEffect(() => {
+    recordDelta('poker', -gameRef.current.human.stack)
+    return () => {
+      recordDelta('poker', gameRef.current.human.stack)
+    }
+  }, [])
 
   // Winners of the hand in progress and the pot they collected, gathered from the
   // `award` beats as they stream by — the seats and cards to light at showdown.
@@ -103,8 +124,11 @@ export function PokerScreen() {
 
   const pickVariant = useCallback((id: string) => {
     setVariantId(id)
-    const g = make(id)
-    setGame(g)
+    // Rack the current chips back onto the wallet, then buy into the new table.
+    recordDelta('poker', gameRef.current.human.stack)
+    const bi = Math.min(BUY_IN, Math.max(0, getBalance()))
+    recordDelta('poker', -bi)
+    setGame(make(id, bi))
     setLastBeat(null)
     setWinners(new Set())
     setAwardNet(0)
@@ -116,9 +140,19 @@ export function PokerScreen() {
     setLastBeat({ type: 'handStart', hand: game.hand, button: game.button })
   }, [game])
 
-  const rebuy = useCallback(() => {
-    pickVariant(variantId)
-  }, [pickVariant, variantId])
+  const rebuy = useCallback(async () => {
+    // Rack whatever's left (nothing, if busted), then make sure there's money to
+    // sit back down with — topping the wallet up if it's also empty.
+    recordDelta('poker', gameRef.current.human.stack)
+    let bal = getBalance()
+    if (bal <= 0) bal = await ensureFunds()
+    const bi = Math.min(BUY_IN, Math.max(0, bal))
+    recordDelta('poker', -bi)
+    setGame(make(variantId, bi))
+    setLastBeat(null)
+    setWinners(new Set())
+    setAwardNet(0)
+  }, [variantId])
 
   const log = useMemo(() => game.log.slice(-8).reverse(), [game.log, game.version])
 
@@ -169,8 +203,8 @@ export function PokerScreen() {
                     <b>You're out of chips.</b> Buy back in for another go.
                   </div>
                   <div className="button-row button-row-actions">
-                    <button className="btn btn-primary" onClick={rebuy}>
-                      Buy in for {BUY_IN.toLocaleString()}
+                    <button className="btn btn-primary" onClick={() => void rebuy()}>
+                      Buy back in
                     </button>
                   </div>
                 </>

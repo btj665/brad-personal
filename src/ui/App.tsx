@@ -10,8 +10,9 @@ import { GamePicker } from './GamePicker'
 import { Settings } from './Settings'
 import { TableView } from './Table'
 import { WinToast } from './WinToast'
+import { BASE_STAKE } from '../wallet/wallet'
+import { useSharedBankroll } from '../wallet/useSharedBankroll'
 
-const STARTING_BANKROLL = 1000
 const HUMAN_SEAT = 2
 
 /** Casino pacing. The engine has no clock of its own — this is the clock. */
@@ -63,7 +64,14 @@ function makeGame(config: Config, bankroll: number): Game {
 
 export function BlackjackScreen() {
   const [config, setConfig] = useState<Config>({ rules: DEFAULT_RULES, bots: 4 })
-  const [game, setGame] = useState(() => makeGame({ rules: DEFAULT_RULES, bots: 4 }, STARTING_BANKROLL))
+  // The wallet tracks total worth — chips in the rack plus any bet still live —
+  // so a rules change that pushes a live bet back doesn't read as a win, and the
+  // balance only moves when a hand actually settles. cashOut is that total.
+  const { game, newGame, replace } = useSharedBankroll(
+    'blackjack',
+    (bankroll) => makeGame(config, bankroll),
+    cashOut,
+  )
   const [showSettings, setShowSettings] = useState(false)
   const [coach, setCoach] = useState(false)
   const [showCount, setShowCount] = useState(false)
@@ -89,19 +97,19 @@ export function BlackjackScreen() {
   const applyRules = useCallback(
     (rules: RuleSet, bots: number) => {
       setConfig({ rules, bots })
-      // A rules change closes the table and opens a new one. You keep your money
-      // — including anything already out in the betting circle, which the house
-      // pushes back to you rather than keeping.
-      setGame(makeGame({ rules, bots }, cashOut(game)))
+      // A rules change closes the table and opens a new one, funded from your
+      // shared balance — including anything already out in the betting circle,
+      // which cashOut already counts as yours.
+      replace((bankroll) => makeGame({ rules, bots }, bankroll))
       setLastBeat(null)
     },
-    [game],
+    [replace],
   )
 
   const rebuy = useCallback(() => {
-    setGame(makeGame(config, STARTING_BANKROLL))
+    newGame()
     setLastBeat(null)
-  }, [config])
+  }, [newGame])
 
   const broke = game.human.bankroll < game.rules.minBet && game.phase === 'betting'
 
@@ -182,7 +190,7 @@ export function BlackjackScreen() {
               </div>
               <div className="button-row">
                 <button className="btn btn-primary" onClick={rebuy}>
-                  Buy in for {STARTING_BANKROLL}
+                  Add {BASE_STAKE}
                 </button>
               </div>
             </div>

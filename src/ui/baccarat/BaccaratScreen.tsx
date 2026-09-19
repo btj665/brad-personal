@@ -4,11 +4,11 @@ import { BaccaratGame, type Beat } from '../../baccarat/engine'
 import { tableauGrid } from '../../baccarat/rules'
 import type { BaccaratHand, BetName, RoundResult, Winner } from '../../baccarat/types'
 import { randomSeed } from '../../engine/rng'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { PlayingCard } from '../Card'
 import { Chip, ChipStack } from '../Chips'
 import { WinToast } from '../WinToast'
-
-const START = 1000
 
 /** How long each beat sits on screen. Baccarat has no decisions, so the pacing
  *  *is* the game: a third card that arrives instantly isn't worth watching. */
@@ -161,7 +161,7 @@ function caption(game: BaccaratGame, beat: Beat | null): string {
 }
 
 export function BaccaratScreen() {
-  const [game, setGame] = useState(() => new BaccaratGame({ seed: randomSeed(), bankroll: START }))
+  const { game, newGame } = useSharedBankroll('baccarat', (bankroll) => new BaccaratGame({ seed: randomSeed(), bankroll }))
   const [lastBeat, setLastBeat] = useState<Beat | null>(null)
   const [showTableau, setShowTableau] = useState(false)
 
@@ -177,9 +177,9 @@ export function BaccaratScreen() {
   }, [game, game.version, pending, lastBeat])
 
   const rebuy = useCallback(() => {
-    setGame(new BaccaratGame({ seed: randomSeed(), bankroll: START }))
+    newGame()
     setLastBeat(null)
-  }, [])
+  }, [newGame])
 
   const deal = useCallback(() => {
     if (game.deal()) setLastBeat(null)
@@ -302,7 +302,7 @@ export function BaccaratScreen() {
                   </div>
                   <div className="button-row">
                     <button className="btn btn-primary" onClick={rebuy}>
-                      Buy in for {START}
+                      Add {BASE_STAKE}
                     </button>
                   </div>
                 </>

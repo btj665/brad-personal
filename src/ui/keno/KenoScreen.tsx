@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useSyncExternalStore } from 'react'
 
 import { randomSeed } from '../../engine/rng'
 import { KenoGame } from '../../keno/engine'
 import { BALLS, DRAWN, MAX_PICKS, oneIn, oneInFloor } from '../../keno/odds'
 import { houseEdge, payFor, winningCatches } from '../../keno/paytables'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { WinToast } from '../WinToast'
 
-const START = 1000
 const BETS = [1, 5, 25, 100]
 /** How long between balls. A real keno board takes a few seconds a ball; this is
  *  the same ceremony at a pace nobody will sit through twice. */
@@ -26,7 +27,7 @@ function odds(picks: number, caught: number): string {
 }
 
 export function KenoScreen() {
-  const [game, setGame] = useState(() => new KenoGame({ seed: randomSeed(), bankroll: START }))
+  const { game, newGame } = useSharedBankroll('keno', (bankroll) => new KenoGame({ seed: randomSeed(), bankroll }))
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   // The engine fixed all twenty numbers when the ticket was bought, so the
@@ -38,10 +39,7 @@ export function KenoScreen() {
     return () => window.clearInterval(t)
   }, [game, game.phase, game.round])
 
-  const rebuy = useCallback(
-    () => setGame(new KenoGame({ seed: randomSeed(), bankroll: START })),
-    [],
-  )
+  const rebuy = useCallback(() => newGame(), [newGame])
 
   const spots = game.picks.length
   const marked = new Set(game.picks)
@@ -266,7 +264,7 @@ export function KenoScreen() {
             <div className="kn-actions">
               {broke ? (
                 <button className="btn btn-primary btn-big" onClick={rebuy}>
-                  Buy in for {START}
+                  Add {BASE_STAKE}
                 </button>
               ) : game.phase === 'drawing' ? (
                 <button className="btn btn-ghost btn-big" onClick={() => game.revealAll()}>

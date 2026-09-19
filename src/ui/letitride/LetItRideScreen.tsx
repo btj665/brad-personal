@@ -4,11 +4,12 @@ import { randomSeed } from '../../engine/rng'
 import { LetItRideGame } from '../../letitride/engine'
 import { labelFor, PAYTABLE } from '../../letitride/rules'
 import { BET1_CHART, BET2_CHART } from '../../letitride/strategy'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { ChipStack } from '../Chips'
 import { PlayingCard } from '../Card'
 import { WinToast } from '../WinToast'
 
-const START = 1000
 const UNITS = [5, 25, 100]
 const CHIPS = [5, 25, 100, 500]
 
@@ -17,13 +18,13 @@ const CHIPS = [5, 25, 100, 500]
 const CIRCLES = ['1', '2', '$']
 
 export function LetItRideScreen() {
-  const [game, setGame] = useState(() => new LetItRideGame({ seed: randomSeed(), bankroll: START }))
+  const { game, replace } = useSharedBankroll('letitride', (bankroll) => new LetItRideGame({ seed: randomSeed(), bankroll }))
   const [coach, setCoach] = useState(false)
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   const rebuy = useCallback(
-    () => setGame(new LetItRideGame({ seed: randomSeed(), bankroll: START, unit: game.unit })),
-    [game],
+    () => replace((bankroll) => new LetItRideGame({ seed: randomSeed(), bankroll, unit: game.unit })),
+    [replace, game],
   )
 
   const round = game.round ?? game.last
@@ -221,7 +222,7 @@ export function LetItRideScreen() {
                 </>
               ) : broke ? (
                 <button className="btn btn-primary" onClick={rebuy}>
-                  Buy in for {START}
+                  Add {BASE_STAKE}
                 </button>
               ) : (
                 <button className="btn btn-primary btn-big" onClick={() => game.deal()}>

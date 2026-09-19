@@ -12,11 +12,11 @@ import {
   type BonusKey,
   type PairPlusKey,
 } from '../../threecard/rules'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { PlayingCard } from '../Card'
 import { ChipStack } from '../Chips'
 import { WinToast } from '../WinToast'
-
-const START = 1000
 
 const BONUS_ROWS: Array<[BonusKey, Cat3, string]> = [
   ['straightFlush', Cat3.StraightFlush, 'Straight flush'],
@@ -86,14 +86,14 @@ function Spot({
 }
 
 export function ThreeCardScreen() {
-  const [game, setGame] = useState(() => new ThreeCardGame({ seed: randomSeed(), bankroll: START }))
+  const { game, replace } = useSharedBankroll('threecard', (bankroll) => new ThreeCardGame({ seed: randomSeed(), bankroll }))
   const [coach, setCoach] = useState(false)
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   const rebuy = useCallback(
     () =>
-      setGame(new ThreeCardGame({ seed: randomSeed(), bankroll: START, pairPlusTableId: game.table.id })),
-    [game],
+      replace((bankroll) => new ThreeCardGame({ seed: randomSeed(), bankroll, pairPlusTableId: game.table.id })),
+    [replace, game],
   )
 
   const deciding = game.phase === 'decide'
@@ -315,7 +315,7 @@ export function ThreeCardScreen() {
                 </button>
                 {broke ? (
                   <button className="btn btn-primary btn-big" onClick={rebuy}>
-                    Buy in for {START}
+                    Add {BASE_STAKE}
                   </button>
                 ) : (
                   <button className="btn btn-primary btn-big" onClick={() => game.deal()}>

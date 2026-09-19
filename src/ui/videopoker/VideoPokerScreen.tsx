@@ -5,10 +5,10 @@ import type { Card } from '../../engine/types'
 import { HAND_COUNTS, VideoPokerGame, type AutoHoldMode } from '../../videopoker/engine'
 import type { PayCategory } from '../../videopoker/classify'
 import { VARIANTS, payFor } from '../../videopoker/paytables'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { PlayingCard } from '../Card'
 import { WinToast } from '../WinToast'
-
-const START = 200
 
 /** The auto-hold button cycles off → winners → best. */
 const NEXT_AUTO: Record<AutoHoldMode, AutoHoldMode> = {
@@ -144,7 +144,10 @@ function HandRow({ row }: { row: RowSpec }) {
 }
 
 export function VideoPokerScreen() {
-  const [game, setGame] = useState(() => new VideoPokerGame({ seed: randomSeed(), bankroll: START }))
+  const { game, replace } = useSharedBankroll(
+    'videopoker',
+    (bankroll) => new VideoPokerGame({ seed: randomSeed(), bankroll }),
+  )
   const [coach, setCoach] = useState(false)
   useSyncExternalStore(game.subscribe, game.getVersion)
 
@@ -192,16 +195,17 @@ export function VideoPokerScreen() {
 
   const changeVariant = useCallback((id: string) => game.setVariant(id), [game])
   const rebuy = useCallback(() => {
-    setGame(
-      new VideoPokerGame({
-        seed: randomSeed(),
-        variantId: game.variant.id,
-        bankroll: START,
-        autoHold: game.autoHold,
-        hands: game.hands,
-      }),
+    replace(
+      (bankroll) =>
+        new VideoPokerGame({
+          seed: randomSeed(),
+          variantId: game.variant.id,
+          bankroll,
+          autoHold: game.autoHold,
+          hands: game.hands,
+        }),
     )
-  }, [game])
+  }, [game, replace])
 
   const broke = game.bankroll < game.totalBet() && game.phase !== 'dealt'
   const won = done?.won ?? 0
@@ -362,7 +366,7 @@ export function VideoPokerScreen() {
 
             {broke ? (
               <button className="btn btn-primary" onClick={rebuy}>
-                Buy in for {START}
+                Add {BASE_STAKE}
               </button>
             ) : game.phase === 'dealt' ? (
               <button className="btn btn-primary btn-big" onClick={() => game.draw()}>

@@ -19,10 +19,6 @@ import { useEffect, useRef, useState } from 'react'
 
 import { ensureFunds, getBalance, recordDelta } from './wallet'
 
-interface Bankrolled {
-  bankroll: number
-}
-
 export interface SharedGame<T> {
   game: T
   /** Rebuild the engine funded from the current balance (e.g. a new shoe). */
@@ -32,48 +28,59 @@ export interface SharedGame<T> {
   replace: (make: (bankroll: number) => T) => void
 }
 
-export function useSharedBankroll<T extends Bankrolled>(
+/** Where the engine keeps its working balance. Most games put it on `.bankroll`;
+ *  blackjack keeps it on `.human.bankroll`, so a screen can pass its own reader. */
+function defaultRead<T>(game: T): number {
+  return (game as { bankroll: number }).bankroll
+}
+
+export function useSharedBankroll<T>(
   gameId: string,
   make: (bankroll: number) => T,
+  read: (game: T) => number = defaultRead,
 ): SharedGame<T> {
   const [game, setGame] = useState<T>(() => make(getBalance()))
-  const last = useRef<number>(game.bankroll)
+  const readRef = useRef(read)
+  readRef.current = read
+  const last = useRef<number>(read(game))
   const makeRef = useRef(make)
   makeRef.current = make
   const idRef = useRef(gameId)
   idRef.current = gameId
   const topping = useRef(false)
 
+  const bankroll = read(game)
+
   useEffect(() => {
     // Mirror whatever the engine just did with the money into the wallet.
-    const delta = game.bankroll - last.current
+    const delta = bankroll - last.current
     if (delta !== 0) {
-      last.current = game.bankroll
+      last.current = bankroll
       recordDelta(idRef.current, delta)
     }
     // Out of money: replenish and deal a fresh, funded engine. Guarded so the
     // async top-up can't fire twice for the same broke state.
-    if (game.bankroll <= 0 && !topping.current) {
+    if (bankroll <= 0 && !topping.current) {
       topping.current = true
       void ensureFunds().then((bal) => {
         topping.current = false
         if (bal > 0) {
           const g = makeRef.current(bal)
-          last.current = g.bankroll
+          last.current = readRef.current(g)
           setGame(g)
         }
       })
     }
-  }, [game, game.bankroll])
+  }, [game, bankroll])
 
   const newGame = () => {
     const g = makeRef.current(getBalance())
-    last.current = g.bankroll
+    last.current = readRef.current(g)
     setGame(g)
   }
   const replace = (make2: (bankroll: number) => T) => {
     const g = make2(getBalance())
-    last.current = g.bankroll
+    last.current = readRef.current(g)
     setGame(g)
   }
 

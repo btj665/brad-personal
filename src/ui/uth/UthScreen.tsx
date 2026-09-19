@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 
 import { randomSeed } from '../../engine/rng'
 import { UthGame, type Beat } from '../../uth/engine'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { WinToast } from '../WinToast'
 import { UthControls } from './UthControls'
 import { UthTable } from './UthTable'
 
-const START = 1000
 const HUMAN = 1
 const BOT_NAMES = ['Vera', 'Sol', 'Marlow']
 
@@ -33,7 +34,7 @@ function make(bankroll: number): UthGame {
 }
 
 export function UthScreen() {
-  const [game, setGame] = useState(() => make(START))
+  const { game, newGame } = useSharedBankroll('uth', (bankroll) => make(bankroll), (g) => g.human.bankroll)
   const [lastBeat, setLastBeat] = useState<Beat | null>(null)
   const [coach, setCoach] = useState(false)
 
@@ -48,9 +49,9 @@ export function UthScreen() {
   }, [game, game.version, pending, lastBeat])
 
   const rebuy = useCallback(() => {
-    setGame(make(START))
+    newGame()
     setLastBeat(null)
-  }, [])
+  }, [newGame])
 
   const broke = game.human.bankroll < game.rules.minBet * 2 && game.phase === 'betting'
   const log = useMemo(() => game.log.slice(-7).reverse(), [game.log, game.version])
@@ -92,7 +93,7 @@ export function UthScreen() {
             </div>
             <div className="button-row">
               <button className="btn btn-primary" onClick={rebuy}>
-                Buy in for {START}
+                Add {BASE_STAKE}
               </button>
             </div>
           </div>

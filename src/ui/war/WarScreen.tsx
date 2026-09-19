@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 
 import { cardName } from '../../engine/cards'
 import { randomSeed } from '../../engine/rng'
@@ -12,11 +12,12 @@ import {
   WarGame,
   type WarRound,
 } from '../../war/engine'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { PlayingCard } from '../Card'
 import { ChipStack } from '../Chips'
 import { WinToast } from '../WinToast'
 
-const START = 1000
 /** Even denominations only: a surrender hands back half the bet, and no table
  *  wants to make change for half a chip. */
 const CHIPS = [2, 10, 50, 100]
@@ -44,13 +45,10 @@ function Side({ label, cards, tilt }: { label: string; cards: Card[]; tilt: numb
 }
 
 export function WarScreen() {
-  const [game, setGame] = useState(() => new WarGame({ seed: randomSeed(), bankroll: START, bet: 10 }))
+  const { game, newGame } = useSharedBankroll('war', (bankroll) => new WarGame({ seed: randomSeed(), bankroll, bet: 10 }))
   useSyncExternalStore(game.subscribe, game.getVersion)
 
-  const rebuy = useCallback(
-    () => setGame(new WarGame({ seed: randomSeed(), bankroll: START, bet: 10 })),
-    [],
-  )
+  const rebuy = useCallback(() => newGame(), [newGame])
 
   const hand = game.hand
   const settled = game.phase === 'settled' && hand !== null
@@ -153,7 +151,7 @@ export function WarScreen() {
             {broke ? (
               <div className="button-row button-row-actions">
                 <button className="btn btn-primary btn-big" onClick={rebuy}>
-                  Buy in for {START}
+                  Add {BASE_STAKE}
                 </button>
               </div>
             ) : tie ? (

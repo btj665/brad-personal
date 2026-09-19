@@ -12,23 +12,21 @@ import {
 import { raiseReason, shouldRaise } from '../../caribbean/strategy'
 import { CATEGORY_NAME } from '../../poker/eval'
 import { randomSeed } from '../../engine/rng'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { PlayingCard } from '../Card'
 import { ChipStack } from '../Chips'
 import { WinToast } from '../WinToast'
 
-const START = 1000
-
 export function CaribbeanScreen() {
-  const [game, setGame] = useState(
-    () => new CaribbeanGame({ seed: randomSeed(), bankroll: START }),
+  const { game, newGame } = useSharedBankroll(
+    'caribbean',
+    (bankroll) => new CaribbeanGame({ seed: randomSeed(), bankroll }),
   )
   const [coach, setCoach] = useState(false)
   useSyncExternalStore(game.subscribe, game.getVersion)
 
-  const rebuy = useCallback(
-    () => setGame(new CaribbeanGame({ seed: randomSeed(), bankroll: START })),
-    [],
-  )
+  const rebuy = useCallback(() => newGame(), [newGame])
 
   // F folds, R raises — the only two keys the game ever needs.
   useEffect(() => {
@@ -191,7 +189,7 @@ export function CaribbeanScreen() {
             {game.phase !== 'decide' && game.bankroll < rules.minAnte * 3 ? (
               <div className="button-row button-row-actions">
                 <button className="btn btn-primary btn-big" onClick={rebuy}>
-                  Buy in for {START}
+                  Add {BASE_STAKE}
                 </button>
               </div>
             ) : game.phase === 'decide' ? (

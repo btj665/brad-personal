@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 
 import { randomSeed } from '../../engine/rng'
 import { PaiGowGame, type Beat } from '../../paigow/engine'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { WinToast } from '../WinToast'
 import { PaiGowControls } from './PaiGowControls'
 import { PaiGowTable } from './PaiGowTable'
 
-const START = 1000
 const HUMAN = 1
 const BOT_NAMES = ['Guo', 'Renata', 'Sax']
 
@@ -34,7 +35,11 @@ function make(bankroll: number, autoSet: boolean): PaiGowGame {
 
 export function PaiGowScreen() {
   const [autoSet, setAutoSet] = useState(false)
-  const [game, setGame] = useState(() => make(START, false))
+  const { game, newGame } = useSharedBankroll(
+    'paigow',
+    (bankroll) => make(bankroll, autoSet),
+    (g) => g.human.bankroll,
+  )
   const [lastBeat, setLastBeat] = useState<Beat | null>(null)
 
   useSyncExternalStore(game.subscribe, game.getVersion)
@@ -53,9 +58,9 @@ export function PaiGowScreen() {
   }, [game, game.version, pending, lastBeat])
 
   const rebuy = useCallback(() => {
-    setGame(make(START, autoSet))
+    newGame()
     setLastBeat(null)
-  }, [autoSet])
+  }, [newGame])
 
   const broke = game.human.bankroll < game.rules.minBet && game.phase === 'betting'
   const log = useMemo(() => game.log.slice(-7).reverse(), [game.log, game.version])
@@ -99,7 +104,7 @@ export function PaiGowScreen() {
             </div>
             <div className="button-row">
               <button className="btn btn-primary" onClick={rebuy}>
-                Buy in for {START}
+                Add {BASE_STAKE}
               </button>
             </div>
           </div>

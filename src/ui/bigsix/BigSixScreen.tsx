@@ -3,9 +3,10 @@ import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore, t
 import { BigSixGame } from '../../bigsix/engine'
 import { houseEdge, LABEL, PAYS, STOPS, SYMBOLS, TOTAL_STOPS, WHEEL, type Symbol6 } from '../../bigsix/wheel'
 import { randomSeed } from '../../engine/rng'
+import { BASE_STAKE } from '../../wallet/wallet'
+import { useSharedBankroll } from '../../wallet/useSharedBankroll'
 import { WinToast } from '../WinToast'
 
-const START = 500
 const CHIPS = [1, 5, 25, 100]
 
 // The wheel, in a square viewBox centred on the origin. Fifty-four stops, a peg
@@ -118,7 +119,7 @@ function BigSixWheel({
 }
 
 export function BigSixScreen() {
-  const [game, setGame] = useState(() => new BigSixGame({ seed: randomSeed(), bankroll: START }))
+  const { game, newGame } = useSharedBankroll('bigsix', (bankroll) => new BigSixGame({ seed: randomSeed(), bankroll }))
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   // Spin the engine first to learn the stop, then let the wheel ride to it
@@ -128,10 +129,10 @@ export function BigSixScreen() {
   const busy = anim !== null && !revealed
 
   const rebuy = useCallback(() => {
-    setGame(new BigSixGame({ seed: randomSeed(), bankroll: START }))
+    newGame()
     setAnim(null)
     setRevealed(true)
-  }, [])
+  }, [newGame])
 
   const spin = useCallback(() => {
     if (!game.canSpin() || busy) return
@@ -257,7 +258,7 @@ export function BigSixScreen() {
               <span className="bs6-staked">On table: {game.staked}</span>
               {broke ? (
                 <button className="btn btn-primary" onClick={rebuy}>
-                  Buy in for {START}
+                  Add {BASE_STAKE}
                 </button>
               ) : game.phase === 'result' && revealed ? (
                 <>
