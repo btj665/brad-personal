@@ -75,9 +75,20 @@ and one deck of hand-drawn SVG cards.
   cousins), all played by one data-driven engine and dealt onto one drag-and-drop
   table. A variant is a *record*, not a program.
 
+## Accounts, one shared wallet, and publishing
+
+Out of the box the app is a static, client-only site with a single play-money
+balance kept in the browser — `npm run dev` and the shareable zip just play, no
+login. Point it at a free Supabase project (two env vars) and the **same build**
+becomes the published version: a login gate, an **authenticator (TOTP)** second
+factor, **one balance that carries across every game and every visit** and
+replenishes when you're broke, and an owner-only **back office** of signups and
+play. Nothing to run yourself — the games stay client-side; a thin, row-level-
+secured data layer holds the money. Step-by-step in [SETUP.md](SETUP.md).
+
 ```bash
 npm run dev          # play them            → http://localhost:5173
-npm test             # 1,145 engine tests
+npm test             # engine tests
 npm run build
 npm run package      # a zip a coworker can unzip and double-click to play
 
