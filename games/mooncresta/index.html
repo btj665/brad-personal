@@ -103,12 +103,32 @@
      Guns       One section fires a single shot, two fire a pair, all three
                 fire four in a spread.
 
-   Sources disagree on two things and this says which way it went. They give
-   the lap as eight waves or as ten, and they call waves seven and eight
-   meteors or fireballs; the ten-wave reading is used, with waves seven and
-   eight as meteors you are not required to shoot. They also give the full
-   ship as four shots or as five; four in a volley is used, with at most five
-   of the player's bullets in the air at once.
+   ----------------------------------------------------------------------------
+   WHAT IS SOURCED AND WHAT IS NOT
+
+   Sourced: the hardware and the 224x256 vertical screen, the rocket in
+   three sections flown one at a time, a docking after the fourth and the
+   eighth wave on a thirty second clock paying a hundred a second, the wave
+   order, Cold Eyes splitting when hit, Four-Ds going invisible while still
+   moving, meteors being worth the most and not needing to be shot, the
+   scoring table, and the rocket coming apart again at the end of a lap.
+
+   Conflicting: a lap is given as eight waves or as ten, and waves seven and
+   eight are called meteors or fireballs. The ten-wave reading is used, with
+   seven and eight as meteors. The full ship is given as four shots or as
+   five; four in a volley is used, capped at five of the player's bullets in
+   the air.
+
+   Unstated anywhere I could reach, so decided here: a docking joins the
+   tail rather than the nose, which leaves the finished rocket nose-first as
+   on the cabinet art.
+
+   Reconstructed. Choices, not findings:
+     - the bonus section at thirty thousand
+     - how many attackers are in each wave
+     - every movement path, speed and firing rate
+     - the docking unit's climb and drift, and how close counts as aligned
+     - the difficulty ramp per lap
    ========================================================================== */
 function boot() {
 'use strict';
@@ -408,9 +428,9 @@ var WAVES = [
 ];
 var DOCK_AFTER = [3, 7];          /* zero-based: after the 4th and the 8th */
 
-var DOCK_SECONDS = 30;
-var DOCK_BONUS_PER_SECOND = 100;
-var MAX_PLAYER_BULLETS = 5;
+var DOCK_SECONDS = 30;             /* SOURCED */
+var DOCK_BONUS_PER_SECOND = 100;   /* SOURCED */
+var MAX_PLAYER_BULLETS = 5;        /* SOURCED as the cap; the volley of four is the reading taken */
 
 var TOP = 18, FLOOR = 214;
 /* The tail of the rocket sits here whatever it is made of, so a docked
@@ -506,6 +526,7 @@ function drawRocket(x, yNose, alpha) {
    WAVES
    ========================================================================== */
 function waveDef() { return WAVES[G.wave]; }
+/* RECONSTRUCTION. Sourced that later laps are harder, not by how much. */
 function speed() { return 1 + G.lap * 0.18 + G.wave * 0.02; }
 
 function startWave() {

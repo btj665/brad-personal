@@ -114,11 +114,35 @@
                  everything is 90. Three ships, and another at every 10,000.
                  45,000 was the score Activision wanted a photograph of.
 
-   The graphics are the deliberate departure. The geometry, the timing and
-   the rules are the cartridge's; the sprites are not, because the TIA gave
-   Cartwright eight pixels of one colour per scan line and the hamburger had
-   to be suggested rather than drawn. These are drawn, at the same size and
-   on the same grid.
+   The graphics are the deliberate departure. The geometry and the rules are
+   the cartridge's; the sprites are not, because the TIA gave Cartwright
+   eight pixels of one colour per scan line and the hamburger had to be
+   suggested rather than drawn. These are drawn, at the same size and on the
+   same grid.
+
+   ----------------------------------------------------------------------------
+   WHAT IS SOURCED AND WHAT IS NOT
+
+   Sourced: the resolution and pixel aspect, the single steerable shot, the
+   eight waves and their order, the scoring table and the ninety-point
+   second cycle, the wave bonus being value times units remaining, the bar
+   being eighty units and refilling only on a cleared wave, wrapping from
+   bottom to top, three ships, the extra ship every ten thousand, and the
+   45,000 patch.
+
+   Reconstructed, because no source I could reach gives them. These are
+   choices, not findings, and each is marked again where it appears:
+     - the energy drain rate
+     - twelve attackers per wave
+     - how often an attacker fires
+     - seven of the eight movement patterns. Only the cookies are
+       documented: they run sideways, dip toward the player and turn back.
+       The other seven are built to fit their descriptions.
+     - the speed increase per MegaCycle, and the recolouring palette
+
+   Corrected after the fact: two secondary sources state that energy is
+   regained by hitting attackers. It is not. It refills on a cleared wave
+   and at no other time.
    ========================================================================== */
 function boot() {
 'use strict';
@@ -448,8 +472,10 @@ function buildArt() {
 buildArt();
 
 /* --------------------------------------------------------------------------
-   The eight waves, in cartridge order. `pts` is the first MegaCycle's value;
-   every attacker is worth 90 from the second cycle on.
+   The eight waves, in cartridge order. SOURCED: the order, and `pts` — the
+   first MegaCycle's value, with every attacker worth 90 from the second
+   cycle on. RECONSTRUCTION: `count`, `fire` and `motion`, except the
+   cookies' dip-and-turn, which is the one pattern the sources describe.
    -------------------------------------------------------------------------- */
 var WAVES = [
   { n: 'HAMBURGERS',   spr: 'burger',  pts: 20, motion: 'march',   count: 12, fire: 0.0016 },
@@ -463,13 +489,25 @@ var WAVES = [
 ];
 
 /* From the second MegaCycle the attackers come back in different colours.
-   The TIA could recolour a sprite for nothing, and the game did. */
+   SOURCED that they are recoloured; RECONSTRUCTION which colours. */
 var CYCLE_TINTS = [null, T.cyanA, T.limeC, T.purpleA, T.orangeA, T.blueC, T.redC, T.goldC];
 
 var TOP = 16, FLOOR = 124;        /* the band the attackers live in */
-var ENERGY_MAX = 60;
-var ENERGY_FRAMES = 46;           /* frames per unit: a wave runs about 46s */
-var EXTRA_LIFE = 10000;
+
+/* SOURCED. The bar is eighty units. It refills when a wave is cleared and
+   at no other time: hitting an attacker puts nothing back, and whatever is
+   left at the end of the wave is the bonus. Two secondary sources claim
+   energy is regained incrementally per kill; both are wrong. The point of
+   a wave is to clear it before the bar runs out. */
+var ENERGY_MAX = 80;
+
+/* RECONSTRUCTION. Nothing I could reach gives the drain rate, so this is
+   chosen rather than found. It is set so a wave lasts about as long as it
+   did when the bar was sixty units: adopting the sourced bar size should
+   not quietly change the pacing with it. */
+var ENERGY_FRAMES = 35;           /* frames per unit: a wave runs about 47s */
+
+var EXTRA_LIFE = 10000;           /* SOURCED */
 
 var G = {
   mode: 'attract', t: 0, modeT: 0,
@@ -513,6 +551,7 @@ function waveDef() { return WAVES[G.wave]; }
    once the first MegaCycle is behind you. */
 function enemyValue() { return G.cycle === 0 ? waveDef().pts : 90; }
 
+/* RECONSTRUCTION. Sourced that later cycles are faster, not by how much. */
 function speedScale() { return 1 + G.cycle * 0.16 + G.wave * 0.035; }
 
 function addScore(n, x, y) {
@@ -737,7 +776,7 @@ function updateEnergy() {
   if (++G.energyT < ENERGY_FRAMES / speedScale()) return;
   G.energyT = 0;
   G.energy--;
-  if (G.energy <= 10 && G.energy > 0) SFX.low();
+  if (G.energy <= ENERGY_MAX * 0.17 && G.energy > 0) SFX.low();
   if (G.energy <= 0) { G.energy = 0; loseShip(true); }
 }
 
@@ -847,12 +886,12 @@ function drawHud() {
   ctx.fillRect(bx + 1, by + 1, bw - 2, bh - 2);
   var inner = bw - 2;
   var filled = Math.round(inner * (G.energy / ENERGY_MAX));
-  ctx.fillStyle = G.energy > 20 ? T.green8 : (G.energy > 10 ? T.goldC : T.red8);
+  ctx.fillStyle = G.energy > ENERGY_MAX * 0.33 ? T.green8
+                : (G.energy > ENERGY_MAX * 0.17 ? T.goldC : T.red8);
   ctx.fillRect(bx + 1, by + 1, filled, bh - 2);
-  /* six divisions, so "units remaining" is something you can read at a
-     glance rather than a smooth bar that tells you nothing */
+  /* eight divisions of ten units, so "units remaining" reads as a count */
   ctx.fillStyle = T.black;
-  for (var u = 1; u < 6; u++) ctx.fillRect(bx + 1 + Math.round(inner * u / 6), by + 1, 1, bh - 2);
+  for (var u = 1; u < 8; u++) ctx.fillRect(bx + 1 + Math.round(inner * u / 8), by + 1, 1, bh - 2);
 
   /* ships in hand on the left, the MegaCycle on the right */
   for (var i = 0; i < Math.min(G.lives - 1, 4); i++) {

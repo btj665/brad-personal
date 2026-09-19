@@ -109,9 +109,31 @@
                    and none here: the voice below is three bandpass filters
                    driven by a pulse train, which is what the SC-01 was.
 
-   Scoring is as documented for the original where sources agree; the
-   Astro Battles saucer values differ between sources and the write-up says
-   which numbers were taken.
+   ----------------------------------------------------------------------------
+   WHAT IS SOURCED AND WHAT IS NOT
+
+   Sourced: the hardware and the 204x320 play area, the eight-way yoke, the
+   quark laser's one-shot-and-cancel rule, the five missions and their
+   order, the six ranks and promotion on a completed tour, Astro Battles'
+   twenty-four invaders and its force field eroding under fire and
+   switching off where the player's own shot passes through, Laser Attack's
+   two formations of three escorts plus a laser ship plus a Gorfian robot
+   and the formation breaking when the laser ship dies, the red Galaxians
+   escorting a flagship, Space Warp being the one mission where enemy fire
+   can be shot down, the Flag Ship's reactor and vent and lethal debris,
+   and the scoring for the laser, Galaxian, warp and flagship missions.
+
+   Conflicting: the Astro Battles saucer is given as 100 and as 200. 100 is
+   used.
+
+   Reconstructed, because no source I could reach gives them. Choices, not
+   findings:
+     - three ships, and the extend at ten thousand
+     - the Galaxian flagship's value
+     - the force field's seventeen segments and three hit points each
+     - every movement speed, dive path and firing rate
+     - the difficulty ramp per tour
+     - which of the twenty-five spoken lines play when
    ========================================================================== */
 function boot() {
 'use strict';
@@ -651,12 +673,13 @@ var MISSIONS = [
 var SCORE = {
   invader: 50, gorfRobot: 300, saucer: 100, saucerFast: 300,
   escort: 100, laserShip: 300, miniGorf: 100,
-  galFormation: 50, galYellow: 60, galBlue: 80, galRed: 100, galFlagship: 200,
+  galFormation: 50, galYellow: 60, galBlue: 80, galRed: 100,
+  galFlagship: 200,   /* RECONSTRUCTION: the other four are sourced, this is not */
   warper: 250,
   hullPiece: 20, flyingPiece: 150, flagEscort: 100, reactor: 1000
 };
 
-var EXTRA_LIFE = 10000;
+var EXTRA_LIFE = 10000;   /* RECONSTRUCTION: no extend is documented for Gorf */
 
 /* --------------------------------------------------------------------------
    State
@@ -738,6 +761,7 @@ function addScore(n, x, y) {
   if (G.score > G.high) { G.high = G.score; A.Store.set('gorf.high', G.high); }
 }
 
+/* RECONSTRUCTION. Sourced that later tours are faster, not by how much. */
 function difficulty() { return 1 + G.tour * 0.22 + G.mission * 0.04; }
 
 function drawSprite(spr, x, y) { A.Sprite.draw(ctx, spr, Math.round(x), Math.round(y)); }
@@ -767,7 +791,7 @@ function enemyShot(x, y, vx, vy, kind) {
    where the player's own shot goes through it, which is the whole trick:
    every shot you take opens the hole they can shoot back through.
    ========================================================================== */
-var FIELD_SEGS = 17;
+var FIELD_SEGS = 17;   /* RECONSTRUCTION: the field is sourced, its granularity is not */
 
 function startAstro() {
   var cols = 6, rows = 4;
