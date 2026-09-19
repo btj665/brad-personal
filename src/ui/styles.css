@@ -9723,3 +9723,208 @@ main.main {
     padding: 5px 8px;
   }
 }
+
+/* --- Slot realism: anticipation, bounce, paylines, winner pop (slr-) --- */
+/* ================================================================ collected: slot realism */
+/*
+   The theatre a real cabinet gives you that the base build was missing: a reel
+   that overshoots and settles, a near-miss reel that shudders and glows while
+   you hold your breath, winning symbols that pop while the losers dim back, and
+   the actual payline drawn across the glass so you can see why a line paid.
+
+   Everything here is prefixed `slr-`. This file is appended LAST to the sheet,
+   so the few rules that re-point an existing `sl-` animation (the reel bounce,
+   the winning-symbol pop) win on equal specificity without touching styles.css.
+*/
+
+/* --- reel-stop bounce ---------------------------------------------------- */
+/* The reel overshoots a hair and springs back as it lands, instead of the flat
+   thunk. It's per-reel: the class is added as each reel's timer fires, so the
+   settle staggers left to right on its own. Replaces `sl-thunk`. */
+.sl-reel-landed {
+  animation: slr-bounce 280ms cubic-bezier(0.22, 0.9, 0.24, 1);
+}
+
+@keyframes slr-bounce {
+  0% {
+    transform: translateY(-5px);
+  }
+  45% {
+    transform: translateY(2.5px);
+  }
+  72% {
+    transform: translateY(-1px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* --- reel anticipation / near-miss --------------------------------------- */
+/* A reel that could complete a trigger spins on while this glow rides its frame
+   and it shudders — the single biggest "feel" cue. The accent and glow are the
+   cabinet's own, set per machine on `--sl-accent` / `--sl-glow`. */
+.slr-reel-ant {
+  border-color: var(--sl-accent);
+  box-shadow:
+    0 0 0 2px var(--sl-accent),
+    0 0 20px 4px var(--sl-glow),
+    inset 0 0 26px var(--sl-glow);
+  z-index: 3;
+  animation:
+    slr-shudder 92ms linear infinite,
+    slr-antglow 620ms ease-in-out infinite alternate;
+}
+
+@keyframes slr-shudder {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-1px);
+  }
+  75% {
+    transform: translateX(1px);
+  }
+}
+
+@keyframes slr-antglow {
+  from {
+    box-shadow:
+      0 0 0 2px var(--sl-accent),
+      0 0 14px 2px var(--sl-glow),
+      inset 0 0 18px var(--sl-glow);
+  }
+  to {
+    box-shadow:
+      0 0 0 2px var(--sl-accent),
+      0 0 30px 7px var(--sl-glow),
+      inset 0 0 34px var(--sl-glow);
+  }
+}
+
+/* --- winning symbols pop, losers dim ------------------------------------- */
+/* When a win is on the glass the reels carry `slr-win`: the winners pop and rock
+   (re-pointing the base `sl-cell-lit` pulse), everything else pulls back so the
+   wins read. The `:not()` selector is more specific than the base `.sl-cell`, so
+   the dim wins regardless of source order. */
+.sl-cell-lit {
+  animation: slr-winpop 720ms ease-in-out infinite alternate;
+}
+
+@keyframes slr-winpop {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  30% {
+    transform: scale(1.2) rotate(-3deg);
+  }
+  60% {
+    transform: scale(1.06) rotate(2deg);
+  }
+  100% {
+    transform: scale(1.13) rotate(-1deg);
+  }
+}
+
+.sl-reels.slr-win .sl-cell:not(.sl-cell-lit) {
+  filter: brightness(0.5) saturate(0.72);
+  opacity: 0.6;
+  transition: filter 0.2s ease, opacity 0.2s ease;
+}
+
+/* --- drawn paylines ------------------------------------------------------ */
+/* The reels box is the positioning context for the overlay; it has no padding,
+   so the SVG at inset 0 lines up cell-for-cell with the tape. */
+.sl-reels {
+  position: relative;
+}
+
+.slr-payline-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 5;
+}
+
+/* The path itself: the cabinet accent, drawn on with a dash sweep. The dash
+   length is a fixed over-estimate — longer than any real line — so a single
+   keyframe draws any path start-to-finish. */
+.slr-payline {
+  fill: none;
+  stroke: var(--sl-accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px var(--sl-glow)) drop-shadow(0 0 9px var(--sl-glow));
+  stroke-dasharray: 1400;
+  stroke-dashoffset: 1400;
+  animation: slr-draw 380ms ease-out forwards;
+}
+
+@keyframes slr-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.slr-payline-node {
+  fill: var(--sl-accent);
+  filter: drop-shadow(0 0 4px var(--sl-glow));
+  animation: slr-node 320ms ease-out backwards;
+}
+
+@keyframes slr-node {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* --- sound toggle -------------------------------------------------------- */
+/* A plain ghost button until it's on, then it wears the cabinet accent so the
+   state is obvious at a glance. */
+.slr-sound {
+  font-variant-numeric: tabular-nums;
+}
+
+.slr-sound-on {
+  border-color: var(--sl-accent);
+  color: var(--sl-accent);
+}
+
+/* --- reduced motion ------------------------------------------------------ */
+/* Show the result, don't perform it: no bounce, no shudder, no flashing, no
+   draw-on. The payline still appears (it's information, not motion) — just
+   without the sweep. Sound is held off in sound.ts under the same query. */
+@media (prefers-reduced-motion: reduce) {
+  .sl-reel-landed,
+  .slr-reel-ant,
+  .sl-cell-lit {
+    animation: none;
+  }
+
+  .slr-reel-ant {
+    /* Keep a static glow so a near-miss reel still reads, without the shudder. */
+    box-shadow:
+      0 0 0 2px var(--sl-accent),
+      0 0 18px 3px var(--sl-glow);
+  }
+
+  .slr-payline {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+
+  .slr-payline-node {
+    animation: none;
+  }
+}

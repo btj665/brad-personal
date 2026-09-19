@@ -9,7 +9,8 @@ import type { Machine, Step, Win } from '../../slots/types'
 import { BigWin, CabinetFrame, TopBox } from './Cabinet'
 import { BonusRound } from './BonusRound'
 import { PayScreen, PayStrip } from './PayScreen'
-import { Reels, rollDuration } from './Reels'
+import { Reels, prefersReducedMotion, spinTiming } from './Reels'
+import * as sound from './sound'
 
 const START = 500
 
@@ -80,6 +81,15 @@ export function SlotsScreen() {
   const [running, setRunning] = useState(0)
   /** The bonus has been played out on screen, so its award may show. */
   const [bonusSettled, setBonusSettled] = useState(true)
+  /** The mute toggle. Quiet by default; the module reads the same persisted key. */
+  const [soundOn, setSoundOn] = useState(() => sound.isEnabled())
+
+  const toggleSound = useCallback(() => {
+    const next = !sound.isEnabled()
+    // The click is a user gesture, so enabling here is what wakes the context.
+    sound.setEnabled(next)
+    setSoundOn(next)
+  }, [])
 
   const steps: Step[] = game.result?.steps ?? []
   const step: Step | null = steps[stepIndex] ?? null
@@ -99,12 +109,20 @@ export function SlotsScreen() {
 
   useEffect(() => {
     if (phase !== 'rolling') return
+    // The reels roll for as long as the anticipation stretches them, so the
+    // reveal has to wait on the same figure the reels use — computed from the
+    // already-decided screen, so it never lengthens a payout, only the show.
+    const total = spinTiming(machine, screen, prefersReducedMotion()).total
+    sound.startSpin(total)
     const t = setTimeout(() => {
       setPhase('reveal')
       setWinIndex(0)
-    }, rollDuration(machine.strips.length))
+    }, total)
     return () => clearTimeout(t)
-  }, [phase, spinToken, machine.strips.length])
+    // `screen` is stable for the duration of a roll (its step doesn't change),
+    // so keying on the spin token is enough to pick up the right window.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, spinToken])
 
   /** Leave the reels: the bonus, then the big-win screen, then rest. */
   const finishSpin = useCallback(() => {
@@ -125,6 +143,10 @@ export function SlotsScreen() {
     }
     if (winIndex === 0) setRunning((r) => r + step.paid)
     if (winIndex < step.wins.length) {
+      // A coin cue for the line now on the glass, scaled by what it paid. Fires
+      // once per win as the walk steps through them.
+      const w = step.wins[winIndex]
+      if (w) sound.win(1 + w.paid / Math.max(1, game.totalBet()))
       // Twenty paylines means a good screen can pay six or eight at once. Holding
       // each for a full beat would take ten seconds, so the walk speeds up as the
       // win count climbs rather than testing anybody's patience.
@@ -154,6 +176,19 @@ export function SlotsScreen() {
     return () => clearTimeout(t)
   }, [phase, stepIndex])
 
+  // The cabinet's two big stings, each fired once as its screen takes over.
+  useEffect(() => {
+    if (phase === 'bigwin') sound.bigWin()
+    else if (phase === 'bonus') sound.bonus()
+  }, [phase])
+
+  // Each reel's stop thunk, plus the rising tone the moment a reel lands one
+  // short of a trigger and the next reel is about to decide it.
+  const onReelLand = useCallback((_reel: number, nextAnticipates: boolean) => {
+    sound.reelStop(_reel)
+    if (nextAnticipates) sound.anticipation()
+  }, [])
+
   /** Collapse into the next screen, spin fresh reels for it, or leave the reels. */
   const advance = useCallback(() => {
     const next = steps[stepIndex + 1]
@@ -180,6 +215,9 @@ export function SlotsScreen() {
 
   const spin = useCallback(() => {
     if (!game.canSpin()) return
+    // The spin button is a user gesture, which is what lets the audio context
+    // start when sound is on — the whir itself is fired from the roll effect.
+    sound.resume()
     setRunning(0)
     setBonusSettled(false)
     game.spin()
@@ -293,6 +331,14 @@ export function SlotsScreen() {
           <span className="sl-blurb">{machine.blurb}</span>
         </div>
         <div className="topbar-right">
+          <button
+            className={`btn btn-ghost slr-sound${soundOn ? ' slr-sound-on' : ''}`}
+            onClick={toggleSound}
+            aria-pressed={soundOn}
+            title={soundOn ? 'Sound on — click to mute' : 'Muted — click for sound'}
+          >
+            {soundOn ? 'Sound on' : 'Sound off'}
+          </button>
           <button className="btn btn-ghost" onClick={() => setPays(true)}>
             Pays
           </button>
@@ -355,6 +401,9 @@ export function SlotsScreen() {
                   crumbling={crumbling}
                   spinToken={spinToken}
                   dropped={phase === 'drop'}
+                  onReelLand={onReelLand}
+                  payCells={showing && showing.kind === 'line' ? showing.cells : null}
+                  payKey={`${stepIndex}-${winIndex}`}
                 />
 
                 <div className="sl-callout">
