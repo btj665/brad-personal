@@ -12,6 +12,12 @@ import type { BonusPlay, Machine, SpinResult, Step, SymbolId, Win } from './type
 
 export type Phase = 'idle' | 'complete'
 
+/** Coins one spin costs per coin-per-line: the number of paylines on a line
+ *  machine, or the ways price on a ways machine (which buys every way at once). */
+export function stakeUnits(machine: Machine): number {
+  return machine.ways ? (machine.waysCost ?? 1) : machine.lines.length
+}
+
 /** A fresh symbol off a reel, drawn with the strip's own frequencies — which is
  *  what keeps a cascade refill distributed exactly like a fresh spin, and so
  *  keeps the base-game arithmetic in `rtp.ts` meaningful. */
@@ -62,7 +68,7 @@ export function resolveSpin(
   coinsPerLine: number,
   rng: Rng,
 ): SpinResult {
-  const staked = coinsPerLine * machine.lines.length
+  const staked = coinsPerLine * stakeUnits(machine)
   const steps: Step[] = []
   let paid = 0
   let freeSpinsAwarded = 0
@@ -156,7 +162,7 @@ export class SlotGame {
   }
 
   totalBet(): number {
-    return this.coinsPerLine * this.machine.lines.length
+    return this.coinsPerLine * stakeUnits(this.machine)
   }
 
   setCoinsPerLine(n: number): void {

@@ -99,6 +99,21 @@ export type Bonus =
       /** Filling every cell pays this much more, again × total stake. */
       fullScreen: number
     }
+  /** The banker's offer — Top Dollar's mechanic. A run of offers is drawn up
+   *  front; each is shown in turn and the player may take it or pass to the next,
+   *  and the last is forced. There is a genuinely optimal line (take an offer that
+   *  beats what passing is worth on average), so the round's return is stated under
+   *  that optimal play, and a coach can point to it — exactly like video poker. */
+  | {
+      kind: 'offer'
+      trigger: SymbolId
+      triggerCount: number
+      /** How many offers are made; the last one cannot be passed. */
+      offers: number
+      /** The pool every offer is drawn from — awards as multiples of the total
+       *  stake, with relative weights. Each offer is an independent draw. */
+      pool: Array<{ value: number; weight: number }>
+    }
 
 /** What a triggered bonus actually did. Everything the cabinet needs to put on a
  *  show is in here, so the UI never decides an outcome. */
@@ -132,8 +147,17 @@ export interface Machine {
   strips: SymbolId[][]
   /** How many symbols of each strip are visible. */
   rows: number
-  /** Each payline as a row index per reel. */
+  /** Each payline as a row index per reel. Empty on a ways machine, which pays
+   *  by adjacency instead of along fixed lines. */
   lines: number[][]
+  /** All-ways pays: a symbol pays when it lands on consecutive reels from reel
+   *  one, regardless of row, and the win multiplies by how many of it sit on each
+   *  matched reel (the "ways"). `linePays` then reads as the per-way pay by run
+   *  length. The stake buys every way at once, priced by `waysCost`. */
+  ways?: boolean
+  /** Coins one spin costs on a ways machine, per coin-per-line — the price of
+   *  buying all the ways (e.g. 25 for a 243-ways game). Ignored on a line game. */
+  waysCost?: number
   linePays: LinePays
   scatterPays?: ScatterPays
   feature: Feature
