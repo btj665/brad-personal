@@ -126,9 +126,14 @@
    Conflicting: the Astro Battles saucer is given as 100 and as 200. 100 is
    used.
 
+   Sourced from MAME's DIP table for this PCB, which is read off the
+   hardware (src/mame/bally/astrocde.cpp): three ships per credit, and the
+   bonus ship awarded for reaching Mission 5 rather than at any score. The
+   switch does not say whether that is once a game or once a tour; this
+   pays it once a tour.
+
    Reconstructed, because no source I could reach gives them. Choices, not
    findings:
-     - three ships, and the extend at ten thousand
      - the Galaxian flagship's value
      - the force field's seventeen segments and three hit points each
      - every movement speed, dive path and firing rate
@@ -679,7 +684,16 @@ var SCORE = {
   hullPiece: 20, flyingPiece: 150, flagEscort: 100, reactor: 1000
 };
 
-var EXTRA_LIFE = 10000;   /* RECONSTRUCTION: no extend is documented for Gorf */
+/* SOURCED, from MAME's DIP table for the Gorf PCB (src/mame/bally/astrocde.cpp,
+   INPUT_PORTS_START(gorf)): the board's bonus-ship switch S1:6 offers only
+   "None" or "Mission 5", defaulting to Mission 5. Gorf does not award an
+   extra ship at a score at all — it gives you one for reaching the Flag
+   Ship. The same table gives S1:5 "Lives per Credit" as 2 or 3, default 3,
+   which is what this starts with.
+
+   OPEN: the switch says Mission 5 but not whether that is once in a game or
+   once every tour. This awards it on reaching the Flag Ship each tour. */
+var BONUS_SHIP_MISSION = 4;   /* zero-based: mission 5 is the Flag Ship */
 
 /* --------------------------------------------------------------------------
    State
@@ -688,7 +702,7 @@ var G = {
   mode: 'attract',        /* attract | brief | play | dying | clear | promote | over */
   t: 0, modeT: 0,
   score: 0, high: A.Store.get('gorf.high', 5000),
-  lives: 3, rank: 0, tour: 0, mission: 0, nextExtra: EXTRA_LIFE,
+  lives: 3, rank: 0, tour: 0, mission: 0, bonusShipTour: -1,
   shake: 0, flash: 0,
   paused: false, resume: false,
   attractPhase: 0
@@ -755,9 +769,6 @@ function addScore(n, x, y) {
   var before = G.score;
   G.score += n;
   if (x != null) fx.popup(x, y, String(n), P.yellow);
-  if (before < G.nextExtra && G.score >= G.nextExtra) {
-    G.lives++; G.nextExtra += EXTRA_LIFE; SFX.extra();
-  }
   if (G.score > G.high) { G.high = G.score; A.Store.set('gorf.high', G.high); }
 }
 
@@ -1393,6 +1404,14 @@ function clearField() {
 }
 
 function startMission() {
+  /* The bonus ship, per the board's S1:6 switch: reaching the Flag Ship
+     earns one. Guarded by the tour it was paid in so a lost ship replaying
+     the mission cannot be farmed for another. */
+  if (G.mission === BONUS_SHIP_MISSION && G.bonusShipTour !== G.tour) {
+    G.bonusShipTour = G.tour;
+    G.lives++;
+    SFX.extra();
+  }
   clearField();
   respawnShip();
   var m = MISSIONS[G.mission];
@@ -1838,7 +1857,7 @@ function drawOver() {
 function startGame() {
   G.score = 0; G.lives = 3; G.rank = 0; G.tour = 0; G.mission = 0;
   G.resume = false;
-  G.nextExtra = EXTRA_LIFE;
+  G.bonusShipTour = -1;
   G.mode = 'brief'; G.modeT = 0;
   taunt('start');
 }

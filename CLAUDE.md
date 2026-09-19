@@ -73,12 +73,29 @@ little they cost you:
 1. **Paste the text, or attach the file.** Always works, no configuration.
    PDFs and images of manual pages are readable.
 2. **Put the document in a GitHub repository.** Committed files are
-   reachable through `raw.githubusercontent.com` right now.
+   reachable through `raw.githubusercontent.com` right now. Drop them in
+   `docs/arcade-sources/`, which lists what is still open.
 3. **Change the environment's network access.** Open the environment for
    editing and use the **Network access** selector: **Custom** with a list
    of hosts, with *Also include default list of common package managers*
    checked so GitHub and the registries keep working, or **Full** for any
    domain.
+
+**`raw.githubusercontent.com` serves any public repository, not only the
+ones attached to this session.** Tested: MAME's 897 KB Galaxian driver
+fetched fine. The GitHub *API* is scoped to attached repositories and
+refuses anything else, but raw file reads are not. That makes a large class
+of primary material reachable without changing any setting — source,
+disassemblies, documentation, data files.
+
+This is worth reaching for before asking. MAME's driver sources carry DIP
+switch tables read off the original boards, and they settled three values
+that had been marked as reconstructions: Gorf runs three ships per credit
+and awards its bonus ship for reaching Mission 5 rather than at any score,
+which corrected a wrong implementation, and Moon Cresta's bonus section
+comes at 30,000. Useful paths: `mamedev/mame`, `src/mame/<manufacturer>/`.
+Say what such a source is — a DIP table read off hardware is strong, and it
+is still not the operator manual.
 
 Never route around a block. The proxy README is explicit: a 403 or 407 is an
 organization policy denial, and the instruction is to report the blocked

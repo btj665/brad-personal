@@ -123,8 +123,12 @@
    tail rather than the nose, which leaves the finished rocket nose-first as
    on the cabinet art.
 
+   Sourced from MAME's DIP table for this PCB, which is read off the
+   hardware: the bonus section at thirty thousand, the board's other
+   setting being fifty thousand. That table has no lives switch, which
+   matches the three lives being the three rocket sections.
+
    Reconstructed. Choices, not findings:
-     - the bonus section at thirty thousand
      - how many attackers are in each wave
      - every movement path, speed and firing rate
      - the docking unit's climb and drift, and how close counts as aligned
@@ -928,8 +932,12 @@ function addScore(n, x, y) {
   var before = G.score;
   G.score += n;
   if (x != null) fx.popup(x, y, String(n), P.cream);
-  /* a bonus rocket section. The threshold is a reconstruction: sources give
-     the scoring table but not the extend. */
+  /* SOURCED, from MAME's DIP table for the Moon Cresta PCB
+     (src/mame/galaxian/galaxian.cpp, INPUT_PORTS_START(mooncrst)): the
+     bonus-life switch offers 30000 or 50000 and defaults to 30000, which
+     is what this uses. The same table has no lives switch, consistent with
+     the three lives being the three rocket sections rather than a count
+     the operator can set. */
   if (before < G.nextExtra && G.score >= G.nextExtra) {
     rocket.reserve.push(2);
     G.nextExtra += 30000;
