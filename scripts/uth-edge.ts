@@ -1,12 +1,12 @@
 // Plays the bots' Ultimate Texas Hold'em strategy and reports the house edge.
 //
-// Perfect play gives up about 2.19% of the ante per hand; that requires solving
-// every decision exactly. These bots instead play the well-known simple charts —
-// the published 4x/2x preflop-and-flop rules and a hidden-pair river — which is
-// sound, never-embarrassing play but leaves a little on the table. The number
-// below is what that strategy actually costs, measured, not the theoretical
-// floor. (The engine itself is exact: `npm run uth:trips` and the settlement
-// tests pin that down.)
+// Perfect play gives up about 2.19% of the ante per hand. These bots play the
+// published 4x/2x preflop-and-flop charts and, at the river, weigh the hand
+// against every dealer holding and bet at the break-even — so they land right by
+// the floor: about 2.4% of the ante over a million hands (the blind's up-to-500:1
+// bonus makes this a high-variance measurement, so it takes that many to settle).
+// (The engine itself is exact: `npm run uth:trips` and the settlement tests pin
+// that down.)
 //
 //   npm run uth:edge
 //   npm run uth:edge -- 2000000
