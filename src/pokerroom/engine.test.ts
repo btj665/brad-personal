@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { PokerGame, type BotBrain } from './engine'
 import { ranker } from './ranker'
-import { HOLDEM } from './variants'
+import { HOLDEM, LIMIT_HOLDEM } from './variants'
 import type { BotProfile } from './types'
 
 const P: BotProfile = { looseness: 0.5, aggression: 0.4, bluff: 0.1, quips: [] }
@@ -122,5 +122,62 @@ describe('the poker engine', () => {
       return g.seats.map((s) => s.stack)
     }
     expect(run()).toEqual(run())
+  })
+
+  it('sizes fixed-limit bets small before the flop, big on the turn', () => {
+    const checkCall: BotBrain = (_g, _s, opt) => (opt.canCheck ? { kind: 'check' } : { kind: 'call' })
+    const g = new PokerGame({
+      variant: LIMIT_HOLDEM,
+      ranker,
+      brain: checkCall,
+      seed: 2,
+      bigBlind: 20,
+      buyIn: 100000, // deep enough that nobody is ever all-in, so bets are full-sized
+      humanSeat: -1,
+      seats: 3,
+      bots: Array.from({ length: 3 }, (_, i) => ({ name: `Bot ${i}`, profile: P })),
+    })
+    g.startHand()
+    // At each street's open, the first player can only open for the fixed step.
+    const openingBet: Record<string, number> = {}
+    for (let i = 0; i < 400 && !g.over; i++) {
+      const b = g.step()
+      if (b.type === 'street' && g.onClock >= 0) openingBet[b.street] = g.options(g.onClock).minTo
+    }
+    // Small bet (one big blind) on the flop, big bet (two) on the turn — the jump
+    // real limit poker makes, and the off-by-one the variants task flagged.
+    expect(openingBet.flop).toBe(20)
+    expect(openingBet.turn).toBe(40)
+  })
+
+  it('caps a multiway fixed-limit round at a bet and three raises', () => {
+    const alwaysRaise: BotBrain = (_g, _s, opt) => {
+      if (opt.canRaise) return { kind: 'raise', to: opt.minTo }
+      if (opt.canBet) return { kind: 'bet', to: opt.minTo }
+      if (opt.canCheck) return { kind: 'check' }
+      return { kind: 'call' }
+    }
+    const g = new PokerGame({
+      variant: LIMIT_HOLDEM,
+      ranker,
+      brain: alwaysRaise,
+      seed: 1,
+      bigBlind: 20,
+      buyIn: 100000,
+      humanSeat: -1,
+      seats: 4,
+      bots: Array.from({ length: 4 }, (_, i) => ({ name: `Bot ${i}`, profile: P })),
+    })
+    g.startHand()
+    // Count the aggressive actions in the preflop round: the big blind is the
+    // opening bet, so a cap of four leaves room for exactly three raises before
+    // everyone is reduced to calling.
+    let raises = 0
+    for (let i = 0; i < 200 && !g.over; i++) {
+      const b = g.step()
+      if (b.type === 'street' && b.street === 'flop') break
+      if (b.type === 'action' && (b.action.kind === 'raise' || b.action.kind === 'bet')) raises++
+    }
+    expect(raises).toBe(3)
   })
 })

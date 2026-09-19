@@ -9928,3 +9928,494 @@ main.main {
     animation: none;
   }
 }
+
+/* --- Poker room: oval table, seats, bet controls (pk-) --- */
+/* ================================================================ Poker room */
+/* A real card room: an oval felt, six seats fanned around it, the board and the
+   pot in the middle, and the bet controls under the human. Built on the shared
+   felt/brass tokens so it belongs to the same floor as the other tables. */
+
+.pk-table {
+  width: 100%;
+  max-width: 1180px;
+}
+
+/* The felt: an oval rather than the half-round the seated house games use, since
+   poker seats every side of the table. */
+.pk-felt {
+  min-height: 0;
+  padding: 20px;
+  border-radius: 180px / 120px;
+  overflow: visible;
+}
+
+.pk-oval {
+  position: relative;
+  width: 100%;
+  height: 560px;
+  margin: 0 auto;
+  border-radius: 46% / 50%;
+  background:
+    radial-gradient(60% 46% at 50% 42%, rgba(255, 255, 255, 0.06), transparent 70%);
+  box-shadow: inset 0 0 0 2px rgba(200, 160, 74, 0.16);
+}
+
+/* ---- the centre: board and pot ---- */
+
+.pk-center {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 2;
+}
+
+.pk-board {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  min-height: 82px;
+}
+
+.pk-board-slot {
+  width: 58px;
+  height: 81px;
+  border-radius: 7px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.pk-board .card {
+  width: 58px;
+  height: 81px;
+}
+
+.pk-board-card {
+  display: inline-block;
+  transform-origin: center bottom;
+  animation: pk-deal 0.34s ease-out both;
+}
+
+.pk-pot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 14px 5px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.34);
+  border: 1px solid rgba(200, 160, 74, 0.28);
+}
+
+.pk-pot-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+
+.pk-award {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--win);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  animation: pk-award 0.5s ease-out both;
+}
+
+/* ---- the seats ---- */
+
+.pk-seat-anchor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 148px;
+  display: flex;
+  justify-content: center;
+  z-index: 3;
+}
+
+.pk-seat {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.pk-seat-human {
+  background: rgba(200, 160, 74, 0.08);
+}
+
+.pk-seat-active {
+  border-color: rgba(200, 160, 74, 0.75);
+  box-shadow: 0 0 0 3px rgba(200, 160, 74, 0.16);
+  animation: pk-clock 1.2s ease-in-out infinite;
+}
+
+.pk-seat-dim {
+  opacity: 0.5;
+}
+
+.pk-seat-winner {
+  border-color: var(--win);
+  background: rgba(88, 201, 138, 0.12);
+  box-shadow: 0 0 0 3px rgba(88, 201, 138, 0.25);
+  animation: pk-win 0.9s ease-in-out;
+}
+
+.pk-seat-cards {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  min-height: 62px;
+}
+
+.pk-seat-cards .card {
+  width: 44px;
+  height: 62px;
+}
+
+.pk-seat-human .pk-seat-cards .card {
+  width: 52px;
+  height: 73px;
+}
+
+.pk-noshow {
+  font-size: 11px;
+  color: var(--ink-dim);
+  align-self: center;
+}
+
+.pk-seat-plate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.3;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--line);
+  min-width: 92px;
+}
+
+.pk-seat-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pk-seat-stack {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+
+.pk-seat-rank {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* Dealer button and blind markers, tucked under the seat plate. */
+.pk-markers {
+  display: flex;
+  gap: 5px;
+}
+
+.pk-btn-disc,
+.pk-blind-disc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pk-btn-disc {
+  background: #f3ede2;
+  color: #1a1408;
+  border: 2px solid #b98d31;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.pk-blind-disc {
+  width: auto;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--brass);
+  color: var(--brass);
+}
+
+.pk-seat-bet {
+  min-height: 34px;
+  display: flex;
+  justify-content: center;
+}
+
+.pk-card-win .card {
+  outline: 3px solid var(--win);
+  outline-offset: -1px;
+  border-radius: 8px;
+}
+
+/* ---- controls tray ---- */
+
+.pk-tray {
+  grid-template-columns: 1fr 260px;
+}
+
+.pk-controls {
+  gap: 14px;
+}
+
+.pk-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pk-raise {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.pk-raise-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.pk-raise-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+}
+
+.pk-raise-amount {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+
+.pk-slider {
+  width: 100%;
+  accent-color: var(--brass);
+  height: 22px;
+}
+
+.pk-quicks {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pk-quick {
+  flex: 1;
+  min-width: 58px;
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.pk-commit {
+  width: 100%;
+}
+
+/* ---- the draw round ---- */
+
+.pk-draw-hand {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pk-draw-card {
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 8px;
+  transition: transform 0.1s;
+}
+
+.pk-draw-card:hover {
+  transform: translateY(-4px);
+}
+
+.pk-draw-picked {
+  outline: 3px solid var(--lose);
+  outline-offset: 2px;
+  border-radius: 8px;
+  opacity: 0.7;
+}
+
+/* ---- topbar bits ---- */
+
+.pk-blurb {
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+/* ---- animations ---- */
+
+@keyframes pk-deal {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pk-clock {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(200, 160, 74, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(200, 160, 74, 0.3);
+  }
+}
+
+@keyframes pk-win {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(88, 201, 138, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(88, 201, 138, 0.5);
+  }
+}
+
+@keyframes pk-award {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- narrow / phone ---- */
+
+@media (max-width: 900px) {
+  .pk-tray {
+    grid-template-columns: 1fr;
+  }
+  .pk-oval {
+    height: 480px;
+  }
+  .pk-seat-anchor {
+    width: 116px;
+  }
+  .pk-seat-cards .card,
+  .pk-seat-human .pk-seat-cards .card {
+    width: 38px;
+    height: 53px;
+  }
+  .pk-board .card,
+  .pk-board-slot {
+    width: 46px;
+    height: 64px;
+  }
+}
+
+@media (max-width: 640px) {
+  .pk-felt {
+    padding: 8px;
+  }
+  .pk-oval {
+    height: 420px;
+    border-radius: 44% / 50%;
+  }
+  .pk-seat-anchor {
+    width: 92px;
+  }
+  .pk-seat {
+    gap: 3px;
+    padding: 4px;
+  }
+  .pk-seat-cards {
+    min-height: 45px;
+    gap: 2px;
+  }
+  .pk-seat-cards .card,
+  .pk-seat-human .pk-seat-cards .card {
+    width: 30px;
+    height: 42px;
+  }
+  .pk-board {
+    gap: 4px;
+    min-height: 56px;
+  }
+  .pk-board .card,
+  .pk-board-slot {
+    width: 34px;
+    height: 48px;
+  }
+  .pk-seat-plate {
+    min-width: 0;
+    padding: 2px 6px;
+  }
+  .pk-seat-name {
+    font-size: 10px;
+  }
+  .pk-seat-stack {
+    font-size: 11px;
+  }
+  .pk-seat-rank {
+    font-size: 8px;
+    padding: 1px 5px;
+  }
+  .pk-btn-disc,
+  .pk-blind-disc {
+    width: 18px;
+    height: 18px;
+    font-size: 8px;
+  }
+  .pk-pot-label {
+    font-size: 11px;
+  }
+  .pk-quick {
+    min-width: 44px;
+    font-size: 11px;
+    padding: 6px 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-board-card,
+  .pk-award {
+    animation: none;
+  }
+  .pk-seat-active,
+  .pk-seat-winner {
+    animation: none;
+  }
+}

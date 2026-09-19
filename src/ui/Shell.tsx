@@ -9,6 +9,7 @@ import { KenoScreen } from './keno/KenoScreen'
 import { LetItRideScreen } from './letitride/LetItRideScreen'
 import { MStudScreen } from './mstud/MStudScreen'
 import { PaiGowScreen } from './paigow/PaiGowScreen'
+import { PokerScreen } from './pokerroom/PokerScreen'
 import { RouletteScreen } from './roulette/RouletteScreen'
 import { SicBoScreen } from './sicbo/SicBoScreen'
 import { SlotsScreen } from './slots/SlotsScreen'
@@ -32,6 +33,7 @@ type GameId =
   | 'roulette'
   | 'sicbo'
   | 'bigsix'
+  | 'poker'
   | 'videopoker'
   | 'slots'
   | 'keno'
@@ -61,6 +63,10 @@ const FLOOR: Array<{ group: string; games: Entry[] }> = [
     ],
   },
   {
+    group: 'Poker room',
+    games: [{ id: 'poker', label: 'Poker', blurb: 'Six-handed vs bots — Hold’em, Omaha, Stud, Draw' }],
+  },
+  {
     group: 'Dice & wheels',
     games: [
       { id: 'craps', label: 'Craps', blurb: 'Pass, come, odds, place, field' },
@@ -87,6 +93,7 @@ const SCREENS: Record<GameId, () => React.JSX.Element> = {
   blackjack: BlackjackScreen,
   baccarat: BaccaratScreen,
   paigow: PaiGowScreen,
+  poker: PokerScreen,
   uth: UthScreen,
   threecard: ThreeCardScreen,
   caribbean: CaribbeanScreen,

@@ -84,6 +84,7 @@ export class PokerGame {
   private dealIndex = 0
   private toAct = -1
   private drawSeat = -1
+  private aggressiveActs = 0
   private drawn = new Set<number>()
   private queue: Beat[] = []
   private phase: 'idle' | 'betting' | 'draw' | 'showdown' | 'over' = 'idle'
@@ -292,8 +293,19 @@ export class PokerGame {
         s.canReopen = true
       }
     }
+    // A fixed-limit round is capped at a bet and N raises. A live blind is
+    // already that opening bet, so the round starts one aggressive action in.
+    this.aggressiveActs = this.currentBet > 0 ? 1 : 0
     this.toAct = first >= 0 ? first : this.nextIn(this.button)
     this.queue.push({ type: 'street', street: this.street })
+  }
+
+  /** In fixed-limit, raising closes once the cap is reached — but the cap lifts
+   *  heads-up, the way a real limit table plays it. */
+  private raiseCapped(): boolean {
+    if (this.variant.limit !== 'fixedLimit' || this.variant.raiseCap == null) return false
+    const live = this.contenders().filter((s) => !s.allIn).length
+    return live > 2 && this.aggressiveActs >= this.variant.raiseCap
   }
 
   options(seat: number): Options {
@@ -326,16 +338,21 @@ export class PokerGame {
       canCheck,
       callAmount,
       canBet: opening && s.stack > 0,
-      canRaise: !opening && s.canReopen && s.stack > toCall,
+      canRaise: !opening && s.canReopen && s.stack > toCall && !this.raiseCapped(),
       minTo,
       maxTo,
     }
   }
 
   private betSize(): number {
+    // The betting round we're in: preflop is round 0, and every closeStreet that
+    // deals the next street bumps dealIndex, so the round is dealIndex - 1. The
+    // first `smallBetStreets` rounds use the small bet, the rest the big bet —
+    // this is what puts stud's jump to the big bet on fifth street, not sixth.
+    const round = Math.max(0, this.dealIndex - 1)
     const streets = this.variant.deal.length
-    const early = this.dealIndex <= Math.ceil(streets / 2)
-    return early ? this.bigBlind : this.bigBlind * 2
+    const smallRounds = this.variant.smallBetStreets ?? Math.ceil(streets / 2)
+    return round < smallRounds ? this.bigBlind : this.bigBlind * 2
   }
 
   act(action: Action): void {
@@ -371,6 +388,7 @@ export class PokerGame {
       const to = Math.max(opt.minTo, Math.min(wanted, opt.maxTo))
       const increment = to - this.currentBet
       const fullRaise = increment >= this.minRaise
+      this.aggressiveActs++
       this.commit(s, to - s.streetCommitted)
       if (fullRaise) {
         this.minRaise = increment
@@ -617,6 +635,15 @@ export class PokerGame {
 
   get over(): boolean {
     return this.phase === 'over'
+  }
+
+  /** The seat the engine is waiting on — the one to act in a betting round or the
+   *  one on the clock to draw — or -1 when no seat is being waited on. A public
+   *  read so the table can highlight it without reaching into engine internals. */
+  get onClock(): number {
+    if (this.phase === 'betting') return this.toAct
+    if (this.phase === 'draw') return this.drawSeat
+    return -1
   }
 
   /** Play a whole hand with no pauses — for the bot-vs-bot equity/accounting

@@ -5,3 +5,6 @@ dist
 packaging/build
 the-tables.zip
 .vite
+
+# TypeScript incremental build info
+*.tsbuildinfo
