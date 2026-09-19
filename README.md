@@ -1,6 +1,6 @@
 # The Tables
 
-Seventeen casino games — including a slot floor of four cabinets and a
+Seventeen casino games — including a slot floor of six cabinets and a
 **six-handed poker room** of six variants — plus a **35-variant solitaire
 room**, all sharing one deterministic engine core, two poker-hand evaluators,
 and one deck of hand-drawn SVG cards.
@@ -56,13 +56,15 @@ and one deck of hand-drawn SVG cards.
 - **Video Poker** — five variants (Jacks or Better, Bonus, Double Bonus, Deuces
   Wild), an optimal-play coach that solves the best hold exactly, auto-hold, and
   Triple / Five / Ten Play.
-- **Slots** — four cabinets, chosen to be four different *mechanics* rather than
-  four themes, because the theme is the only part of a slot that doesn't change
+- **Slots** — six cabinets, chosen to be six different *mechanics* rather than
+  six themes, because the theme is the only part of a slot that doesn't change
   the arithmetic: a three-reel stepper with doubling wilds and a top-box wheel; a
   thirty-line game whose bells pay from anywhere and then lock and respin; a
   cascading screen where winners crumble, the chain escalates, and boulders hide
-  prizes; and a lounge with free games, a wild that swallows a whole reel, and
-  eight backstage doors.
+  prizes; a lounge with free games, a wild that swallows a whole reel, and eight
+  backstage doors; a stepper whose top-box banker keeps phoning with offers you
+  can take or pass (Top Dollar's mechanic, with a genuinely optimal line); and a
+  243-ways game where a symbol pays on adjacent reels regardless of row.
 - **Keno** — pick one to ten of eighty, drawn twenty at a time, with the exact
   hypergeometric odds and an honest note about what the ticket costs you.
 
@@ -191,6 +193,8 @@ hit.
 | Bell Ringer | 30 lines, bells pay from anywhere | hold & spin | 85.311% | 94.901% | 95% |
 | Rockslide | cascading reels, 1×→10× ladder | pick a boulder | 44.702% | 94.818% | 95% |
 | The Late Show | expanding wilds, free games at 2× | eight doors | 65.136% | 95.944% | 96% |
+| High Roller | 3-reel stepper, wild | banker's offer | 79.187% | 92.008% | 92% |
+| Nova Ways | 5×3, 243 ways | free games at 3× | 83.888% | 93.980% | 94% |
 
 The **base** column is the reels alone. Nothing that feeds a screen back into
 itself can be enumerated — a cascade produces its own next screen, a free-games
@@ -201,7 +205,7 @@ them together; it also names *which* features sit outside the enumeration, since
 a wheel worth 15% of a machine is otherwise easy to hide inside a reassuring
 "exact" figure.
 
-Two of the three bonus mechanics are priced in **closed form**, so the cabinets
+Three of the four bonus mechanics are priced in **closed form**, so the cabinets
 carrying them were re-cut algebraically rather than by hunting:
 
 - A **wheel** with equally-likely wedges is worth its own mean. Bars & Sevens is
@@ -217,8 +221,21 @@ carrying them were re-cut algebraically rather than by hunting:
   it is collected with probability `1/(d+1)`, independent of how many other
   prizes there are. Verified against simulation on four boards, including a
   degenerate one-prize-four-duds case, before it was relied on.
+- **The banker's offer** (Top Dollar's mechanic) is worth its value under
+  optimal play, by backward induction: at the last, forced offer it is worth the
+  pool mean; at an earlier one the player takes iff the call beats the value of
+  passing, so the stage is `Σ p·max(v, next)`. High Roller's five-offer round
+  works out to `19.449` stakes, checked against a brute-force enumeration of a
+  small pool and against simulation, and — like video poker — the machine's
+  return is stated under that best line, with a coach that could point to it.
 - **Hold and spin** has no closed form, because respins re-grant themselves
   whenever a coin lands, so it is measured.
+
+And the base game has a fourth exact form for **all-ways pays** (Nova Ways):
+because ways wins sum across symbols and the reels are independent, the return
+factorizes — for each symbol and run length, the per-way pay times the product of
+the expected matches on the run's reels times the chance the run breaks where it
+does — so 243 ways enumerate without walking a single screen.
 
 Adding the bonus symbol cost nothing, which is the trick that made the retune
 cheap: `BON` replaced **blanks**, not paying symbols. Since the evaluator treats

@@ -79,7 +79,7 @@ const FLOOR: Array<{ group: string; games: Entry[] }> = [
     group: 'Machines',
     games: [
       { id: 'videopoker', label: 'Video Poker', blurb: 'Five variants, up to ten hands' },
-      { id: 'slots', label: 'Slots', blurb: 'Four cabinets, four mechanics' },
+      { id: 'slots', label: 'Slots', blurb: 'Six cabinets, six mechanics' },
       { id: 'keno', label: 'Keno', blurb: 'Pick ten of eighty, exact odds' },
     ],
   },
