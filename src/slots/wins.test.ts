@@ -20,7 +20,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { makeRng } from '../engine/rng'
-import { resolveSpin } from './machine'
+import { resolveSpin, stakeUnits } from './machine'
 import { MACHINES } from './machines'
 import type { Machine } from './types'
 
@@ -57,7 +57,7 @@ function winFaults(m: Machine, spins: number, coins = 1): string[] {
   const faults: string[] = []
   const rng = makeRng(20260726)
   const byId = new Map(m.symbols.map((s) => [s.id, s]))
-  const stake = coins * m.lines.length
+  const stake = coins * stakeUnits(m)
 
   for (let s = 0; s < spins && faults.length < 20; s++) {
     const result = resolveSpin(m, coins, rng)
@@ -82,6 +82,44 @@ function winFaults(m: Machine, spins: number, coins = 1): string[] {
           }
           const due = (m.scatterPays?.[win.symbol]?.[win.count] ?? 0) * stake
           if (due !== win.paid) faults.push(`${where}: scatter paid ${win.paid}, table says ${due}`)
+          continue
+        }
+
+        if (m.ways) {
+          // A ways win has no line: it is the leftmost run of matched reels, paid
+          // by the run length and multiplied by how many matched on each reel.
+          if (win.line !== -1) faults.push(`${where}: ways win names line ${win.line}`)
+          const perReel = new Map<number, number>()
+          for (const [reel, row] of win.cells) {
+            const id = step.window[reel][row]
+            const sym = byId.get(id)
+            if (id !== win.symbol && !(sym?.wild && !sym.scatter)) {
+              faults.push(`${where}: ways cell [${reel},${row}] holds ${id}, not ${win.symbol} or a wild`)
+            }
+            perReel.set(reel, (perReel.get(reel) ?? 0) + 1)
+          }
+          // The run must be reels 0..count-1, each with a match…
+          const covered = [...perReel.keys()].sort((a, b) => a - b).join(',')
+          const expected = Array.from({ length: win.count }, (_, i) => i).join(',')
+          if (covered !== expected) {
+            faults.push(`${where}: ways run covers reels [${covered}], expected [${expected}]`)
+          }
+          // …and maximal: the reel after the run matched nothing, or the run is
+          // the whole screen.
+          if (win.count < m.strips.length) {
+            const reel = win.count
+            const matched = step.window[reel].some((id) => {
+              const sym = byId.get(id)
+              return id === win.symbol || (sym?.wild && !sym.scatter)
+            })
+            if (matched) faults.push(`${where}: ways run stopped at ${win.count} but reel ${reel} matched`)
+          }
+          let ways = 1
+          for (const n of perReel.values()) ways *= n
+          const owed = (m.linePays[win.symbol]?.[win.count] ?? 0) * coins * ways
+          if (owed !== win.paid) {
+            faults.push(`${where}: ways ${win.symbol}×${win.count} (${ways} ways) paid ${win.paid}, table says ${owed}`)
+          }
           continue
         }
 

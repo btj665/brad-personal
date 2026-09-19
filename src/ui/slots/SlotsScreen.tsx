@@ -37,6 +37,21 @@ function cellsOf(wins: Win[]): Set<string> {
   return out
 }
 
+/** How many ways a ways-win covers: the product of how many matched cells sit on
+ *  each reel. Read straight off the win's cells, so it needs no pay table. */
+function waysOf(cells: Array<[number, number]>): number {
+  const perReel = new Map<number, number>()
+  for (const [reel] of cells) perReel.set(reel, (perReel.get(reel) ?? 0) + 1)
+  let ways = 1
+  for (const n of perReel.values()) ways *= n
+  return ways
+}
+
+/** The number of ways a ways cabinet buys at once: rows to the power of reels. */
+function waysCount(machine: Machine): number {
+  return machine.rows ** machine.strips.length
+}
+
 /** A meter that rolls up to its target rather than snapping, the way the credit
  *  display on a cabinet does. */
 function useRollup(target: number): number {
@@ -361,7 +376,11 @@ export function SlotsScreen() {
           <div className="sl-stage">
           <CabinetFrame
             machine={machine.id}
-            bellyText={`${machine.lines.length} line${machine.lines.length === 1 ? '' : 's'}`}
+            bellyText={
+              machine.ways
+                ? `${waysCount(machine)} ways`
+                : `${machine.lines.length} line${machine.lines.length === 1 ? '' : 's'}`
+            }
           >
             <div className="sl-body">
               <PayStrip machine={machine} coins={game.coinsPerLine} onSeeAll={() => setPays(true)} />
@@ -413,7 +432,9 @@ export function SlotsScreen() {
                     <span className="sl-hit">
                       {showing.kind === 'scatter'
                         ? `${showing.count} scatters`
-                        : `Line ${showing.line + 1} — ${showing.count} of a kind`}
+                        : machine.ways
+                          ? `${showing.count} of a kind — ${waysOf(showing.cells)} way${waysOf(showing.cells) === 1 ? '' : 's'}`
+                          : `Line ${showing.line + 1} — ${showing.count} of a kind`}
                       <b>+{showing.paid * (step?.multiplier ?? 1)}</b>
                     </span>
                   ) : running > 0 ? (
@@ -421,7 +442,9 @@ export function SlotsScreen() {
                       Total win <b>+{running.toLocaleString()}</b>
                       <em className="sl-breakdown">
                         {[
-                          `${linesPaid} line${linesPaid === 1 ? '' : 's'}`,
+                          machine.ways
+                            ? `${linesPaid} win${linesPaid === 1 ? '' : 's'}`
+                            : `${linesPaid} line${linesPaid === 1 ? '' : 's'}`,
                           paidSteps.length > 1 ? `${paidSteps.length} paying drops` : null,
                           freeSpinsThisSpin > 0 ? `${freeSpinsThisSpin} free games` : null,
                           result?.bonus && bonusSettled ? 'bonus' : null,
@@ -447,8 +470,8 @@ export function SlotsScreen() {
                   <b>{game.totalBet()}</b>
                 </span>
                 <span className="sl-meter">
-                  <i>Lines</i>
-                  <b>{machine.lines.length}</b>
+                  <i>{machine.ways ? 'Ways' : 'Lines'}</i>
+                  <b>{machine.ways ? waysCount(machine) : machine.lines.length}</b>
                 </span>
                 <span className="sl-meter sl-meter-win">
                   <i>Win</i>
@@ -467,7 +490,7 @@ export function SlotsScreen() {
                     {n}
                   </button>
                 ))}
-                <i>per line</i>
+                <i>{machine.ways ? 'per way' : 'per line'}</i>
               </div>
 
               <div className="sl-buttons">

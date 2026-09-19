@@ -14,14 +14,14 @@
 //
 //   the pool     mean 8.30 × the total stake, five independent calls
 //   optimal line take an offer ≥ the value of continuing; last is forced
-//   the offer    backward induction, EV 21.504541 × the total stake
+//   the offer    backward induction, EV 19.449490 × the total stake
 //   the trigger  three phones anywhere = (6/32)³ = 27/4096 = 1 in 151.7 spins
-//   the feature  27/4096 × 21.504541  =  0.141773 of the return, exactly
-//   the lines    enumerated            =  0.778227
+//   the feature  27/4096 × 19.449490  =  0.128207 of the return, exactly
+//   the lines    enumerated            =  0.791870
 //   ------------------------------------------------------------------------
-//   the machine                          0.920000 against a target of 0.92
+//   the machine                          0.920077 against a target of 0.92
 //
-// The offer is 15% of this cabinet, paid for out of the pay table. Every figure
+// The offer is 14% of this cabinet, paid for out of the pay table. Every figure
 // above is closed form; `slots:rtp` plays it as a cross-check, never a
 // measurement — the offer's 100× call and the take/pass swings make the per-spin
 // standard deviation large, so the exact figures are the ones to quote.

@@ -26,7 +26,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { JSX } from 'react'
 
-import { pickValue, wheelValue } from '../../slots/bonus'
+import { offerValue, pickValue, wheelValue } from '../../slots/bonus'
+import { stakeUnits } from '../../slots/machine'
 import { exactBaseReturn } from '../../slots/rtp'
 import type { Bonus, Machine, SlotSymbol, SymbolId } from '../../slots/types'
 import { SlotArt } from './Symbols'
@@ -40,6 +41,11 @@ const fmt = (n: number): string => Math.round(n).toLocaleString('en-US')
 function times(n: number): string {
   if (Number.isInteger(n)) return `${n}×`
   return `${Number(n.toFixed(2))}×`
+}
+
+/** How many ways a ways cabinet buys at once: rows to the power of reels. */
+function waysCount(machine: Machine): number {
+  return machine.rows ** machine.strips.length
 }
 
 /** A ladder row: one paying symbol and its schedule. */
@@ -259,10 +265,20 @@ function LinePayCard({ machine, coins }: { machine: Machine; coins: number }): J
 
   return (
     <section className="slp-card">
-      <h3 className="slp-h">Line pays</h3>
+      <h3 className="slp-h">{machine.ways ? 'Way pays' : 'Line pays'}</h3>
       <p className="slp-sub">
-        Credits <b>per line</b>, at {coins} coin{coins === 1 ? '' : 's'} a line. Every line is
-        staked and paid on its own. Runs start on reel one and must be unbroken.
+        {machine.ways ? (
+          <>
+            Credits <b>per way</b>, at {coins} coin{coins === 1 ? '' : 's'}. One bet buys all{' '}
+            {waysCount(machine)} ways. A symbol pays on consecutive reels from reel one, wherever it
+            sits, and the win multiplies by how many land on each reel.
+          </>
+        ) : (
+          <>
+            Credits <b>per line</b>, at {coins} coin{coins === 1 ? '' : 's'} a line. Every line is
+            staked and paid on its own. Runs start on reel one and must be unbroken.
+          </>
+        )}
       </p>
 
       <table className="slp-ladder">
@@ -323,8 +339,11 @@ function ScatterCard({
       <h3 className="slp-h">Pays from anywhere</h3>
       <p className="slp-sub">
         Counted over the whole screen — no line, no adjacency. Paid as a multiple of your{' '}
-        <b>total bet</b> ({totalBet} credits at {coins} a line × {machine.lines.length} lines), not
-        per line.
+        <b>total bet</b> (
+        {machine.ways
+          ? `${totalBet} credits at ${coins} × ${machine.waysCost ?? 1} for all ${waysCount(machine)} ways`
+          : `${totalBet} credits at ${coins} a line × ${machine.lines.length} lines`}
+        ), not per {machine.ways ? 'way' : 'line'}.
       </p>
 
       {entries.map(([id, schedule]) => (
@@ -350,7 +369,61 @@ function ScatterCard({
   )
 }
 
+/** A ways cabinet has no paylines to draw. Instead: the grid with reel one
+ *  flagged as the gate, and the count of ways it buys — the one thing to
+ *  understand is that every row on every reel is in play from the left. */
+function WaysCard({ machine }: { machine: Machine }): JSX.Element {
+  const reels = machine.strips.length
+  const rows = machine.rows
+  const ways = waysCount(machine)
+  const cells: JSX.Element[] = []
+  for (let reel = 0; reel < reels; reel++) {
+    for (let row = 0; row < rows; row++) {
+      cells.push(
+        <rect
+          key={`${reel},${row}`}
+          className="slp-lc slp-lc-on"
+          x={reel * 10 + 0.7}
+          y={row * 10 + 0.7}
+          width={8.6}
+          height={8.6}
+          rx={1.7}
+        />,
+      )
+    }
+  }
+  return (
+    <section className="slp-card">
+      <h3 className="slp-h">
+        Ways to win <span className="slp-count">{ways}</span>
+      </h3>
+      <p className="slp-sub">
+        No paylines. A symbol pays whenever it lands on adjacent reels from reel one, wherever it
+        sits in the {rows} rows — {rows}
+        <sup>{reels}</sup> = {ways} ways, all bought at once. The win multiplies by how many of the
+        symbol stand on each matched reel.
+      </p>
+      <div className="slp-ways">
+        <svg
+          className="slp-waysgrid"
+          viewBox={`0 0 ${reels * 10} ${rows * 10}`}
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          aria-label={`${ways} ways: any row on each reel, counted from reel one`}
+        >
+          {cells}
+          <polyline
+            className="slp-lpath"
+            points={Array.from({ length: reels }, (_, reel) => `${reel * 10 + 5},${(rows * 10) / 2}`).join(' ')}
+          />
+        </svg>
+      </div>
+    </section>
+  )
+}
+
 function LinesCard({ machine }: { machine: Machine }): JSX.Element {
+  if (machine.ways) return <WaysCard machine={machine} />
   return (
     <section className="slp-card">
       <h3 className="slp-h">
@@ -580,6 +653,30 @@ function BonusCard({
         </>
       )}
 
+      {b.kind === 'offer' && (
+        <>
+          <div className="slp-chips">
+            {b.pool.map((o, i) => {
+              const weight = b.pool.reduce((s, p) => s + p.weight, 0)
+              return (
+                <span className="slp-chip" key={i}>
+                  <i>{times(o.value)}</i>
+                  <b>{fmt(o.value * totalBet)}</b>
+                  <em>{((o.weight / weight) * 100).toFixed(0)}%</em>
+                </span>
+              )
+            })}
+          </div>
+          <p className="slp-body-text">
+            {b.offers} calls, each an independent draw from this pool. Passing is a real choice: take
+            a call when it beats what one more is worth on average, and the last is forced. Under that
+            line the round is worth {times(offerValue(b))} your bet — {fmt(offerValue(b) * totalBet)}{' '}
+            credits at this bet — which is the figure the cabinet is priced on, the way video poker
+            quotes its return under best play.
+          </p>
+        </>
+      )}
+
       <p className="slp-body-text slp-plain">
         The outcome is decided the moment the round triggers: {alreadyDecided(b)} What you touch, and
         in what order, sets how the total is revealed to you — it does not set the total. That is
@@ -605,7 +702,9 @@ function ReturnCard({ machine }: { machine: Machine }): JSX.Element {
       ? `the wheel, whose average is exactly ${times(wheelValue(machine.bonus))} the bet because every wedge is equally likely`
       : machine.bonus?.kind === 'pick'
         ? `the pick board, whose average is exactly ${times(pickValue(machine.bonus))} the bet — the prize pool over one more than the duds`
-        : null
+        : machine.bonus?.kind === 'offer'
+          ? `the banker's offer, whose average under optimal play is exactly ${times(offerValue(machine.bonus))} the bet — a backward induction over the offer pool, not a sample`
+          : null
 
   const outside = [...measured, ...(priced ? [priced] : [])]
 
@@ -674,7 +773,7 @@ export function PayScreen({
 
   if (!open) return null
 
-  const totalBet = coins * machine.lines.length
+  const totalBet = coins * stakeUnits(machine)
 
   return (
     // The cabinet class carries this machine's accent, so the overlay is tinted
@@ -700,12 +799,12 @@ export function PayScreen({
           </div>
           <div className="slp-bet">
             <span className="slp-figure">
-              <i>Coins per line</i>
+              <i>{machine.ways ? 'Coins per way' : 'Coins per line'}</i>
               <b>{coins}</b>
             </span>
             <span className="slp-figure">
-              <i>Lines</i>
-              <b>{machine.lines.length}</b>
+              <i>{machine.ways ? 'Ways' : 'Lines'}</i>
+              <b>{machine.ways ? waysCount(machine) : machine.lines.length}</b>
             </span>
             <span className="slp-figure slp-figure-key">
               <i>Total bet</i>
@@ -777,7 +876,7 @@ export function PayStrip({
   onSeeAll?: () => void
 }): JSX.Element {
   const rows = ladders(machine).slice(0, 5)
-  const totalBet = coins * machine.lines.length
+  const totalBet = coins * stakeUnits(machine)
   const scatter = machine.scatterPays
     ? Object.entries(machine.scatterPays)
         .map(([id, schedule]) => ({ id, rungs: scatterRungs(schedule) }))
@@ -796,14 +895,16 @@ export function PayStrip({
       ? 'Hold & spin bonus'
       : machine.bonus.kind === 'wheel'
         ? 'Wheel bonus'
-        : 'Pick bonus'
+        : machine.bonus.kind === 'pick'
+          ? 'Pick bonus'
+          : "Banker's offer"
     : null
 
   return (
     <div className="slp-strip">
       <div className="slp-strip-head">
         <span>Top pays</span>
-        <em>{coins}/line</em>
+        <em>{machine.ways ? `${coins}/way` : `${coins}/line`}</em>
       </div>
 
       <ul className="slp-strip-list">
@@ -835,8 +936,8 @@ export function PayStrip({
 
       <div className="slp-strip-note">
         {scatter
-          ? 'Bottom row pays from anywhere, × total bet. The rest is per line.'
-          : 'Credits per line, at this bet.'}
+          ? `Bottom row pays from anywhere, × total bet. The rest is per ${machine.ways ? 'way' : 'line'}.`
+          : `Credits per ${machine.ways ? 'way' : 'line'}, at this bet.`}
       </div>
 
       {(feature || bonus) && (
@@ -847,13 +948,23 @@ export function PayStrip({
         <button className="slp-strip-more" onClick={onSeeAll}>
           See all pays
           <i>
-            {machine.lines.length} line{machine.lines.length === 1 ? '' : 's'} · odds
+            {machine.ways
+              ? `${waysCount(machine)} ways · odds`
+              : `${machine.lines.length} line${machine.lines.length === 1 ? '' : 's'} · odds`}
           </i>
         </button>
       ) : (
         <div className="slp-strip-more slp-strip-more-flat">
-          Press <b>Pays</b> for all {machine.lines.length} line
-          {machine.lines.length === 1 ? '' : 's'} and the odds
+          {machine.ways ? (
+            <>
+              Press <b>Pays</b> for all {waysCount(machine)} ways and the odds
+            </>
+          ) : (
+            <>
+              Press <b>Pays</b> for all {machine.lines.length} line
+              {machine.lines.length === 1 ? '' : 's'} and the odds
+            </>
+          )}
         </div>
       )}
     </div>

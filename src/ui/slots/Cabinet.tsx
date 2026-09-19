@@ -220,6 +220,31 @@ const SKIN: Record<string, Skin> = {
     well: '#0e0512',
     name: 'The Late Show',
   },
+  // Black-tie gold rather than bell's warm brass: the near-black `dark` gives the
+  // rails and tray a tuxedo edge, so High Roller doesn't read as Bell Ringer even
+  // though both are red-and-gold.
+  highroller: {
+    light: '#ffe9a6',
+    mid: '#c69a3a',
+    dark: '#160a02',
+    line: '#ffdf8a',
+    accent: '#e6b93c',
+    glow: '#ffd873',
+    well: '#0a0602',
+    name: 'High Roller',
+  },
+  // Cyan lamp on a violet cabinet: the accent leans cyan so Nova never reads as
+  // The Late Show's orchid, while the art stays violet-and-cyan cosmic.
+  nova: {
+    light: '#bfe8ff',
+    mid: '#3a7fb0',
+    dark: '#0a1830',
+    line: '#cdeaff',
+    accent: '#38c8f0',
+    glow: '#8fe8ff',
+    well: '#060a16',
+    name: 'Nova Ways',
+  },
 }
 
 const FALLBACK = 'bell'
@@ -714,11 +739,150 @@ const LATE_TOP: TopArt = {
   },
 }
 
+/* --- highroller: black-and-gold deco, a dollar and the phones --------------- */
+// Bell already owns warm red glass and brass bells, so this one is a tuxedo: a
+// near-black field with gold pinstripes, a struck dollar medallion at the centre
+// the way bell strikes a seven, and the banker's phone either side of the name.
+
+/** The banker's desk phone on a 100-unit grid, so it can be placed into the band.
+ *  Uses the caller's `${u}-brass` and `${u}-red` gradients. */
+function goldPhone(u: string): JSX.Element {
+  return (
+    <g>
+      <path d="M24 58 Q22 46 34 46 H66 Q78 46 76 58 L80 78 Q80 84 74 84 H26 Q20 84 20 78 Z" fill={`url(#${u}-brass)`} stroke="#5d3f0c" strokeWidth="1.8" strokeLinejoin="round" />
+      <circle cx="50" cy="65" r="10" fill={`url(#${u}-red)`} stroke="#5d3f0c" strokeWidth="1.4" />
+      <circle cx="50" cy="65" r="3.4" fill={`url(#${u}-brass)`} />
+      <path d="M22 38 C22 22 78 22 78 38" fill="none" stroke={`url(#${u}-brass)`} strokeWidth="9" strokeLinecap="round" />
+      <ellipse cx="24" cy="38" rx="9" ry="6" fill={`url(#${u}-brass)`} stroke="#5d3f0c" strokeWidth="1.4" transform="rotate(-26 24 38)" />
+      <ellipse cx="76" cy="38" rx="9" ry="6" fill={`url(#${u}-brass)`} stroke="#5d3f0c" strokeWidth="1.4" transform="rotate(26 76 38)" />
+    </g>
+  )
+}
+
+const HIGH_TOP: TopArt = {
+  band: (u) => (
+    <>
+      <Lin id={`${u}-field`} s={[[0, '#2a0a10'], [0.4, '#180307'], [1, '#050203']]} />
+      <Rad id={`${u}-warm`} s={[[0, '#e6b93c', 0.32], [0.5, '#c8121f', 0.12], [1, '#c8121f', 0]]} cy={0.6} r={0.62} />
+      <Lin id={`${u}-bead`} s={[[0, '#ffe9a6'], [0.4, '#d9ae52'], [1, '#6a4a10']]} />
+      <rect width="700" height="100" fill={`url(#${u}-field)`} />
+      <rect width="700" height="100" fill={`url(#${u}-warm)`} />
+      {/* Gold pinstripes: vertical hairlines stay vertical however far it stretches. */}
+      <g stroke="#e6b93c" strokeOpacity="0.08" strokeWidth="1">
+        {Array.from({ length: 50 }, (_, i) => (
+          <path key={i} d={`M${7 + i * 14} 0 V100`} />
+        ))}
+      </g>
+      <rect width="700" height="10" fill={`url(#${u}-bead)`} />
+      <rect y="90" width="700" height="10" fill={`url(#${u}-bead)`} transform="translate(0 100) scale(1 -1)" />
+      <rect y="10" width="700" height="2" fill="#1c0206" fillOpacity="0.7" />
+      <rect y="88" width="700" height="2" fill="#1c0206" fillOpacity="0.7" />
+    </>
+  ),
+  art: (u, label) => (
+    <>
+      <Lin id={`${u}-brass`} s={[[0, '#ffe9a6'], [0.4, '#e8b73e'], [0.72, '#b9871f'], [1, '#7a530f']]} />
+      <Lin id={`${u}-red`} s={[[0, '#f2565f'], [0.5, '#c8121f'], [1, '#5e050d']]} />
+      <Rad id={`${u}-coin`} s={[[0, '#fff4cd'], [0.5, '#e8b73e'], [1, '#9a6a12']]} />
+      <Lin id={`${u}-ribbon`} s={[[0, '#fff6d8'], [0.34, '#e0b95c'], [0.62, '#a97e28'], [1, '#f2dc9a']]} />
+
+      <Rays n={24} r0={40} r1={196} w={5} color="#ffd873" o={0.24} cx={350} cy={40} phase={7.5} />
+
+      {/* The dollar medallion, struck where bell strikes its seven. */}
+      <g transform="translate(350 34)">
+        <circle r="30" fill={`url(#${u}-coin)`} stroke="#5d3f0c" strokeWidth="3" />
+        <circle r="23.5" fill="none" stroke="#fff6d8" strokeOpacity="0.55" strokeWidth="2" />
+        <text x="0" y="15" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontWeight="800" fontSize="42" fill="#6b1018">
+          $
+        </text>
+      </g>
+
+      <g transform="translate(70 4) scale(0.92)">{goldPhone(u)}</g>
+      <g transform="translate(530 4) scale(0.92)">{goldPhone(u)}</g>
+
+      <path d="M152 62 H548 L536 92 H164 Z" fill={`url(#${u}-ribbon)`} stroke="#6f4f12" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M156 65 H544 L542 71 H158 Z" fill="#fffbe8" fillOpacity="0.45" />
+      <DrawnName label={label} x={350} y={86} room={340} fill="#4a0a10" shadow="#ffe9a6" />
+    </>
+  ),
+}
+
+/* --- nova: deep space, ringed worlds and a neon name ----------------------- */
+// A nebula in the stretching layer with a field of fixed stars; two ringed
+// planets and the name in cyan neon in the layer that keeps its shape.
+
+/** Background stars for the band. Index-derived so a re-render never reshuffles
+ *  them — the same reasoning as the coin shower in `BigWin`. */
+const NOVA_STARS = Array.from({ length: 46 }, (_, i) => ({
+  x: (i * 97) % 700,
+  y: 7 + ((i * 43) % 86),
+  r: 0.6 + ((i * 17) % 20) / 12,
+  o: 0.3 + ((i * 29) % 60) / 100,
+}))
+
+/** A ringed planet centred on the origin, for the band and the belly. Uses the
+ *  caller's `${u}-planet` and `${u}-ring` gradients. */
+function ringedPlanet(u: string): JSX.Element {
+  return (
+    <g>
+      <g transform="rotate(-20)">
+        <ellipse cx="0" cy="0" rx="42" ry="12" fill="none" stroke={`url(#${u}-ring)`} strokeWidth="4.5" strokeOpacity="0.5" />
+      </g>
+      <circle cx="0" cy="0" r="24" fill={`url(#${u}-planet)`} stroke="#c9a4ff" strokeWidth="1.8" />
+      <g transform="rotate(-20)">
+        <path d="M-42 0 A 42 12 0 0 0 42 0" fill="none" stroke={`url(#${u}-ring)`} strokeWidth="5.5" />
+      </g>
+      <ellipse cx="-9" cy="-9" rx="6.5" ry="4" fill="#fff" fillOpacity="0.35" transform="rotate(-20)" />
+    </g>
+  )
+}
+
+const NOVA_TOP: TopArt = {
+  band: (u) => (
+    <>
+      <Lin id={`${u}-space`} s={[[0, '#2a1560'], [0.5, '#140a30'], [1, '#05030f']]} />
+      <Rad id={`${u}-neb`} s={[[0, '#7c3ef0', 0.4], [0.5, '#38c8f0', 0.14], [1, '#38c8f0', 0]]} cy={0.5} r={0.7} />
+      <Lin id={`${u}-bead`} s={[[0, '#bfe8ff'], [0.4, '#3a7fb0'], [1, '#0a1830']]} />
+      <rect width="700" height="100" fill={`url(#${u}-space)`} />
+      <rect width="700" height="100" fill={`url(#${u}-neb)`} />
+      <g fill="#dfeaff">
+        {NOVA_STARS.map((s, i) => (
+          <circle key={i} cx={s.x} cy={s.y} r={s.r} fillOpacity={s.o} />
+        ))}
+      </g>
+      <rect width="700" height="8" fill={`url(#${u}-bead)`} />
+      <rect y="92" width="700" height="8" fill={`url(#${u}-bead)`} transform="translate(0 100) scale(1 -1)" />
+      <rect y="8" width="700" height="1.6" fill="#02040e" fillOpacity="0.7" />
+      <rect y="90.4" width="700" height="1.6" fill="#02040e" fillOpacity="0.7" />
+    </>
+  ),
+  art: (u, label) => (
+    <>
+      <Lin id={`${u}-planet`} s={[[0, '#e6c4ff'], [0.5, '#9a5cf0'], [1, '#3a1580']]} />
+      <Lin id={`${u}-ring`} s={[[0, '#c4fbff'], [0.5, '#38d6f0'], [1, '#0a6fa8']]} x2={1} y2={0} />
+      <Rad id={`${u}-glow`} s={[[0, '#7c3ef0', 0.5], [0.5, '#38c8f0', 0.16], [1, '#38c8f0', 0]]} />
+      <Lin id={`${u}-tube`} s={[[0, '#38c8f0', 0], [0.16, '#38c8f0', 1], [0.84, '#38c8f0', 1], [1, '#38c8f0', 0]]} x2={1} y2={0} />
+
+      <ellipse cx="350" cy="50" rx="240" ry="40" fill={`url(#${u}-glow)`} />
+      <g transform="translate(74 50)">{ringedPlanet(u)}</g>
+      <g transform="translate(626 50)">{ringedPlanet(u)}</g>
+
+      {/* The name in cyan neon: a bloom, a tube, a hot core — same build as the
+          Late Show's, in this cabinet's colour. */}
+      <DrawnName label={label} x={350} y={57} room={420} fill="#eafaff" stroke="#38c8f0" strokeWidth={9} />
+      <rect x="212" y="72" width="276" height="6" rx="3" fill={`url(#${u}-tube)`} />
+      <rect x="230" y="73.4" width="240" height="2" rx="1" fill="#d0f6ff" fillOpacity="0.8" />
+    </>
+  ),
+}
+
 const TOP: Record<string, TopArt> = {
   bars: BARS_TOP,
   bell: BELL_TOP,
   rockslide: ROCK_TOP,
   lateshow: LATE_TOP,
+  highroller: HIGH_TOP,
+  nova: NOVA_TOP,
 }
 
 export interface TopBoxProps {
@@ -900,6 +1064,53 @@ const BELLY: Record<string, BellyArt> = {
         <polygon points={star(64, 32, 20, 8)} fill="#fff4cd" stroke="#ffd873" strokeWidth="1.8" />
         <polygon points={star(636, 32, 20, 8)} fill="#fff4cd" stroke="#ffd873" strokeWidth="1.8" />
       </g>
+    ),
+  },
+  highroller: {
+    band: (u) => (
+      <>
+        <Lin id={`${u}-f`} s={[[0, '#2a0a10'], [0.4, '#160307'], [1, '#050203']]} />
+        <Rad id={`${u}-w`} s={[[0, '#e6b93c', 0.28], [1, '#c8121f', 0]]} cy={0.5} r={0.6} />
+        <rect width="700" height="64" fill={`url(#${u}-f)`} />
+        <rect width="700" height="64" fill={`url(#${u}-w)`} />
+      </>
+    ),
+    motif: (u) => (
+      <>
+        <Rad id={`${u}-coin`} s={[[0, '#fff4cd'], [0.5, '#e8b73e'], [1, '#9a6a12']]} />
+        {[64, 636].map((x, i) => (
+          <g key={i} transform={`translate(${x} 32)`}>
+            <circle r="20" fill={`url(#${u}-coin)`} stroke="#5d3f0c" strokeWidth="2.2" />
+            <circle r="15" fill="none" stroke="#fff6d8" strokeOpacity="0.5" strokeWidth="1.6" />
+            <text x="0" y="10" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontWeight="800" fontSize="28" fill="#6b1018">
+              $
+            </text>
+          </g>
+        ))}
+      </>
+    ),
+  },
+  nova: {
+    band: (u) => (
+      <>
+        <Lin id={`${u}-f`} s={[[0, '#1e1050'], [0.5, '#120a2e'], [1, '#05030f']]} />
+        <Rad id={`${u}-w`} s={[[0, '#38c8f0', 0.24], [1, '#7c3ef0', 0]]} cy={0.5} r={0.6} />
+        <rect width="700" height="64" fill={`url(#${u}-f)`} />
+        <rect width="700" height="64" fill={`url(#${u}-w)`} />
+        <g fill="#dfeaff">
+          {NOVA_STARS.filter((s) => s.y < 60).map((s, i) => (
+            <circle key={i} cx={s.x} cy={s.y * 0.64} r={s.r} fillOpacity={s.o * 0.8} />
+          ))}
+        </g>
+      </>
+    ),
+    motif: (u) => (
+      <>
+        <Lin id={`${u}-planet`} s={[[0, '#e6c4ff'], [0.5, '#9a5cf0'], [1, '#3a1580']]} />
+        <Lin id={`${u}-ring`} s={[[0, '#c4fbff'], [0.5, '#38d6f0'], [1, '#0a6fa8']]} x2={1} y2={0} />
+        <g transform="translate(64 32) scale(0.6)">{ringedPlanet(u)}</g>
+        <g transform="translate(636 32) scale(0.6)">{ringedPlanet(u)}</g>
+      </>
     ),
   },
 }

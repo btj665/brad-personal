@@ -379,9 +379,18 @@ describe('a hold-and-spin', () => {
 describe('the trigger is the paid screen and nothing else', () => {
   const withBonus = MACHINES.filter((m) => m.bonus)
 
-  it('gives every cabinet a bonus', () => {
-    expect(withBonus).toHaveLength(MACHINES.length)
-    expect(withBonus.map((m) => m.bonus?.kind).sort()).toEqual(['holdSpin', 'pick', 'pick', 'wheel'])
+  it('gives every cabinet a bonus or a feature, and never a bare line game', () => {
+    // Nova Ways carries a free-games feature instead of a bonus round; every
+    // other cabinet has a bonus. What must hold for all of them is that none is
+    // a plain reels-only game with nothing on top.
+    for (const m of MACHINES) expect(Boolean(m.bonus) || m.feature.kind !== 'none').toBe(true)
+    expect(withBonus.map((m) => m.bonus?.kind).sort()).toEqual([
+      'holdSpin',
+      'offer',
+      'pick',
+      'pick',
+      'wheel',
+    ])
   })
 
   it.each(withBonus.map((m) => [m.label, m] as const))(

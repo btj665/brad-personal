@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX, ReactNode } from 'react'
 
+import { stakeUnits } from '../../slots/machine'
 import type { Bonus, BonusPlay, Machine, SymbolId } from '../../slots/types'
 import { SlotArt } from './Symbols'
 
@@ -33,6 +34,14 @@ const PICK_END_MS = 2000
 const LOCK_MS = 620
 const FULL_HOLD_MS = 1700
 const SPIN_END_MS = 1300
+
+/** Offer: the phone rings on a beat, the take holds, then the calls that were
+ *  passed up are turned over one at a time as the sting. */
+const OFFER_FIRST_MS = 520
+const OFFER_STEP_MS = 900
+const OFFER_HOLD_MS = 1000
+const OFFER_STING_MS = 560
+const OFFER_END_MS = 2200
 
 /** Total respin airtime and total landing airtime, shared out across however many
  *  respins this play took. A round that got lucky twenty times over cannot have
@@ -749,6 +758,175 @@ function SpinRound({
   )
 }
 
+/* ------------------------------------------------------------------- offer */
+
+type OfferPhase = 'ring' | 'hold' | 'sting' | 'done'
+
+/** The banker's offer — Top Dollar's take-it-or-pass. The engine has already
+ *  drawn the whole run and picked, by the optimal rule, where the player stops:
+ *  `play.reveals` are the calls shown up to and including the one taken (the last
+ *  of them, and `play.paid`), `play.missed` are the calls that came after — what
+ *  holding out would have turned up. So this only paces the reveal: the phone
+ *  rings offer by offer, the take is held, then the missed calls turn over drained
+ *  of colour, exactly the reveal/sting rhythm `PickRound` uses. */
+function OfferRound({
+  machine,
+  bonus,
+  play,
+  stake,
+  still,
+  finish,
+}: {
+  machine: Machine
+  bonus: Extract<Bonus, { kind: 'offer' }>
+  play: BonusPlay
+  stake: number
+  still: boolean
+  finish: () => void
+}): JSX.Element {
+  const reveals = play.reveals ?? []
+  const missed = play.missed ?? []
+  // Every call the banker will make, in order: the ones the player saw, then the
+  // ones passing would have reached. The take is the last of the seen calls.
+  const calls = [...reveals, ...missed]
+  const takenAt = Math.max(0, reveals.length - 1)
+  const takeMult = stake > 0 ? Math.round(play.paid / stake) : 0
+  // The biggest call left on the table — the one that got away, if any beat the
+  // take. Never celebratory; taking was the right line on average, not every time.
+  const bestMissed = missed.reduce((m, v) => Math.max(m, v), 0)
+
+  // How many calls have rung, and how many missed calls have been turned over.
+  const [rung, setRung] = useState(still ? reveals.length : 0)
+  const [stung, setStung] = useState(still ? missed.length : 0)
+  const [phase, setPhase] = useState<OfferPhase>(still ? 'done' : 'ring')
+
+  // Ring the calls one at a time. When the last seen call is on the table it is
+  // the take, so the run stops and the take holds.
+  useTimer(phase === 'ring' ? `ring-${rung}` : null, rung === 0 ? OFFER_FIRST_MS : OFFER_STEP_MS, () => {
+    if (rung >= reveals.length) {
+      setPhase('hold')
+      return
+    }
+    setRung((n) => n + 1)
+  })
+  useTimer(phase === 'hold' ? 'hold' : null, OFFER_HOLD_MS, () =>
+    setPhase(missed.length > 0 ? 'sting' : 'done'),
+  )
+  useTimer(phase === 'sting' ? `sting-${stung}` : null, OFFER_STING_MS, () => {
+    if (stung >= missed.length) {
+      setPhase('done')
+      return
+    }
+    setStung((n) => n + 1)
+  })
+  useTimer(phase === 'done' ? 'done' : null, OFFER_END_MS, finish)
+
+  /** Finish the presentation without waiting. The take never changes. */
+  const rush = useCallback(() => {
+    setRung(reveals.length)
+    setStung(missed.length)
+    setPhase('done')
+  }, [reveals.length, missed.length])
+
+  const taken = rung > takenAt
+  const onTable = Math.min(rung, reveals.length)
+
+  return (
+    <Frame
+      machine={machine}
+      trigger={bonus.trigger}
+      title="The banker calls"
+      note={
+        phase === 'ring'
+          ? `${bonus.offers} calls. Take the one in front of you, or pass for the next — the last is forced.`
+          : phase === 'sting'
+            ? 'What holding out would have turned up.'
+            : taken
+              ? 'Took the call.'
+              : 'The phone is ringing.'
+      }
+      badge={
+        taken ? (
+          <span className="slb-badge slb-badge-win" aria-live="polite">
+            {takeMult}× bet
+          </span>
+        ) : (
+          <span className="slb-badge" aria-live="polite">
+            <i>call</i>
+            <b>
+              {Math.max(1, onTable)} / {bonus.offers}
+            </b>
+          </span>
+        )
+      }
+      totalLabel="Bonus win"
+      total={taken ? play.paid : 0}
+      still={still}
+      buttons={
+        phase === 'done' ? (
+          <Go label="Collect" onClick={finish} />
+        ) : (
+          <Ghost label="Skip" onClick={rush} />
+        )
+      }
+    >
+      <div className="slb-offers">
+        {calls.map((value, i) => {
+          const seen = i < reveals.length
+          const shown = seen ? i < rung : i - reveals.length < stung
+          const isTake = seen && i === takenAt && taken
+          const isPass = seen && i !== takenAt && shown
+          const isMissed = !seen && shown
+          const isLive = phase === 'ring' && shown && i === rung - 1 && i !== takenAt
+          return (
+            <div
+              key={i}
+              className={[
+                'slb-offer',
+                shown ? 'slb-offer-open' : '',
+                isTake ? 'slb-offer-take' : '',
+                isPass ? 'slb-offer-pass' : '',
+                isMissed ? 'slb-offer-missed' : '',
+                isLive ? 'slb-offer-live' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <span className="slb-offer-n">Call {i + 1}</span>
+              <span className="slb-offer-amt">{shown ? credits(value) : '—'}</span>
+              <span className="slb-offer-tag">
+                {isTake ? 'Deal' : isPass ? 'Pass' : isMissed ? 'Missed' : shown ? '' : '…'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="slb-award" aria-live="polite">
+        {phase === 'done' ? (
+          bestMissed > play.paid ? (
+            <span className="slb-award-sting">
+              The next call was <b>{credits(bestMissed)}</b>
+            </span>
+          ) : (
+            <span className="slb-award-win">
+              {credits(play.paid)} credits
+              <i>{takeMult}× total bet</i>
+            </span>
+          )
+        ) : taken ? (
+          <span className="slb-award-win">
+            {credits(play.paid)} credits
+            <i>deal</i>
+          </span>
+        ) : (
+          <span className="slb-award-idle">{phase === 'ring' ? 'The phone is ringing…' : 'Deal'}</span>
+        )}
+      </div>
+    </Frame>
+  )
+}
+
 /* -------------------------------------------------------------- the overlay */
 
 /** Whatever the round was, it paid this. Shown when a `BonusPlay` arrives without
@@ -800,9 +978,10 @@ export function BonusRound({
   onDone: (paid: number) => void
 }): JSX.Element {
   const still = useReducedMotion()
-  // Wedge and full-screen awards are quoted as multiples of the total bet, which
-  // is every line at the current coins — the same figure the engine was handed.
-  const stake = coins * machine.lines.length
+  // Awards are quoted as multiples of the total bet — the same figure the engine
+  // was handed. `stakeUnits` is the line count on a line machine and the ways
+  // price on a ways machine, so this is right on both.
+  const stake = coins * stakeUnits(machine)
 
   const done = useRef(false)
   const finish = useCallback(() => {
@@ -818,6 +997,8 @@ export function BonusRound({
     body = <PickRound machine={machine} bonus={bonus} play={play} still={still} finish={finish} />
   } else if (play.kind === 'holdSpin' && bonus.kind === 'holdSpin' && play.grids && play.grids.length > 0) {
     body = <SpinRound machine={machine} bonus={bonus} play={play} stake={stake} still={still} finish={finish} />
+  } else if (play.kind === 'offer' && bonus.kind === 'offer' && play.reveals) {
+    body = <OfferRound machine={machine} bonus={bonus} play={play} stake={stake} still={still} finish={finish} />
   } else {
     body = <Award machine={machine} paid={play.paid} still={still} finish={finish} />
   }

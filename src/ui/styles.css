@@ -6557,6 +6557,21 @@ main.main {
   --sl-glow: rgba(214, 150, 240, 0.58);
 }
 
+/* High Roller: casino gold. Bell owns amber too, but High Roller's art (black
+   deco, a dollar, phones) carries the difference — the lamp stays gold. */
+.sl-highroller {
+  --sl-accent: #e6b93c;
+  --sl-accent-dim: rgba(230, 185, 60, 0.3);
+  --sl-glow: rgba(255, 216, 121, 0.58);
+}
+
+/* Nova: a cyan lamp, kept clear of The Late Show's orchid, over violet-cyan art. */
+.sl-nova {
+  --sl-accent: #38c8f0;
+  --sl-accent-dim: rgba(56, 200, 240, 0.3);
+  --sl-glow: rgba(143, 232, 255, 0.6);
+}
+
 .sl-picker {
   background: var(--panel-2);
   color: var(--ink);
@@ -7187,6 +7202,18 @@ main.main {
   --slc-accent: #b06ad0;
   --slc-glow: #d696f0;
   --slc-edge: rgba(176, 106, 208, 0.42);
+}
+
+.slc-m-highroller {
+  --slc-accent: #e6b93c;
+  --slc-glow: #ffd873;
+  --slc-edge: rgba(230, 185, 60, 0.42);
+}
+
+.slc-m-nova {
+  --slc-accent: #38c8f0;
+  --slc-glow: #8fe8ff;
+  --slc-edge: rgba(56, 200, 240, 0.42);
 }
 
 /* --- the top box --------------------------------------------------------- */
@@ -8133,6 +8160,20 @@ main.main {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--slp-ink-dim);
+}
+
+/* A ways cabinet has no paylines to list — one grid stands in, every cell lit to
+   say the whole screen is in play from reel one. */
+.slp-ways {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
+}
+
+.slp-waysgrid {
+  width: min(300px, 100%);
+  height: auto;
+  display: block;
 }
 
 /* --- specials ----------------------------------------------------------- */
@@ -9284,6 +9325,122 @@ main.main {
   color: var(--win);
 }
 
+/* ------------------------------------------------------------------- offer */
+/* The banker's calls, stacked as a call log: each rings in, the take lights, the
+   passed-up calls turn over drained of colour — the same reveal/sting language the
+   pick board uses, in a list because the banker calls in a fixed order. */
+
+.slb-offers {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.slb-offer {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  /* A closed call reads as waiting: dim, no number yet. */
+  opacity: 0.5;
+  transition: opacity 200ms ease, border-color 200ms ease, background 200ms ease;
+}
+
+.slb-offer-open {
+  opacity: 1;
+}
+
+.slb-offer-n {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.slb-offer-amt {
+  font-size: 19px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.slb-offer-tag {
+  min-width: 3.4em;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* The call currently ringing. */
+.slb-offer-live {
+  border-color: var(--slb-dim);
+  background: rgba(255, 255, 255, 0.05);
+  animation: slb-ring 700ms ease-in-out infinite alternate;
+}
+
+@keyframes slb-ring {
+  from {
+    box-shadow: none;
+  }
+  to {
+    box-shadow: 0 0 16px var(--slb-dim);
+  }
+}
+
+/* A call the player passed: seen, declined, left behind. */
+.slb-offer-pass {
+  opacity: 0.7;
+}
+
+.slb-offer-pass .slb-offer-amt {
+  color: var(--ink-dim);
+  text-decoration: line-through;
+  text-decoration-color: var(--slb-dim);
+}
+
+.slb-offer-pass .slb-offer-tag {
+  color: var(--ink-dim);
+}
+
+/* The call taken: the deal, in the cabinet's colour and the winning green. */
+.slb-offer-take {
+  border-color: var(--slb-accent);
+  background: radial-gradient(120% 140% at 0% 50%, var(--slb-dim), transparent 66%);
+  box-shadow: inset 0 0 14px var(--slb-dim);
+  animation: slb-flash 560ms ease-out;
+}
+
+.slb-offer-take .slb-offer-amt {
+  color: var(--win);
+}
+
+.slb-offer-take .slb-offer-tag {
+  color: var(--slb-accent);
+}
+
+/* Calls that came after the take — the sting. Turned over by the banker, not the
+   player, so they read the way the pick board's missed tiles do. */
+.slb-offer-missed {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #0b0d10;
+  opacity: 0.62;
+}
+
+.slb-offer-missed .slb-offer-amt,
+.slb-offer-missed .slb-offer-tag {
+  color: var(--ink-dim);
+}
+
 /* --- narrow ------------------------------------------------------------- */
 
 @media (max-width: 560px) {
@@ -9327,6 +9484,15 @@ main.main {
   .slb-hsmeta .slb-award-win {
     font-size: 13px;
   }
+
+  .slb-offer {
+    padding: 7px 10px;
+    gap: 7px;
+  }
+
+  .slb-offer-amt {
+    font-size: 16px;
+  }
 }
 
 /* --- no theatre --------------------------------------------------------- */
@@ -9345,14 +9511,17 @@ main.main {
   .slb-w-seg-hit,
   .slb-w-ptr-hit path,
   .slb-respins-reset,
-  .slb-grid-full {
+  .slb-grid-full,
+  .slb-offer-live,
+  .slb-offer-take {
     animation: none;
   }
 
   .slb-flip,
   .slb-wheelspin,
   .slb-btn,
-  .slb-lid {
+  .slb-lid,
+  .slb-offer {
     transition: none;
   }
 }

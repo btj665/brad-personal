@@ -759,6 +759,225 @@ const LATE: Record<string, (u: string) => JSX.Element> = {
   '-': () => <Blank tint="#c9a6d8" />,
 }
 
+/* -------------------------------------------------------------- highroller */
+// Deep red and casino gold on dark glass. A high-stakes stepper where the whole
+// show is the banker's phone, so the phone gets the biggest halo on the cabinet,
+// the way the bell does — the wild and the diamond stay below it on purpose.
+
+const HR_GOLD: Stop[] = [[0, '#ffe9a6'], [0.4, '#e8b73e'], [0.72, '#b9871f'], [1, '#7a530f']]
+const HR_GOLD_LINE = '#ffdf8a'
+const HR_RED: Stop[] = [[0, '#f2565f'], [0.5, '#c8121f'], [1, '#6c0510']]
+
+/** A five-pointed star as a `points` string — the shape the wild is built on. */
+function starPoints(cx: number, cy: number, ro: number, ri: number): string {
+  const pts: string[] = []
+  for (let i = 0; i < 10; i++) {
+    const a = (-90 + i * 36) * (Math.PI / 180)
+    const r = i % 2 === 0 ? ro : ri
+    pts.push(`${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`)
+  }
+  return pts.join(' ')
+}
+
+const HIGH: Record<string, (u: string) => JSX.Element> = {
+  // The wild: a gold star with a red boss. No multiplier badge — this cabinet's
+  // wild carries its own top award rather than doubling, so nothing here promises
+  // a ×2 the pay table doesn't back.
+  W: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffd473" r={48} o={0.5} />
+      <Lin id={`${u}-g`} s={HR_GOLD} />
+      <Rad id={`${u}-r`} s={[[0, '#ff8a92'], [0.5, '#d8202e'], [1, '#7c0a14']]} />
+      <polygon points={starPoints(50, 47, 42, 18)} fill={`url(#${u}-g)`} stroke="#7a530f" strokeWidth="4" strokeLinejoin="round" />
+      <polygon points={starPoints(50, 47, 42, 18)} fill="none" stroke={HR_GOLD_LINE} strokeWidth="1.6" strokeLinejoin="round" />
+      <circle cx="50" cy="47" r="16" fill={`url(#${u}-r)`} stroke={HR_GOLD_LINE} strokeWidth="2" />
+      <text x="50" y="54" textAnchor="middle" fontFamily="sans-serif" fontWeight="800" fontSize="20" fill="#fff2e6">
+        W
+      </text>
+    </>
+  ),
+  '7': (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#d98a3a" r={42} o={0.16} />
+      <Seven u={u} s={HR_RED} rims={[[10, '#7a530f'], [6, HR_GOLD_LINE]]} />
+    </>
+  ),
+  // The one cool symbol on a hot cabinet: an icy brilliant with a gold girdle, so
+  // it belongs to the casino palette without going red like everything else.
+  DIA: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#bfe0ff" r={44} o={0.24} />
+      <Lin id={`${u}-g`} s={[[0, '#ffffff'], [0.42, '#cbe8ff'], [1, '#5f9fd8']]} />
+      <path d="M30 24 H70 L86 42 L50 88 L14 42 Z" fill={`url(#${u}-g)`} stroke={HR_GOLD_LINE} strokeWidth="2.6" strokeLinejoin="round" />
+      <g stroke="#ffffff" strokeOpacity="0.7" strokeWidth="1.6" fill="none">
+        <path d="M14 42 H86" />
+        <path d="M30 24 L40 42 L50 88" />
+        <path d="M70 24 L60 42 L50 88" />
+      </g>
+      <path d="M30 24 H70 L60 42 H40 Z" fill="#ffffff" fillOpacity="0.42" />
+    </>
+  ),
+  CRN: (u) => (
+    <>
+      <Lin id={`${u}-g`} s={HR_GOLD} />
+      <Rad id={`${u}-j`} s={[[0, '#ff8a92'], [0.5, '#d8202e'], [1, '#7c0a14']]} />
+      <path d="M16 66 L12 32 L33 50 L50 22 L67 50 L88 32 L84 66 Z" fill={`url(#${u}-g)`} stroke="#7a530f" strokeWidth="2.4" strokeLinejoin="round" />
+      <path d="M20 42 L33 55 L50 33 L67 55 L80 42" fill="none" stroke="#fff" strokeOpacity="0.28" strokeWidth="2" />
+      <rect x="16" y="66" width="68" height="16" rx="3.5" fill={`url(#${u}-g)`} stroke="#7a530f" strokeWidth="2.4" />
+      <rect x="20" y="69.5" width="60" height="3.5" rx="1.75" fill={HR_GOLD_LINE} fillOpacity="0.55" />
+      <circle cx="12" cy="32" r="5" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1.2" />
+      <circle cx="50" cy="22" r="5.5" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1.2" />
+      <circle cx="88" cy="32" r="5" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1.2" />
+      <circle cx="34" cy="74" r="4" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1" />
+      <circle cx="50" cy="74" r="4" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1" />
+      <circle cx="66" cy="74" r="4" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1" />
+    </>
+  ),
+  // A poker chip: red body, gold rim and hub, white edge spots, monogrammed.
+  CHP: (u) => (
+    <>
+      <Rad id={`${u}-c`} s={[[0, '#f2565f'], [0.55, '#c8121f'], [1, '#7c0a14']]} />
+      <Lin id={`${u}-g`} s={HR_GOLD} />
+      <circle cx="50" cy="50" r="35" fill={`url(#${u}-c)`} stroke={HR_GOLD_LINE} strokeWidth="2.4" />
+      {Array.from({ length: 6 }, (_, i) => {
+        const a = (i * 60 * Math.PI) / 180
+        const x = 50 + 35 * Math.cos(a)
+        const y = 50 + 35 * Math.sin(a)
+        return <rect key={i} x={x - 4} y={y - 6} width="8" height="12" rx="2" fill="#f6f1e6" transform={`rotate(${i * 60} ${x} ${y})`} />
+      })}
+      <circle cx="50" cy="50" r="21" fill="none" stroke="#ffffff" strokeOpacity="0.8" strokeWidth="2" strokeDasharray="5 5" />
+      <circle cx="50" cy="50" r="14" fill={`url(#${u}-g)`} stroke="#7a530f" strokeWidth="1.6" />
+      <text x="50" y="55.5" textAnchor="middle" fontFamily="sans-serif" fontWeight="800" fontSize="14" letterSpacing="0.5" fill="#6b1018">
+        HR
+      </text>
+      <ellipse cx="40" cy="36" rx="8" ry="4.5" fill="#fff" fillOpacity="0.28" transform="rotate(-28 40 36)" />
+    </>
+  ),
+  // The bonus trigger: the banker's golden phone. Everything else on this cabinet
+  // is a thing you win; this is the thing that starts the offer, so it is lit like
+  // the wheel and the dynamite are on the other cabinets — biggest halo, its own
+  // rays — and it can't be mistaken for the wild because it isn't a star.
+  PH: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffcf5c" r={50} o={0.62} cy={52} />
+      <Rays n={12} r0={34} r1={50} w={3.4} color="#ffdf8a" o={0.58} cy={52} phase={15} />
+      <Lin id={`${u}-g`} s={HR_GOLD} />
+      <Lin id={`${u}-r`} s={HR_RED} />
+      <path d="M22 58 Q20 44 34 44 H66 Q80 44 78 58 L82 78 Q82 86 74 86 H26 Q18 86 18 78 Z" fill={`url(#${u}-r)`} stroke="#5e050d" strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="50" cy="65" r="12" fill={`url(#${u}-g)`} stroke="#5e050d" strokeWidth="1.6" />
+      <circle cx="50" cy="65" r="4" fill={`url(#${u}-r)`} />
+      {/* The handset, cradled and bowing up: the one part that reads as a phone at
+          50px even after the body has gone to a red blob. */}
+      <path d="M22 36 C22 18 78 18 78 36" fill="none" stroke={`url(#${u}-g)`} strokeWidth="10" strokeLinecap="round" />
+      <path d="M22 36 C22 18 78 18 78 36" fill="none" stroke={HR_GOLD_LINE} strokeOpacity="0.5" strokeWidth="3" strokeLinecap="round" />
+      <ellipse cx="24" cy="37" rx="10" ry="6.5" fill={`url(#${u}-g)`} stroke="#5e050d" strokeWidth="1.6" transform="rotate(-24 24 37)" />
+      <ellipse cx="76" cy="37" rx="10" ry="6.5" fill={`url(#${u}-g)`} stroke="#5e050d" strokeWidth="1.6" transform="rotate(24 76 37)" />
+      <path d="M30 30 C38 24 46 22 50 22" fill="none" stroke="#fff6d8" strokeOpacity="0.5" strokeWidth="2.4" strokeLinecap="round" />
+    </>
+  ),
+  '-': () => <Blank tint="#c8912a" />,
+}
+
+/* --------------------------------------------------------------------- nova */
+// Violet and cyan on deep space. Cosmic objects rather than card ranks up top:
+// each premium is a different celestial thing so it reads by silhouette — a burst,
+// a spiral, a comet, a ringed world, a crescent — and never by colour alone.
+
+const NV_VIOLET: Stop[] = [[0, '#c9a4ff'], [0.5, '#7c3ef0'], [1, '#331470']]
+const NV_LINE = '#d8c4ff'
+
+const NOVA: Record<string, (u: string) => JSX.Element> = {
+  // The wild: a four-point sparkle, lit violet. A sparkle, not a burst, so it
+  // stays clear of the nova premium below it.
+  W: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#a97dff" r={50} o={0.5} />
+      <Lin id={`${u}-g`} s={NV_VIOLET} />
+      <path d="M50 5 C55 33 67 45 95 50 C67 55 55 67 50 95 C45 67 33 55 5 50 C33 45 45 33 50 5 Z" fill={`url(#${u}-g)`} stroke={NV_LINE} strokeWidth="2.4" strokeLinejoin="round" />
+      <path d="M50 24 C53 41 59 47 76 50 C59 53 53 59 50 76 C47 59 41 53 24 50 C41 47 47 41 50 24 Z" fill="#ffffff" fillOpacity="0.22" />
+      <text x="50" y="58" textAnchor="middle" fontFamily="sans-serif" fontWeight="800" fontSize="22" fill="#fdf6ff">
+        W
+      </text>
+      <circle cx="80" cy="22" r="2.6" fill="#fff" fillOpacity="0.9" />
+      <circle cx="22" cy="76" r="2" fill="#fff" fillOpacity="0.8" />
+    </>
+  ),
+  // The scatter: a spiral galaxy — the "three galaxies" the round is bought with.
+  // Brightest thing on the cabinet, and an elongated disc so it never reads as the
+  // symmetric nova burst.
+  SC: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#8aa4ff" r={50} o={0.68} />
+      <Rays n={16} r0={22} r1={49} w={2} color="#c4d4ff" o={0.3} />
+      <Rad id={`${u}-core`} s={[[0, '#fff8ff'], [0.4, '#ffd6a4'], [1, '#c86adf', 0]]} />
+      <Rad id={`${u}-disc`} s={[[0, '#e0c4ff', 0.9], [0.55, '#6a4ad0', 0.5], [1, '#2a1560', 0]]} />
+      <ellipse cx="50" cy="50" rx="44" ry="20" fill={`url(#${u}-disc)`} transform="rotate(-24 50 50)" />
+      <g transform="rotate(-24 50 50)" fill="none" stroke="#dfe6ff" strokeOpacity="0.65" strokeWidth="3" strokeLinecap="round">
+        <path d="M50 50 C66 43 80 47 88 58" />
+        <path d="M50 50 C34 57 20 53 12 42" />
+      </g>
+      <circle cx="50" cy="50" r="13" fill={`url(#${u}-core)`} />
+      <circle cx="50" cy="50" r="6" fill="#fff" fillOpacity="0.95" />
+      <g fill="#eef2ff">
+        <circle cx="24" cy="40" r="1.6" />
+        <circle cx="78" cy="60" r="1.6" />
+        <circle cx="66" cy="34" r="1.3" fillOpacity="0.8" />
+        <circle cx="34" cy="66" r="1.3" fillOpacity="0.8" />
+      </g>
+    </>
+  ),
+  // The top premium: an exploding star. A symmetric burst with a white-hot core.
+  NV: (u) => (
+    <>
+      <Rad id={`${u}-c`} s={[[0, '#fff8ff'], [0.4, '#e0a4ff'], [1, '#6a2ad0']]} />
+      <Rays n={12} r0={12} r1={48} w={4.5} color="#a75cff" o={0.9} />
+      <Rays n={12} r0={9} r1={34} w={3} color="#ffd6ff" o={0.7} phase={15} />
+      <circle cx="50" cy="50" r="17" fill={`url(#${u}-c)`} stroke="#e6c4ff" strokeWidth="2" />
+      <circle cx="44" cy="44" r="4.5" fill="#fff" fillOpacity="0.9" />
+    </>
+  ),
+  // A comet: a bright cyan head with a swept tail. The tail is the silhouette.
+  CM: (u) => (
+    <>
+      <Lin id={`${u}-t`} s={[[0, '#bff6ff', 0], [1, '#38d6f0', 0.85]]} x2={1} y2={1} />
+      <Rad id={`${u}-hd`} s={[[0, '#ffffff'], [0.4, '#7ee8ff'], [1, '#128fc8']]} cx={0.4} cy={0.38} />
+      <path d="M10 12 L60 58 L52 66 Z" fill={`url(#${u}-t)`} opacity="0.9" />
+      <path d="M26 8 L64 54 L58 62 Z" fill={`url(#${u}-t)`} opacity="0.7" />
+      <path d="M8 30 L56 62 L52 70 Z" fill={`url(#${u}-t)`} opacity="0.6" />
+      <circle cx="64" cy="64" r="17" fill={`url(#${u}-hd)`} stroke="#d6faff" strokeWidth="2" />
+      <circle cx="58" cy="58" r="5" fill="#fff" fillOpacity="0.9" />
+    </>
+  ),
+  // A ringed world. The ring is drawn in three passes — a faint full ellipse
+  // behind, the planet, then the front arc over it — which is the only way a flat
+  // ring reads as going behind and in front of a sphere.
+  ST: (u) => (
+    <>
+      <Rad id={`${u}-p`} s={[[0, '#e6c4ff'], [0.45, '#9a5cf0'], [1, '#3a1580']]} cx={0.38} cy={0.34} />
+      <Lin id={`${u}-r`} s={[[0, '#c4fbff'], [0.5, '#38d6f0'], [1, '#0a6fa8']]} x2={1} y2={0} />
+      <g transform="rotate(-20 50 52)">
+        <ellipse cx="50" cy="52" rx="42" ry="12" fill="none" stroke={`url(#${u}-r)`} strokeWidth="4.5" strokeOpacity="0.5" />
+      </g>
+      <circle cx="50" cy="52" r="24" fill={`url(#${u}-p)`} stroke="#c9a4ff" strokeWidth="1.8" />
+      <g transform="rotate(-20 50 52)">
+        <path d="M8 52 A 42 12 0 0 0 92 52" fill="none" stroke={`url(#${u}-r)`} strokeWidth="5.5" />
+      </g>
+      <ellipse cx="40" cy="42" rx="6.5" ry="4" fill="#fff" fillOpacity="0.35" transform="rotate(-20 40 42)" />
+    </>
+  ),
+  // A crescent moon: the big disc minus an offset one, opening to the right.
+  MN: (u) => (
+    <>
+      <Rad id={`${u}-m`} s={[[0, '#f4fbff'], [0.5, '#b8d4f0'], [1, '#6a8cc0']]} cx={0.4} cy={0.36} />
+      <path d="M60 12 A 40 40 0 1 0 60 88 A 30 30 0 1 1 60 12 Z" fill={`url(#${u}-m)`} stroke="#dfeaff" strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="34" cy="40" r="5.5" fill="#8aa4cc" fillOpacity="0.45" />
+      <circle cx="28" cy="58" r="3.6" fill="#8aa4cc" fillOpacity="0.4" />
+      <circle cx="42" cy="66" r="2.8" fill="#8aa4cc" fillOpacity="0.36" />
+    </>
+  ),
+  ...ranks('#1a1030', '#5a3a8a', '#c9b8e8', '#8a7ab0', '#c07ad0'),
+}
+
 /* ------------------------------------------------------------- the machines */
 
 interface Cabinet {
@@ -800,6 +1019,21 @@ const CABINETS: Record<string, Cabinet> = {
       spot: 'wild spotlight', mrq: 'marquee scatter', BON: 'stage door, opens the feature',
       mic: 'microphone', mar: 'martini glass', sax: 'saxophone', crt: 'stage curtain',
       ...RANK_NAMES, '-': 'blank',
+    },
+  },
+  highroller: {
+    art: HIGH,
+    names: {
+      W: 'wild, stands in for anything', '7': 'lucky seven', DIA: 'diamond',
+      CRN: 'crown', CHP: 'casino chip', PH: 'golden phone, calls the banker', '-': 'blank',
+    },
+  },
+  nova: {
+    art: NOVA,
+    names: {
+      W: 'wild, stands in for anything', SC: 'galaxy scatter, buys the free games',
+      NV: 'nova', CM: 'comet', ST: 'ringed planet', MN: 'crescent moon',
+      ...RANK_NAMES,
     },
   },
 }
