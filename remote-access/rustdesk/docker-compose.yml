@@ -1,0 +1,43 @@
+# OPTIONAL, SEPARATE stack — RustDesk self-hosted relay (AnyDesk/TeamViewer feel).
+# Run independently of the MeshCentral stack:  docker compose -f rustdesk/docker-compose.yml up -d
+#
+# IMPORTANT — exposure model differs from MeshCentral:
+# RustDesk's native clients speak raw TCP/UDP on 21115-21117. Cloudflare's FREE Tunnel only
+# carries HTTP/S, so it CANNOT proxy these. To reach this relay from anywhere you must either
+# run it on a host with a public IP (e.g. a cheap VPS) or forward these ports on your router.
+# See README.md in this directory for the full explanation.
+services:
+  hbbs:
+    image: rustdesk/rustdesk-server:latest
+    container_name: rustdesk-hbbs
+    # -r tells clients where the relay (hbbr) lives. Use your public host/domain.
+    command: hbbs -r REPLACE_WITH_PUBLIC_HOST:21117
+    restart: unless-stopped
+    ports:
+      - "21115:21115"       # NAT type test (tcp)
+      - "21116:21116"       # ID registration / hole punching (tcp)
+      - "21116:21116/udp"   # ID registration / hole punching (udp)
+      - "21118:21118"       # web client (tcp) — optional; can ride the Cloudflare Tunnel
+    volumes:
+      - ./data:/root
+    depends_on:
+      - hbbr
+    networks:
+      - rustdesk
+
+  hbbr:
+    image: rustdesk/rustdesk-server:latest
+    container_name: rustdesk-hbbr
+    command: hbbr
+    restart: unless-stopped
+    ports:
+      - "21117:21117"       # relay (tcp)
+      - "21119:21119"       # web client relay (tcp) — optional; can ride the tunnel
+    volumes:
+      - ./data:/root
+    networks:
+      - rustdesk
+
+networks:
+  rustdesk:
+    driver: bridge

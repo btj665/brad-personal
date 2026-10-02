@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Ylianst/MeshCentral/master/meshcentral-config-schema.json",
+  "settings": {
+    "_comment": "cert MUST be the public hostname you route through Cloudflare (e.g. mesh.example.com). MeshCentral bakes it into the agent connection URLs.",
+    "cert": "REPLACE_WITH_YOUR_DOMAIN",
+    "WANonly": true,
+    "_ports": "MeshCentral listens HTTP on 4430 internally (TLS is terminated by Cloudflare); cloudflared connects there over http. aliasPort advertises the public 443 to agents/browsers.",
+    "port": 4430,
+    "aliasPort": 443,
+    "redirPort": 8080,
+    "_TlsOffload": "MUST be true behind Cloudflare Tunnel (or any TLS-terminating proxy). Cloudflare presents its OWN cert to agents; with offload, agents authenticate via the server's agent cert instead of pinning the TLS cert. If false, agents fail with 'bad web cert hash, holding connection'.",
+    "TlsOffload": true,
+    "AgentPong": 300,
+    "maxInvalidLogin": { "time": 10, "count": 5, "coolofftime": 30 }
+  },
+  "domains": {
+    "": {
+      "title": "Home Lab Remote Access",
+      "title2": "Personal use only",
+      "_siteStyle": "3 = MeshCentral's Modern UI (much cleaner than the dated default). Applies to all users; individuals can still switch in My Account. For a deeper reskin, add a custom.css override — see docs/appearance.md.",
+      "siteStyle": 3,
+      "_certUrl": "REQUIRED behind Cloudflare Tunnel (or any TLS-terminating proxy): the public https URL agents reach. MeshCentral fetches the cert presented there (Cloudflare's edge cert) so agents that see it pass the web-cert-hash check. Without this, agents fail with 'Agent bad web cert hash, holding connection' and never register. Set it to the SAME hostname as `cert`, with https:// prefix.",
+      "certUrl": "https://REPLACE_WITH_YOUR_DOMAIN",
+      "_newAccounts": "Leave true ONLY until you have created your first account (it auto-becomes site admin). Then set to false and restart to lock down registration.",
+      "newAccounts": true,
+      "userNameIsEmail": false,
+      "passwordRequirements": { "min": 12, "force2factor": true }
+    }
+  }
+}
