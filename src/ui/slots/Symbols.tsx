@@ -1,0 +1,1071 @@
+import type { JSX } from 'react'
+
+// The reel art. Every symbol is a single self-contained <svg> on a 100x100 grid,
+// drawn the way `Card.tsx` draws a deck: geometry and flat colour, no clip art.
+//
+// Two rules run through all of it, because these are read at ~50px while moving:
+//   1. Silhouette before detail. Three bars must differ from two in *outline*.
+//   2. Tier by ink. Premiums are metallic and saturated; card ranks are flat,
+//      low-contrast plates; the blank is almost nothing at all.
+//
+// Each cabinet owns its palette, so four machines on one page don't look like
+// one machine four times. Every gradient id is prefixed `machine-symbol`, which
+// is what keeps four cabinets' <defs> from colliding in a shared document.
+
+/* ------------------------------------------------------------------ helpers */
+
+type Stop = [offset: number, color: string, opacity?: number]
+
+function toStops(list: Stop[]) {
+  return list.map(([o, c, op], i) => <stop key={i} offset={o} stopColor={c} stopOpacity={op} />)
+}
+
+type LinP = { id: string; s: Stop[]; x1?: number; y1?: number; x2?: number; y2?: number }
+
+function Lin({ id, s, x1 = 0, y1 = 0, x2 = 0, y2 = 1 }: LinP) {
+  return (
+    <defs>
+      <linearGradient id={id} x1={x1} y1={y1} x2={x2} y2={y2}>
+        {toStops(s)}
+      </linearGradient>
+    </defs>
+  )
+}
+
+function Rad({ id, s, cx = 0.5, cy = 0.5, r = 0.5 }: { id: string; s: Stop[]; cx?: number; cy?: number; r?: number }) {
+  return (
+    <defs>
+      <radialGradient id={id} cx={cx} cy={cy} r={r}>
+        {toStops(s)}
+      </radialGradient>
+    </defs>
+  )
+}
+
+/** The soft backing light behind a wild or a scatter. This, more than any
+ *  interior detail, is what makes those two symbols findable mid-spin. */
+type HaloP = { id: string; color: string; cx?: number; cy?: number; r?: number; o?: number }
+
+function Halo({ id, color, cx = 50, cy = 50, r = 50, o = 0.5 }: HaloP) {
+  return (
+    <>
+      <Rad id={id} s={[[0, color, o], [0.45, color, o * 0.4], [1, color, 0]]} />
+      <circle cx={cx} cy={cy} r={r} fill={`url(#${id})`} />
+    </>
+  )
+}
+
+type RaysP = { n: number; r0: number; r1: number; w: number; color: string; o?: number; cx?: number; cy?: number; phase?: number }
+
+/** Light thrown off a scatter. Tapered wedges, not lines — a line reads as wire
+ *  at 50px, a wedge reads as a beam. */
+function Rays({ n, r0, r1, w, color, o = 0.7, cx = 50, cy = 50, phase = 0 }: RaysP) {
+  return (
+    <g opacity={o} fill={color}>
+      {Array.from({ length: n }, (_, i) => (
+        <polygon
+          key={i}
+          points={`${-w} ${-r0} ${w} ${-r0} 0 ${-r1}`}
+          transform={`translate(${cx} ${cy}) rotate(${phase + (i * 360) / n})`}
+        />
+      ))}
+    </g>
+  )
+}
+
+const SUIT_PATH = {
+  S: 'M0 -7 C4.4 -1.6 7.4 0.8 7.4 4.4 C7.4 7.4 3.6 8.4 1.2 5.8 C1.6 7.6 2.4 8.8 3.6 9.6 H-3.6 C-2.4 8.8 -1.6 7.6 -1.2 5.8 C-3.6 8.4 -7.4 7.4 -7.4 4.4 C-7.4 0.8 -4.4 -1.6 0 -7 Z',
+  H: 'M0 9.4 C-7.4 3 -8.4 -1.4 -6.2 -4.6 C-4 -7.6 0 -6.4 0 -2.6 C0 -6.4 4 -7.6 6.2 -4.6 C8.4 -1.4 7.4 3 0 9.4 Z',
+  D: 'M0 -9 L6.6 0 L0 9 L-6.6 0 Z',
+} as const
+
+type Suit = 'S' | 'H' | 'D' | 'C'
+
+function Pip({ suit, x, y, s, fill }: { suit: Suit; x: number; y: number; s: number; fill: string }) {
+  const t = `translate(${x} ${y}) scale(${s})`
+  if (suit === 'C') {
+    return (
+      <g transform={t} fill={fill}>
+        <circle cx="0" cy="-3.6" r="4" />
+        <circle cx="-4.4" cy="2.6" r="4" />
+        <circle cx="4.4" cy="2.6" r="4" />
+        <path d="M-3 9.6 C-1.2 7 -1 4.6 -1 1.6 H1 C1 4.6 1.2 7 3 9.6 Z" />
+      </g>
+    )
+  }
+  return <path d={SUIT_PATH[suit]} transform={t} fill={fill} />
+}
+
+/** The low tier, shared by the two five-reel cabinets that use card indices.
+ *  Deliberately dull: one flat plate, a hairline, no gradient on the letter. */
+function CardRank({ rank, suit, plate, edge, ink, pip }: { rank: string; suit: Suit; plate: string; edge: string; ink: string; pip: string }) {
+  return (
+    <g>
+      <rect x="16" y="12" width="68" height="76" rx="8" fill={plate} stroke={edge} strokeWidth="1.6" />
+      <text x="50" y="57" textAnchor="middle" fontFamily="sans-serif" fontWeight="700" fontSize={rank === '10' ? 34 : 44} fill={ink}>
+        {rank}
+      </text>
+      <Pip suit={suit} x={50} y={72} s={0.95} fill={pip} />
+    </g>
+  )
+}
+
+/** A cabinet's whole low tier at once, in that cabinet's colours. Red suits take
+ *  the red ink, exactly as a printed deck does — it is the one flourish this
+ *  tier gets, and it is what stops five plates reading as five grey boxes. */
+function ranks(plate: string, edge: string, ink: string, black: string, red: string): Record<string, (u: string) => JSX.Element> {
+  const set: Array<[id: string, text: string, suit: Suit]> = [
+    ['A', 'A', 'S'],
+    ['K', 'K', 'H'],
+    ['Q', 'Q', 'D'],
+    ['J', 'J', 'C'],
+    ['T', '10', 'S'],
+  ]
+  const out: Record<string, (u: string) => JSX.Element> = {}
+  for (const [id, text, suit] of set) {
+    const pip = suit === 'H' || suit === 'D' ? red : black
+    out[id] = () => <CardRank rank={text} suit={suit} plate={plate} edge={edge} ink={ink} pip={pip} />
+  }
+  return out
+}
+
+/** The majority of every strip. It has to vanish or the screen reads as noise. */
+/** A stop with nothing printed on it. It has to recede — blanks are a third to a
+ *  half of every strip — but it still has to look like strip material, or a reel
+ *  showing two of them reads as a fault rather than a losing screen. */
+function Blank({ tint }: { tint: string }) {
+  return (
+    <rect
+      x="16"
+      y="16"
+      width="68"
+      height="68"
+      rx="11"
+      fill={tint}
+      fillOpacity="0.1"
+      stroke={tint}
+      strokeOpacity="0.26"
+      strokeWidth="1.5"
+    />
+  )
+}
+
+/** A seven, shared by two cabinets with different metal on the rim. */
+function Seven({ u, s, rims }: { u: string; s: Stop[]; rims: Array<[number, string]> }) {
+  const d = 'M25 18 H77 L50 86 H32 L57 32 H25 Z'
+  return (
+    <>
+      <Lin id={`${u}-f`} s={s} />
+      {rims.map(([w, c], i) => (
+        <path key={i} d={d} fill="none" stroke={c} strokeWidth={w} strokeLinejoin="round" />
+      ))}
+      <path d={d} fill={`url(#${u}-f)`} />
+      <path d="M29 21 H70 L67 28 H29 Z" fill="#ffffff" fillOpacity="0.32" />
+    </>
+  )
+}
+
+/* -------------------------------------------------------------------- bars */
+// Chrome, cherry red and deep blue on a cream reel strip — a mechanical
+// stepper, where the symbols really were printed on paper behind glass.
+
+const CREAM = '#f6f1e6'
+const STEEL = '#6c7880'
+const BAR_RED: Stop[] = [[0, '#f4626c'], [0.5, '#d21f2c'], [1, '#8d0d18']]
+const BAR_BLUE: Stop[] = [[0, '#4a83c8'], [0.5, '#1a4c8b'], [1, '#0a2547']]
+// Graphite, not chrome: the triple bar is the top bar award, so on a cream
+// strip it wants the *most* contrast, and light-on-light gave it the least.
+const GRAPHITE: Stop[] = [[0, '#8b98a3'], [0.45, '#3c474f'], [0.6, '#5a666e'], [1, '#141a1f']]
+
+/** The printed strip behind every paying symbol on this cabinet. */
+function Strip({ u }: { u: string }) {
+  return (
+    <>
+      <Lin id={`${u}-st`} s={[[0, '#fdfaf3'], [0.55, CREAM], [1, '#dcd3bf']]} />
+      <rect x="7" y="7" width="86" height="86" rx="13" fill={`url(#${u}-st)`} stroke={STEEL} strokeWidth="2" />
+      <rect x="11" y="11" width="78" height="78" rx="9" fill="none" stroke="#ffffff" strokeOpacity="0.8" />
+    </>
+  )
+}
+
+function Fit({ children, k = 0.92 }: { children: JSX.Element | JSX.Element[]; k?: number }) {
+  return <g transform={`translate(50 50) scale(${k}) translate(-50 -50)`}>{children}</g>
+}
+
+/** One, two or three bars. The count is the *last* cue: each stack has its own
+ *  width, its own overall height and its own metal, so the outline alone tells
+ *  them apart at speed. */
+function BarStack({ u, n }: { u: string; n: 1 | 2 | 3 }) {
+  const spec = {
+    1: { w: 76, h: 26, gap: 0, s: BAR_BLUE, edge: '#07203d' },
+    2: { w: 64, h: 17, gap: 9, s: BAR_RED, edge: '#6d0812' },
+    3: { w: 50, h: 12, gap: 8, s: GRAPHITE, edge: '#080c0f' },
+  }[n]
+  const total = n * spec.h + (n - 1) * spec.gap
+  const x = 50 - spec.w / 2
+  return (
+    <>
+      <Lin id={`${u}-b`} s={spec.s} />
+      {Array.from({ length: n }, (_, i) => {
+        const y = 50 - total / 2 + i * (spec.h + spec.gap)
+        return (
+          <g key={i}>
+            <rect
+              x={x}
+              y={y}
+              width={spec.w}
+              height={spec.h}
+              rx={Math.min(4, spec.h / 3)}
+              fill={`url(#${u}-b)`}
+              stroke={spec.edge}
+              strokeWidth="1.6"
+            />
+            <rect x={x + 3} y={y + 1.8} width={spec.w - 6} height={spec.h * 0.22} rx={spec.h * 0.11} fill="#ffffff" fillOpacity="0.42" />
+          </g>
+        )
+      })}
+    </>
+  )
+}
+
+const SHIELD = 'M50 14 L84 25 C84 56 71 79 50 88 C29 79 16 56 16 25 Z'
+
+const BARS: Record<string, (u: string) => JSX.Element> = {
+  // The wild doubles what it completes, so the multiplier is part of the badge.
+  W: (u) => (
+    <>
+      <Strip u={u} />
+      <Fit>
+        <>
+          <Lin id={`${u}-sh`} s={BAR_BLUE} />
+          <Lin id={`${u}-bd`} s={BAR_RED} />
+          {/* Steel under chrome: two strokes on one outline make a bevelled rim. */}
+          <path d={SHIELD} fill={`url(#${u}-sh)`} stroke={STEEL} strokeWidth="5" strokeLinejoin="round" />
+          <path d={SHIELD} fill={`url(#${u}-sh)`} stroke="#eef3f6" strokeWidth="2.4" strokeLinejoin="round" />
+          <path d="M50 19 L79 28 C79 41 74 51 68 58 C60 44 46 34 25 31 L23 26 Z" fill="#ffffff" fillOpacity="0.16" />
+          <text x="48" y="63" textAnchor="middle" fontFamily="sans-serif" fontWeight="700" fontSize="42" fill="#f4f8fb">
+            W
+          </text>
+          <circle cx="76" cy="76" r="17" fill={`url(#${u}-bd)`} stroke="#eef3f6" strokeWidth="3" />
+          <text x="76" y="82" textAnchor="middle" fontFamily="sans-serif" fontWeight="700" fontSize="19" fill="#fff8f8">
+            ×2
+          </text>
+        </>
+      </Fit>
+    </>
+  ),
+  '7': (u) => (
+    <>
+      <Strip u={u} />
+      <Fit>
+        <Seven u={u} s={BAR_RED} rims={[[10, STEEL], [6, '#eef3f6']]} />
+      </Fit>
+    </>
+  ),
+  BBB: (u) => (
+    <>
+      <Strip u={u} />
+      <BarStack u={u} n={3} />
+    </>
+  ),
+  BB: (u) => (
+    <>
+      <Strip u={u} />
+      <BarStack u={u} n={2} />
+    </>
+  ),
+  B: (u) => (
+    <>
+      <Strip u={u} />
+      <BarStack u={u} n={1} />
+    </>
+  ),
+  C: (u) => (
+    <>
+      <Strip u={u} />
+      <Fit>
+        <>
+          <Rad id={`${u}-c`} s={[[0, '#ff8a92'], [0.45, '#d8202e'], [1, '#78060f']]} cx={0.35} cy={0.3} r={0.8} />
+          <path d="M50 22 C44 34 34 42 30 54" fill="none" stroke="#6b4a1f" strokeWidth="4" strokeLinecap="round" />
+          <path d="M52 22 C60 34 66 46 68 60" fill="none" stroke="#6b4a1f" strokeWidth="4" strokeLinecap="round" />
+          <path d="M50 22 C58 12 74 10 80 16 C72 26 58 28 50 22 Z" fill="#2f7d3a" stroke="#1b4f24" strokeWidth="1.5" />
+          <circle cx="30" cy="70" r="17" fill={`url(#${u}-c)`} stroke="#6b0a13" strokeWidth="1.5" />
+          <circle cx="69" cy="74" r="14" fill={`url(#${u}-c)`} stroke="#6b0a13" strokeWidth="1.5" />
+          <ellipse cx="24" cy="63" rx="5" ry="3.4" fill="#fff" fillOpacity="0.6" transform="rotate(-25 24 63)" />
+          <ellipse cx="64" cy="69" rx="4" ry="2.6" fill="#fff" fillOpacity="0.55" transform="rotate(-25 64 69)" />
+        </>
+      </Fit>
+    </>
+  ),
+  // The bonus trigger. A wheel, because a wheel is what it opens, and the only
+  // thing printed on this cream strip with light behind it — which is what puts it
+  // on a par with the wild rather than below it. The segments are a dashed stroke
+  // on one circle: twelve alternating wedges, exactly even, in one declaration.
+  BON: (u) => {
+    const rMid = 22
+    const dash = ((2 * Math.PI * rMid) / 24).toFixed(3)
+    return (
+      <>
+        <Strip u={u} />
+        <Fit>
+          <>
+            <Rad id={`${u}-lit`} s={[[0, '#ffd76a', 0.9], [0.55, '#ffb43c', 0.4], [1, '#ffb43c', 0]]} />
+            <Lin id={`${u}-seg`} s={BAR_RED} />
+            <circle cx="50" cy="53" r="47" fill={`url(#${u}-lit)`} />
+            <Rays n={12} r0={35} r1={49} w={3.4} color="#ffcf5c" o={0.8} cy={53} phase={15} />
+            {/* The wheel: cream face, twelve red segments, a bevelled chrome rim. */}
+            <circle cx="50" cy="53" r="33" fill={CREAM} />
+            <circle
+              cx="50"
+              cy="53"
+              r={rMid}
+              fill="none"
+              stroke={`url(#${u}-seg)`}
+              strokeWidth="22"
+              strokeDasharray={`${dash} ${dash}`}
+            />
+            <circle cx="50" cy="53" r="33" fill="none" stroke={STEEL} strokeWidth="7" />
+            <circle cx="50" cy="53" r="33" fill="none" stroke="#eef3f6" strokeWidth="3.6" />
+            <circle cx="50" cy="53" r="12.5" fill="#eef3f6" stroke={STEEL} strokeWidth="2" />
+            <polygon
+              points="50,41.5 52.82,49.12 60.94,49.45 54.56,54.48 56.76,62.3 50,57.8 43.24,62.3 45.44,54.48 39.06,49.45 47.18,49.12"
+              fill="#ffbf2e"
+              stroke="#8a5b0c"
+              strokeWidth="1.2"
+            />
+            {/* The pointer. Without it this is a pie chart. */}
+            <polygon points="50,24 44,10 56,10" fill="#eef3f6" stroke={STEEL} strokeWidth="2" strokeLinejoin="round" />
+          </>
+        </Fit>
+      </>
+    )
+  },
+  // A stepper's blank is not a hole in the reel — it is the printed strip with
+  // nothing on it. Drawing it as bare plate keeps the reel reading as one
+  // continuous band, which matters here because blanks are 15 of the 32 stops.
+  '-': (u: string) => (
+    <>
+      <Strip u={u} />
+      <rect x="26" y="46" width="48" height="8" rx="4" fill={STEEL} fillOpacity="0.12" />
+    </>
+  ),
+}
+
+/* -------------------------------------------------------------------- bell */
+// Brass and deep red on the dark glass. The bell is the whole hook, so it gets
+// the biggest halo on the floor.
+
+const BRASS: Stop[] = [[0, '#ffeeb4'], [0.4, '#d9ae52'], [0.72, '#a97e28'], [1, '#6f4f12']]
+const BRASS_LINE = '#f0d98a'
+const BELL_RED: Stop[] = [[0, '#e8515c'], [0.5, '#b3121f'], [1, '#63060f']]
+
+const BELL: Record<string, (u: string) => JSX.Element> = {
+  W: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffd473" r={48} o={0.42} />
+      <Lin id={`${u}-d`} s={BELL_RED} />
+      <Lin id={`${u}-r`} s={BRASS} />
+      <path d="M50 9 L91 50 L50 91 L9 50 Z" fill={`url(#${u}-r)`} />
+      <path d="M50 17 L83 50 L50 83 L17 50 Z" fill={`url(#${u}-d)`} stroke="#4d040c" strokeWidth="1.2" />
+      <path d="M50 17 L83 50 L74 50 C68 34 56 24 42 21 Z" fill="#ffffff" fillOpacity="0.18" />
+      <text x="50" y="65" textAnchor="middle" fontFamily="sans-serif" fontWeight="700" fontSize="42" fill="#ffeec2">
+        W
+      </text>
+    </>
+  ),
+  // The scatter. Brightest thing on the cabinet, by design.
+  BL: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffcf5c" r={50} o={0.72} cy={52} />
+      <Rays n={12} r0={30} r1={49} w={3.6} color="#ffe8a4" o={0.62} cy={52} phase={15} />
+      <Lin id={`${u}-b`} s={BRASS} />
+      <Rad id={`${u}-k`} s={[[0, '#fff4cd'], [1, '#c08f2a']]} />
+      <circle cx="50" cy="17" r="6.5" fill={`url(#${u}-k)`} stroke="#6f4f12" strokeWidth="1.2" />
+      <path d="M50 21 C36 21 32 38 28 60 C26 69 22 72 19 77 H81 C78 72 74 69 72 60 C68 38 64 21 50 21 Z" fill={`url(#${u}-b)`} stroke="#6f4f12" strokeWidth="1.6" />
+      <path d="M45 25 C38 30 36 45 33 62 C31 70 29 73 27 77 H35 C36 70 37 60 39 48 C41 34 43 28 47 25 Z" fill="#fff3c8" fillOpacity="0.55" />
+      <rect x="17" y="75" width="66" height="7" rx="3.5" fill={`url(#${u}-b)`} stroke="#6f4f12" strokeWidth="1.4" />
+      <circle cx="50" cy="88" r="7" fill={`url(#${u}-k)`} stroke="#6f4f12" strokeWidth="1.4" />
+    </>
+  ),
+  '7': (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#c8a04a" r={44} o={0.18} />
+      <Seven u={u} s={BELL_RED} rims={[[9, '#6f4f12'], [5.5, BRASS_LINE]]} />
+    </>
+  ),
+  D: (u) => (
+    <>
+      <Lin id={`${u}-g`} s={[[0, '#f4fdff'], [0.45, '#a9d8ee'], [1, '#4a86ab']]} />
+      <path d="M50 13 L84 41 L50 89 L16 41 Z" fill={`url(#${u}-g)`} stroke={BRASS_LINE} strokeWidth="2.4" strokeLinejoin="round" />
+      <g stroke="#ffffff" strokeOpacity="0.7" strokeWidth="1.6" fill="none">
+        <path d="M16 41 H84" />
+        <path d="M33 27 L38 41 L50 89" />
+        <path d="M67 27 L62 41 L50 89" />
+      </g>
+      <path d="M33 27 H67 L62 41 H38 Z" fill="#ffffff" fillOpacity="0.3" />
+    </>
+  ),
+  BAR: (u) => (
+    <>
+      <Lin id={`${u}-b`} s={BRASS} />
+      <rect x="11" y="35" width="78" height="30" rx="6" fill={`url(#${u}-b)`} stroke="#6f4f12" strokeWidth="2" />
+      <rect x="15" y="38" width="70" height="5" rx="2.5" fill="#fff6d6" fillOpacity="0.5" />
+      <text x="50" y="58" textAnchor="middle" fontFamily="sans-serif" fontWeight="700" fontSize="21" letterSpacing="2" fill="#5b1018">
+        BAR
+      </text>
+    </>
+  ),
+  ...ranks('#191309', '#6b5628', '#cfc0a1', '#93826a', '#9a5b53'),
+  '-': () => <Blank tint="#c8a04a" />,
+}
+
+/* --------------------------------------------------------------- rockslide */
+// Slate, ochre and hard-edged gems. Everything is faceted and slightly
+// asymmetric, because these are things that break.
+
+// Kept dark and low-contrast on purpose: the slab is ground, the gem is figure,
+// and a brighter rock would blur the gems' outlines into one another.
+const SLATE: Stop[] = [[0, '#333c42'], [1, '#171d21']]
+
+/** The chip of rock a gem is still embedded in. */
+function Slab({ u }: { u: string }) {
+  return (
+    <>
+      <Lin id={`${u}-sl`} s={SLATE} />
+      <polygon points="21,13 63,8 91,29 87,71 61,93 25,88 8,58 12,29" fill={`url(#${u}-sl)`} stroke="#414c53" strokeWidth="1.5" />
+      <polyline points="12,29 24,40 20,66 25,88" fill="none" stroke="#0d1114" strokeOpacity="0.5" strokeWidth="2" />
+      <polyline points="91,29 79,38 84,66 87,71" fill="none" stroke="#0d1114" strokeOpacity="0.4" strokeWidth="2" />
+    </>
+  )
+}
+
+/** A gem: a faceted outline, a bright crown wedge, a dark pavilion wedge. */
+type GemP = { u: string; d: string; s: Stop[]; edge: string; crown: string; pavilion: string; lines: string }
+
+function Gem({ u, d, s, edge, crown, pavilion, lines }: GemP) {
+  return (
+    <>
+      <Lin id={`${u}-g`} s={s} />
+      <path d={d} fill={`url(#${u}-g)`} stroke={edge} strokeWidth="2.2" strokeLinejoin="round" />
+      <path d={crown} fill="#ffffff" fillOpacity="0.4" />
+      <path d={pavilion} fill="#000000" fillOpacity="0.28" />
+      <path d={lines} fill="none" stroke="#ffffff" strokeOpacity="0.42" strokeWidth="1.5" />
+    </>
+  )
+}
+
+const ROCK: Record<string, (u: string) => JSX.Element> = {
+  // Struck crystal: the only thing on this cabinet that emits light.
+  W: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#7de3ff" r={50} o={0.5} />
+      <Rays n={4} r0={32} r1={48} w={2.2} color="#ffffff" o={0.55} phase={45} />
+      <Lin id={`${u}-c`} s={[[0, '#f0fdff'], [0.35, '#7fd8f5'], [0.7, '#4a8fd6'], [1, '#2b3f9c']]} />
+      <path d="M50 6 L68 30 L63 76 L50 94 L37 76 L32 30 Z" fill={`url(#${u}-c)`} stroke="#dff8ff" strokeWidth="2.4" strokeLinejoin="round" />
+      <path d="M50 6 L68 30 L58 33 L50 12 Z" fill="#ffffff" fillOpacity="0.6" />
+      <path d="M50 94 L63 76 L56 74 L50 88 Z" fill="#000000" fillOpacity="0.3" />
+      <g stroke="#ffffff" strokeOpacity="0.6" strokeWidth="1.6" fill="none">
+        <path d="M32 30 L50 36 L68 30" />
+        <path d="M50 36 V94" />
+      </g>
+      <circle cx="66" cy="20" r="3.6" fill="#ffffff" fillOpacity="0.85" />
+    </>
+  ),
+  // The bonus trigger. Everything else on this cabinet is something the canyon
+  // gives up; this is the thing that makes it. Lit amber rather than gem-blue so
+  // it can't be mistaken for the wild at speed, and no slab behind it — a stick of
+  // dynamite is not embedded in anything, it is about to remove what is.
+  BON: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffab3d" r={50} o={0.58} cy={54} />
+      <Rays n={8} r0={34} r1={50} w={3} color="#ffd27a" o={0.5} cy={54} phase={22} />
+      <Lin id={`${u}-dy`} s={[[0, '#f4756a'], [0.42, '#c8302a'], [1, '#63100e']]} x2={1} y2={0} />
+      <Lin id={`${u}-st`} s={[[0, '#5f4b38'], [0.4, '#3a2d21'], [1, '#1d160f']]} x2={1} y2={0} />
+      <Rad id={`${u}-sp`} s={[[0, '#ffffff'], [0.4, '#ffd76a'], [1, '#ff8a1e', 0]]} />
+      <g stroke="#390b09" strokeWidth="1.8">
+        <rect x="20" y="40" width="17" height="50" rx="7" fill={`url(#${u}-dy)`} transform="rotate(-9 28 65)" />
+        <rect x="63" y="40" width="17" height="50" rx="7" fill={`url(#${u}-dy)`} transform="rotate(9 72 65)" />
+        <rect x="41" y="33" width="18" height="57" rx="7.5" fill={`url(#${u}-dy)`} />
+      </g>
+      {/* The strap. It is what makes three sticks read as a charge. */}
+      <rect x="13" y="59" width="74" height="14" fill={`url(#${u}-st)`} stroke="#140e09" strokeWidth="1.6" />
+      <rect x="13" y="61" width="74" height="2.6" fill="#ffffff" fillOpacity="0.16" />
+      <path d="M50 33 C50 21 61 19 66 13" fill="none" stroke="#d9c48f" strokeWidth="3.6" strokeLinecap="round" />
+      <path d="M50 33 C50 21 61 19 66 13" fill="none" stroke="#8a7448" strokeWidth="1.2" strokeLinecap="round" />
+      <Rays n={6} r0={5} r1={19} w={2.2} color="#ffe9a8" o={0.85} cx={67} cy={12} phase={12} />
+      <circle cx="67" cy="12" r="11" fill={`url(#${u}-sp)`} />
+      <circle cx="67" cy="12" r="4.4" fill="#fffdf2" />
+    </>
+  ),
+  D: (u) => (
+    <>
+      <Slab u={u} />
+      <Gem
+        u={u}
+        d="M31 26 H69 L86 45 L50 88 L14 45 Z"
+        s={[[0, '#f6feff'], [0.45, '#a5e0f7'], [1, '#3d8fc4']]}
+        edge="#dff4ff"
+        crown="M31 26 H69 L60 39 H40 Z"
+        pavilion="M50 88 L86 45 L69 45 Z"
+        lines="M14 45 H86 M31 26 L40 39 L50 88 M69 26 L60 39 L50 88"
+      />
+    </>
+  ),
+  G: (u) => (
+    <>
+      <Slab u={u} />
+      <Gem
+        u={u}
+        d="M26 40 L38 22 L62 18 L80 34 L84 58 L68 80 L40 82 L20 66 Z"
+        s={[[0, '#fff0b8'], [0.4, '#f0b429'], [1, '#8a5b0c']]}
+        edge="#5f3d05"
+        crown="M38 22 L62 18 L58 34 L34 36 Z"
+        pavilion="M68 80 L84 58 L62 60 L48 82 Z"
+        lines="M34 36 L58 34 L68 56 L48 68 L26 58 Z M58 34 L80 34 M68 56 L84 58"
+      />
+      <circle cx="72" cy="28" r="3.2" fill="#fff8dc" fillOpacity="0.9" />
+    </>
+  ),
+  R: (u) => (
+    <>
+      <Slab u={u} />
+      <Gem
+        u={u}
+        d="M34 20 H66 L84 40 V62 L64 82 H36 L16 60 V38 Z"
+        s={[[0, '#ff8fa1'], [0.45, '#d81e3f'], [1, '#6c0619']]}
+        edge="#48030f"
+        crown="M34 20 H66 L58 34 H42 Z"
+        pavilion="M64 82 H36 L44 68 H58 Z"
+        lines="M42 34 H58 L70 48 L58 68 H42 L30 50 Z M34 20 L42 34 M66 20 L58 34 M84 40 L70 48 M16 38 L30 50"
+      />
+    </>
+  ),
+  E: (u) => (
+    <>
+      <Slab u={u} />
+      <Gem
+        u={u}
+        d="M30 22 H70 L82 34 V66 L70 78 H30 L18 66 V34 Z"
+        s={[[0, '#8ff2c6'], [0.45, '#17a672'], [1, '#064a33']]}
+        edge="#04301f"
+        crown="M30 22 H70 L64 32 H36 Z"
+        pavilion="M30 78 H70 L64 68 H36 Z"
+        lines="M36 32 H64 V68 H36 Z M43 40 H57 V60 H43 Z M18 34 L30 22 M82 34 L70 22"
+      />
+    </>
+  ),
+  // The cheapest symbol on the strip: a chip of country rock. Angular like the
+  // gems so it belongs, but matte and grey so it never competes with them.
+  Q: () => (
+    <>
+      <path
+        d="M23 45 L37 27 L59 23 L75 34 L79 57 L66 75 L41 79 L26 67 Z"
+        fill="#6c757b"
+        stroke="#262d31"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M37 27 L59 23 L75 34 L57 40 L39 37 Z" fill="#ffffff" fillOpacity="0.13" />
+      <path d="M79 57 L66 75 L41 79 L52 60 L74 52 Z" fill="#000000" fillOpacity="0.2" />
+      <path d="M23 45 L39 37 L36 58 L26 67 Z" fill="#000000" fillOpacity="0.1" />
+    </>
+  ),
+  // Bare rock. A blank on this cabinet is the canyon face with nothing in it,
+  // which is both what the theme wants and what stops the screen looking like it
+  // has holes punched in it.
+  '-': (u: string) => (
+    <g opacity="0.5">
+      <Slab u={u} />
+    </g>
+  ),
+}
+
+/* ---------------------------------------------------------------- lateshow */
+// Brass and neon on near-black. Objects and places only — a room after the
+// audience has gone home.
+
+const NEON_PINK = '#ff4d9d'
+const LOUNGE_BRASS: Stop[] = [[0, '#ffe6a8'], [0.4, '#c8a04a'], [1, '#7a5716']]
+
+const LATE: Record<string, (u: string) => JSX.Element> = {
+  // Expanding wild. Drawn as a beam rather than a lamp, because filling the
+  // reel is the thing it actually does.
+  spot: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffe9a8" r={40} o={0.4} cy={26} />
+      <Lin id={`${u}-beam`} s={[[0, '#fff6d8', 0.92], [0.45, '#ffe08a', 0.4], [1, '#ffd166', 0.04]]} />
+      <Lin id={`${u}-core`} s={[[0, '#ffffff', 0.85], [1, '#fff3c4', 0.05]]} />
+      <Lin id={`${u}-can`} s={LOUNGE_BRASS} />
+      <polygon points="37,30 63,30 92,96 8,96" fill={`url(#${u}-beam)`} />
+      <polygon points="44,30 56,30 68,96 32,96" fill={`url(#${u}-core)`} />
+      <path d="M34 8 H66 L63 31 H37 Z" fill={`url(#${u}-can)`} stroke="#5d3f0c" strokeWidth="1.8" />
+      <rect x="36" y="27" width="28" height="5" rx="2.5" fill="#fff8e2" />
+      <rect x="30" y="4" width="40" height="6" rx="3" fill={`url(#${u}-can)`} stroke="#5d3f0c" strokeWidth="1.4" />
+    </>
+  ),
+  // The scatter: a lit sign. A boxy arch hung with bulbs, so it can't be taken
+  // for the wild's beam even at a glance — the other bright thing on this reel.
+  mrq: (u) => {
+    // Bulbs ring the sign: over the arch, down both jambs, along the sill.
+    const bulbs: Array<[number, number]> = []
+    for (let i = 0; i <= 8; i++) {
+      const a = Math.PI - (i * Math.PI) / 8
+      bulbs.push([50 + 35 * Math.cos(a), 41 - 35 * Math.sin(a)])
+    }
+    for (let i = 1; i <= 3; i++) {
+      bulbs.push([15, 41 + i * 12])
+      bulbs.push([85, 41 + i * 12])
+    }
+    for (let i = 0; i <= 5; i++) bulbs.push([15 + i * 14, 89])
+    return (
+      <>
+        <Halo id={`${u}-h`} color="#ffcf72" r={50} o={0.5} cy={46} />
+        <Lin id={`${u}-f`} s={[[0, '#4a1140'], [1, '#20081d']]} />
+        <Lin id={`${u}-b`} s={LOUNGE_BRASS} />
+        <Rad id={`${u}-bg`} s={[[0, '#fff6d0', 0.95], [0.4, '#ffd873', 0.55], [1, '#ffd873', 0]]} />
+        <path d="M20 41 A30 30 0 0 1 80 41 V83 H20 Z" fill={`url(#${u}-f)`} stroke={`url(#${u}-b)`} strokeWidth="4" strokeLinejoin="round" />
+        <polygon points="50,27 54.1,38.3 66.2,38.8 56.7,46.2 60,57.8 50,51 40,57.8 43.3,46.2 33.8,38.8 45.9,38.3" fill="#fff4cd" stroke="#ffd873" strokeWidth="1.6" />
+        <rect x="31" y="65" width="38" height="7" rx="3.5" fill={NEON_PINK} />
+        <rect x="33" y="66.5" width="34" height="2" rx="1" fill="#ffd7ea" />
+        <g>
+          {bulbs.map(([x, y], i) => (
+            <circle key={`g${i}`} cx={x} cy={y} r="7" fill={`url(#${u}-bg)`} />
+          ))}
+          {bulbs.map(([x, y], i) => (
+            <circle key={`b${i}`} cx={x} cy={y} r="3.1" fill="#fff8e0" />
+          ))}
+        </g>
+      </>
+    )
+  },
+  // The bonus trigger: the star on the dressing-room door. Every other symbol on
+  // this cabinet is a thing in the room — this is the way further in, so it is a
+  // door, closed, with light coming out from under it. Bright enough to sit beside
+  // the marquee scatter; a gold star where that one has a silver one, and squared
+  // off where that one is arched, so the two never read as each other.
+  BON: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffcf72" r={49} o={0.5} cy={48} />
+      <Lin id={`${u}-fr`} s={LOUNGE_BRASS} />
+      <Lin id={`${u}-dr`} s={[[0, '#5a1a4c'], [0.45, '#330d2c'], [1, '#190617']]} x2={1} y2={0.3} />
+      <Rad id={`${u}-leak`} s={[[0, '#fff3c8', 0.95], [0.5, '#ffcf72', 0.4], [1, '#ffcf72', 0]]} />
+      {/* Architrave, then the leaf. */}
+      <rect x="15" y="5" width="70" height="88" rx="3" fill={`url(#${u}-fr)`} stroke="#5d3f0c" strokeWidth="1.6" />
+      <rect x="22" y="11" width="56" height="79" rx="2" fill={`url(#${u}-dr)`} stroke="#1a0616" strokeWidth="1.6" />
+      {/* Two recessed panels. A door with no joinery on it is a wall. */}
+      <g fill="none" stroke="#8a4a72" strokeOpacity="0.75" strokeWidth="1.8">
+        <rect x="28" y="16" width="44" height="43" rx="1.5" />
+        <rect x="28" y="65" width="44" height="20" rx="1.5" />
+      </g>
+      {/* Hinge stile: the vertical the leaf swings on. */}
+      <rect x="22" y="11" width="3.4" height="79" fill="#000000" fillOpacity="0.4" />
+      <Rays n={10} r0={17} r1={36} w={2.8} color="#ffe9a8" o={0.65} cy={38} phase={18} />
+      <polygon
+        points="50,19 54.64,31.61 68.07,32.13 57.51,40.44 61.17,53.37 50,45.9 38.83,53.37 42.49,40.44 31.93,32.13 45.36,31.61"
+        fill="#ffd35e"
+        stroke="#8a6216"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <polygon points="50,19 54.64,31.61 45.36,31.61" fill="#fff6d8" fillOpacity="0.8" />
+      {/* Lever handle, and the light coming out under the door — the one cue that
+          reads at 50px even when the joinery has gone to mush. */}
+      <circle cx="68" cy="75" r="4" fill="#ffe9ae" stroke="#5d3f0c" strokeWidth="1.2" />
+      <rect x="60" y="73.6" width="9" height="3" rx="1.5" fill="#ffe9ae" stroke="#5d3f0c" strokeWidth="1" />
+      <ellipse cx="50" cy="93" rx="38" ry="11" fill={`url(#${u}-leak)`} />
+      <rect x="22" y="86" width="56" height="4.4" fill="#fff6d8" />
+    </>
+  ),
+  mic: (u) => (
+    <>
+      <Lin id={`${u}-c`} s={[[0, '#f7fafc'], [0.35, '#b9c4cb'], [0.6, '#eef3f6'], [1, '#79848c']]} />
+      <Lin id={`${u}-b`} s={LOUNGE_BRASS} />
+      <rect x="46" y="58" width="8" height="26" rx="3" fill={`url(#${u}-b)`} stroke="#5d3f0c" strokeWidth="1.2" />
+      <ellipse cx="50" cy="87" rx="17" ry="5.5" fill={`url(#${u}-b)`} stroke="#5d3f0c" strokeWidth="1.4" />
+      <rect x="33" y="10" width="34" height="50" rx="17" fill={`url(#${u}-c)`} stroke="#3d464c" strokeWidth="2" />
+      <g stroke="#4b555c" strokeWidth="2" strokeOpacity="0.75">
+        <path d="M35 22 H65" />
+        <path d="M34 31 H66" />
+        <path d="M34 40 H66" />
+        <path d="M35 49 H65" />
+      </g>
+      <rect x="37" y="14" width="7" height="42" rx="3.5" fill="#ffffff" fillOpacity="0.4" />
+      <rect x="30" y="55" width="40" height="8" rx="4" fill={`url(#${u}-b)`} stroke="#5d3f0c" strokeWidth="1.2" />
+    </>
+  ),
+  mar: (u) => (
+    <>
+      <Lin id={`${u}-g`} s={[[0, '#dff6ff', 0.95], [1, '#6fb7d6', 0.75]]} />
+      <Lin id={`${u}-b`} s={LOUNGE_BRASS} />
+      <path d="M46 60 H54 V82 H46 Z" fill={`url(#${u}-b)`} />
+      <path d="M28 84 H72 C72 89 66 91 50 91 C34 91 28 89 28 84 Z" fill={`url(#${u}-b)`} stroke="#5d3f0c" strokeWidth="1.2" />
+      <path d="M16 24 H84 L52 62 H48 Z" fill={`url(#${u}-g)`} stroke="#e9f7ff" strokeWidth="2.4" strokeLinejoin="round" />
+      <path d="M22 28 H78 L50 60 Z" fill="#bfe8f8" fillOpacity="0.35" />
+      <path d="M26 30 L46 54" stroke="#ffffff" strokeOpacity="0.75" strokeWidth="3" strokeLinecap="round" />
+      <path d="M63 12 L52 38" stroke="#e3d6b4" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="66" cy="10" r="7" fill="#7fae32" stroke="#4e6d18" strokeWidth="1.4" />
+      <circle cx="66" cy="10" r="2.8" fill="#c8443c" />
+    </>
+  ),
+  // The bell does the identifying work: a wide flared mouth up and to the left,
+  // a body that bends under it. Without a big bell this reads as a horseshoe.
+  sax: (u) => {
+    const body = 'M64 15 C63 23 69 27 69 37 L69 58 C69 76 57 89 43 89 C30 89 21 80 23 67 L25 59'
+    return (
+      <>
+        <Lin id={`${u}-b`} s={LOUNGE_BRASS} x2={1} y2={0.4} />
+        <Lin id={`${u}-l`} s={[[0, '#ffeab0'], [0.5, '#d3a63c'], [1, '#8a6216']]} x2={1} y2={0} />
+        <path d="M58 5 H70 L67 17 H59 Z" fill="#2b2418" stroke="#5d3f0c" strokeWidth="1.2" />
+        <path d={body} fill="none" stroke={`url(#${u}-b)`} strokeWidth="13" strokeLinecap="round" />
+        <path d={body} fill="none" stroke="#fff0c4" strokeOpacity="0.3" strokeWidth="4" strokeLinecap="round" />
+        <g fill="#33290f">
+          <circle cx="69" cy="40" r="3.4" />
+          <circle cx="70" cy="51" r="3.4" />
+          <circle cx="67" cy="62" r="3.4" />
+        </g>
+        <path d="M19 62 H33 L39 31 H3 Z" fill={`url(#${u}-l)`} stroke="#5d3f0c" strokeWidth="1.5" />
+        <ellipse cx="21" cy="31" rx="18" ry="6.5" fill="#ffe9ae" stroke="#5d3f0c" strokeWidth="1.5" />
+        <ellipse cx="21" cy="31" rx="11" ry="3.6" fill="#6f4f12" fillOpacity="0.6" />
+      </>
+    )
+  },
+  crt: (u) => {
+    // One panel, drawn twice: the right one is the left one mirrored about the
+    // centre line, which is also how a real pair of drapes is cut.
+    const half = (
+      <>
+        <path d="M11 20 H43 C41 44 45 66 41 84 Q34 92 27 84 Q19 92 11 84 Z" fill={`url(#${u}-c)`} stroke="#2c040f" strokeWidth="1.6" />
+        <g stroke="#3d0715" strokeOpacity="0.6" strokeWidth="2" fill="none">
+          <path d="M20 22 C19 46 22 66 19 84" />
+          <path d="M30 22 C29 46 32 66 29 84" />
+        </g>
+      </>
+    )
+    return (
+      <>
+        <Lin id={`${u}-c`} s={[[0, '#a3223c'], [0.5, '#78122a'], [1, '#3d0715']]} x2={1} y2={0} />
+        <Lin id={`${u}-b`} s={LOUNGE_BRASS} />
+        <Rad id={`${u}-stage`} s={[[0, '#ffdb94', 0.5], [1, '#ffdb94', 0]]} cy={0.72} />
+        <ellipse cx="50" cy="72" rx="22" ry="30" fill={`url(#${u}-stage)`} />
+        {half}
+        <g transform="translate(100 0) scale(-1 1)">{half}</g>
+        <rect x="7" y="11" width="86" height="9" rx="4.5" fill={`url(#${u}-b)`} stroke="#5d3f0c" strokeWidth="1.4" />
+        <ellipse cx="38" cy="52" rx="6" ry="9" fill={`url(#${u}-b)`} stroke="#5d3f0c" strokeWidth="1.2" />
+        <ellipse cx="62" cy="52" rx="6" ry="9" fill={`url(#${u}-b)`} stroke="#5d3f0c" strokeWidth="1.2" />
+      </>
+    )
+  },
+  ...ranks('#181320', '#6a5734', '#c6b79c', '#8d7f6d', '#9c5f62'),
+  '-': () => <Blank tint="#c9a6d8" />,
+}
+
+/* -------------------------------------------------------------- highroller */
+// Deep red and casino gold on dark glass. A high-stakes stepper where the whole
+// show is the banker's phone, so the phone gets the biggest halo on the cabinet,
+// the way the bell does — the wild and the diamond stay below it on purpose.
+
+const HR_GOLD: Stop[] = [[0, '#ffe9a6'], [0.4, '#e8b73e'], [0.72, '#b9871f'], [1, '#7a530f']]
+const HR_GOLD_LINE = '#ffdf8a'
+const HR_RED: Stop[] = [[0, '#f2565f'], [0.5, '#c8121f'], [1, '#6c0510']]
+
+/** A five-pointed star as a `points` string — the shape the wild is built on. */
+function starPoints(cx: number, cy: number, ro: number, ri: number): string {
+  const pts: string[] = []
+  for (let i = 0; i < 10; i++) {
+    const a = (-90 + i * 36) * (Math.PI / 180)
+    const r = i % 2 === 0 ? ro : ri
+    pts.push(`${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`)
+  }
+  return pts.join(' ')
+}
+
+const HIGH: Record<string, (u: string) => JSX.Element> = {
+  // The wild: a gold star with a red boss. No multiplier badge — this cabinet's
+  // wild carries its own top award rather than doubling, so nothing here promises
+  // a ×2 the pay table doesn't back.
+  W: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffd473" r={48} o={0.5} />
+      <Lin id={`${u}-g`} s={HR_GOLD} />
+      <Rad id={`${u}-r`} s={[[0, '#ff8a92'], [0.5, '#d8202e'], [1, '#7c0a14']]} />
+      <polygon points={starPoints(50, 47, 42, 18)} fill={`url(#${u}-g)`} stroke="#7a530f" strokeWidth="4" strokeLinejoin="round" />
+      <polygon points={starPoints(50, 47, 42, 18)} fill="none" stroke={HR_GOLD_LINE} strokeWidth="1.6" strokeLinejoin="round" />
+      <circle cx="50" cy="47" r="16" fill={`url(#${u}-r)`} stroke={HR_GOLD_LINE} strokeWidth="2" />
+      <text x="50" y="54" textAnchor="middle" fontFamily="sans-serif" fontWeight="800" fontSize="20" fill="#fff2e6">
+        W
+      </text>
+    </>
+  ),
+  '7': (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#d98a3a" r={42} o={0.16} />
+      <Seven u={u} s={HR_RED} rims={[[10, '#7a530f'], [6, HR_GOLD_LINE]]} />
+    </>
+  ),
+  // The one cool symbol on a hot cabinet: an icy brilliant with a gold girdle, so
+  // it belongs to the casino palette without going red like everything else.
+  DIA: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#bfe0ff" r={44} o={0.24} />
+      <Lin id={`${u}-g`} s={[[0, '#ffffff'], [0.42, '#cbe8ff'], [1, '#5f9fd8']]} />
+      <path d="M30 24 H70 L86 42 L50 88 L14 42 Z" fill={`url(#${u}-g)`} stroke={HR_GOLD_LINE} strokeWidth="2.6" strokeLinejoin="round" />
+      <g stroke="#ffffff" strokeOpacity="0.7" strokeWidth="1.6" fill="none">
+        <path d="M14 42 H86" />
+        <path d="M30 24 L40 42 L50 88" />
+        <path d="M70 24 L60 42 L50 88" />
+      </g>
+      <path d="M30 24 H70 L60 42 H40 Z" fill="#ffffff" fillOpacity="0.42" />
+    </>
+  ),
+  CRN: (u) => (
+    <>
+      <Lin id={`${u}-g`} s={HR_GOLD} />
+      <Rad id={`${u}-j`} s={[[0, '#ff8a92'], [0.5, '#d8202e'], [1, '#7c0a14']]} />
+      <path d="M16 66 L12 32 L33 50 L50 22 L67 50 L88 32 L84 66 Z" fill={`url(#${u}-g)`} stroke="#7a530f" strokeWidth="2.4" strokeLinejoin="round" />
+      <path d="M20 42 L33 55 L50 33 L67 55 L80 42" fill="none" stroke="#fff" strokeOpacity="0.28" strokeWidth="2" />
+      <rect x="16" y="66" width="68" height="16" rx="3.5" fill={`url(#${u}-g)`} stroke="#7a530f" strokeWidth="2.4" />
+      <rect x="20" y="69.5" width="60" height="3.5" rx="1.75" fill={HR_GOLD_LINE} fillOpacity="0.55" />
+      <circle cx="12" cy="32" r="5" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1.2" />
+      <circle cx="50" cy="22" r="5.5" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1.2" />
+      <circle cx="88" cy="32" r="5" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1.2" />
+      <circle cx="34" cy="74" r="4" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1" />
+      <circle cx="50" cy="74" r="4" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1" />
+      <circle cx="66" cy="74" r="4" fill={`url(#${u}-j)`} stroke={HR_GOLD_LINE} strokeWidth="1" />
+    </>
+  ),
+  // A poker chip: red body, gold rim and hub, white edge spots, monogrammed.
+  CHP: (u) => (
+    <>
+      <Rad id={`${u}-c`} s={[[0, '#f2565f'], [0.55, '#c8121f'], [1, '#7c0a14']]} />
+      <Lin id={`${u}-g`} s={HR_GOLD} />
+      <circle cx="50" cy="50" r="35" fill={`url(#${u}-c)`} stroke={HR_GOLD_LINE} strokeWidth="2.4" />
+      {Array.from({ length: 6 }, (_, i) => {
+        const a = (i * 60 * Math.PI) / 180
+        const x = 50 + 35 * Math.cos(a)
+        const y = 50 + 35 * Math.sin(a)
+        return <rect key={i} x={x - 4} y={y - 6} width="8" height="12" rx="2" fill="#f6f1e6" transform={`rotate(${i * 60} ${x} ${y})`} />
+      })}
+      <circle cx="50" cy="50" r="21" fill="none" stroke="#ffffff" strokeOpacity="0.8" strokeWidth="2" strokeDasharray="5 5" />
+      <circle cx="50" cy="50" r="14" fill={`url(#${u}-g)`} stroke="#7a530f" strokeWidth="1.6" />
+      <text x="50" y="55.5" textAnchor="middle" fontFamily="sans-serif" fontWeight="800" fontSize="14" letterSpacing="0.5" fill="#6b1018">
+        HR
+      </text>
+      <ellipse cx="40" cy="36" rx="8" ry="4.5" fill="#fff" fillOpacity="0.28" transform="rotate(-28 40 36)" />
+    </>
+  ),
+  // The bonus trigger: the banker's golden phone. Everything else on this cabinet
+  // is a thing you win; this is the thing that starts the offer, so it is lit like
+  // the wheel and the dynamite are on the other cabinets — biggest halo, its own
+  // rays — and it can't be mistaken for the wild because it isn't a star.
+  PH: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#ffcf5c" r={50} o={0.62} cy={52} />
+      <Rays n={12} r0={34} r1={50} w={3.4} color="#ffdf8a" o={0.58} cy={52} phase={15} />
+      <Lin id={`${u}-g`} s={HR_GOLD} />
+      <Lin id={`${u}-r`} s={HR_RED} />
+      <path d="M22 58 Q20 44 34 44 H66 Q80 44 78 58 L82 78 Q82 86 74 86 H26 Q18 86 18 78 Z" fill={`url(#${u}-r)`} stroke="#5e050d" strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="50" cy="65" r="12" fill={`url(#${u}-g)`} stroke="#5e050d" strokeWidth="1.6" />
+      <circle cx="50" cy="65" r="4" fill={`url(#${u}-r)`} />
+      {/* The handset, cradled and bowing up: the one part that reads as a phone at
+          50px even after the body has gone to a red blob. */}
+      <path d="M22 36 C22 18 78 18 78 36" fill="none" stroke={`url(#${u}-g)`} strokeWidth="10" strokeLinecap="round" />
+      <path d="M22 36 C22 18 78 18 78 36" fill="none" stroke={HR_GOLD_LINE} strokeOpacity="0.5" strokeWidth="3" strokeLinecap="round" />
+      <ellipse cx="24" cy="37" rx="10" ry="6.5" fill={`url(#${u}-g)`} stroke="#5e050d" strokeWidth="1.6" transform="rotate(-24 24 37)" />
+      <ellipse cx="76" cy="37" rx="10" ry="6.5" fill={`url(#${u}-g)`} stroke="#5e050d" strokeWidth="1.6" transform="rotate(24 76 37)" />
+      <path d="M30 30 C38 24 46 22 50 22" fill="none" stroke="#fff6d8" strokeOpacity="0.5" strokeWidth="2.4" strokeLinecap="round" />
+    </>
+  ),
+  '-': () => <Blank tint="#c8912a" />,
+}
+
+/* --------------------------------------------------------------------- nova */
+// Violet and cyan on deep space. Cosmic objects rather than card ranks up top:
+// each premium is a different celestial thing so it reads by silhouette — a burst,
+// a spiral, a comet, a ringed world, a crescent — and never by colour alone.
+
+const NV_VIOLET: Stop[] = [[0, '#c9a4ff'], [0.5, '#7c3ef0'], [1, '#331470']]
+const NV_LINE = '#d8c4ff'
+
+const NOVA: Record<string, (u: string) => JSX.Element> = {
+  // The wild: a four-point sparkle, lit violet. A sparkle, not a burst, so it
+  // stays clear of the nova premium below it.
+  W: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#a97dff" r={50} o={0.5} />
+      <Lin id={`${u}-g`} s={NV_VIOLET} />
+      <path d="M50 5 C55 33 67 45 95 50 C67 55 55 67 50 95 C45 67 33 55 5 50 C33 45 45 33 50 5 Z" fill={`url(#${u}-g)`} stroke={NV_LINE} strokeWidth="2.4" strokeLinejoin="round" />
+      <path d="M50 24 C53 41 59 47 76 50 C59 53 53 59 50 76 C47 59 41 53 24 50 C41 47 47 41 50 24 Z" fill="#ffffff" fillOpacity="0.22" />
+      <text x="50" y="58" textAnchor="middle" fontFamily="sans-serif" fontWeight="800" fontSize="22" fill="#fdf6ff">
+        W
+      </text>
+      <circle cx="80" cy="22" r="2.6" fill="#fff" fillOpacity="0.9" />
+      <circle cx="22" cy="76" r="2" fill="#fff" fillOpacity="0.8" />
+    </>
+  ),
+  // The scatter: a spiral galaxy — the "three galaxies" the round is bought with.
+  // Brightest thing on the cabinet, and an elongated disc so it never reads as the
+  // symmetric nova burst.
+  SC: (u) => (
+    <>
+      <Halo id={`${u}-h`} color="#8aa4ff" r={50} o={0.68} />
+      <Rays n={16} r0={22} r1={49} w={2} color="#c4d4ff" o={0.3} />
+      <Rad id={`${u}-core`} s={[[0, '#fff8ff'], [0.4, '#ffd6a4'], [1, '#c86adf', 0]]} />
+      <Rad id={`${u}-disc`} s={[[0, '#e0c4ff', 0.9], [0.55, '#6a4ad0', 0.5], [1, '#2a1560', 0]]} />
+      <ellipse cx="50" cy="50" rx="44" ry="20" fill={`url(#${u}-disc)`} transform="rotate(-24 50 50)" />
+      <g transform="rotate(-24 50 50)" fill="none" stroke="#dfe6ff" strokeOpacity="0.65" strokeWidth="3" strokeLinecap="round">
+        <path d="M50 50 C66 43 80 47 88 58" />
+        <path d="M50 50 C34 57 20 53 12 42" />
+      </g>
+      <circle cx="50" cy="50" r="13" fill={`url(#${u}-core)`} />
+      <circle cx="50" cy="50" r="6" fill="#fff" fillOpacity="0.95" />
+      <g fill="#eef2ff">
+        <circle cx="24" cy="40" r="1.6" />
+        <circle cx="78" cy="60" r="1.6" />
+        <circle cx="66" cy="34" r="1.3" fillOpacity="0.8" />
+        <circle cx="34" cy="66" r="1.3" fillOpacity="0.8" />
+      </g>
+    </>
+  ),
+  // The top premium: an exploding star. A symmetric burst with a white-hot core.
+  NV: (u) => (
+    <>
+      <Rad id={`${u}-c`} s={[[0, '#fff8ff'], [0.4, '#e0a4ff'], [1, '#6a2ad0']]} />
+      <Rays n={12} r0={12} r1={48} w={4.5} color="#a75cff" o={0.9} />
+      <Rays n={12} r0={9} r1={34} w={3} color="#ffd6ff" o={0.7} phase={15} />
+      <circle cx="50" cy="50" r="17" fill={`url(#${u}-c)`} stroke="#e6c4ff" strokeWidth="2" />
+      <circle cx="44" cy="44" r="4.5" fill="#fff" fillOpacity="0.9" />
+    </>
+  ),
+  // A comet: a bright cyan head with a swept tail. The tail is the silhouette.
+  CM: (u) => (
+    <>
+      <Lin id={`${u}-t`} s={[[0, '#bff6ff', 0], [1, '#38d6f0', 0.85]]} x2={1} y2={1} />
+      <Rad id={`${u}-hd`} s={[[0, '#ffffff'], [0.4, '#7ee8ff'], [1, '#128fc8']]} cx={0.4} cy={0.38} />
+      <path d="M10 12 L60 58 L52 66 Z" fill={`url(#${u}-t)`} opacity="0.9" />
+      <path d="M26 8 L64 54 L58 62 Z" fill={`url(#${u}-t)`} opacity="0.7" />
+      <path d="M8 30 L56 62 L52 70 Z" fill={`url(#${u}-t)`} opacity="0.6" />
+      <circle cx="64" cy="64" r="17" fill={`url(#${u}-hd)`} stroke="#d6faff" strokeWidth="2" />
+      <circle cx="58" cy="58" r="5" fill="#fff" fillOpacity="0.9" />
+    </>
+  ),
+  // A ringed world. The ring is drawn in three passes — a faint full ellipse
+  // behind, the planet, then the front arc over it — which is the only way a flat
+  // ring reads as going behind and in front of a sphere.
+  ST: (u) => (
+    <>
+      <Rad id={`${u}-p`} s={[[0, '#e6c4ff'], [0.45, '#9a5cf0'], [1, '#3a1580']]} cx={0.38} cy={0.34} />
+      <Lin id={`${u}-r`} s={[[0, '#c4fbff'], [0.5, '#38d6f0'], [1, '#0a6fa8']]} x2={1} y2={0} />
+      <g transform="rotate(-20 50 52)">
+        <ellipse cx="50" cy="52" rx="42" ry="12" fill="none" stroke={`url(#${u}-r)`} strokeWidth="4.5" strokeOpacity="0.5" />
+      </g>
+      <circle cx="50" cy="52" r="24" fill={`url(#${u}-p)`} stroke="#c9a4ff" strokeWidth="1.8" />
+      <g transform="rotate(-20 50 52)">
+        <path d="M8 52 A 42 12 0 0 0 92 52" fill="none" stroke={`url(#${u}-r)`} strokeWidth="5.5" />
+      </g>
+      <ellipse cx="40" cy="42" rx="6.5" ry="4" fill="#fff" fillOpacity="0.35" transform="rotate(-20 40 42)" />
+    </>
+  ),
+  // A crescent moon: the big disc minus an offset one, opening to the right.
+  MN: (u) => (
+    <>
+      <Rad id={`${u}-m`} s={[[0, '#f4fbff'], [0.5, '#b8d4f0'], [1, '#6a8cc0']]} cx={0.4} cy={0.36} />
+      <path d="M60 12 A 40 40 0 1 0 60 88 A 30 30 0 1 1 60 12 Z" fill={`url(#${u}-m)`} stroke="#dfeaff" strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="34" cy="40" r="5.5" fill="#8aa4cc" fillOpacity="0.45" />
+      <circle cx="28" cy="58" r="3.6" fill="#8aa4cc" fillOpacity="0.4" />
+      <circle cx="42" cy="66" r="2.8" fill="#8aa4cc" fillOpacity="0.36" />
+    </>
+  ),
+  ...ranks('#1a1030', '#5a3a8a', '#c9b8e8', '#8a7ab0', '#c07ad0'),
+}
+
+/* ------------------------------------------------------------- the machines */
+
+interface Cabinet {
+  art: Record<string, (u: string) => JSX.Element>
+  names: Record<string, string>
+}
+
+/** Spoken names, because a screen reader gets `aria-label` and not the drawing.
+ *  The ids collide across cabinets and mean different things, so these are keyed
+ *  by machine too: `D` is a card-free gemstone on one cabinet and a diamond
+ *  premium on another. */
+const RANK_NAMES = { A: 'ace', K: 'king', Q: 'queen', J: 'jack', T: 'ten' }
+
+const CABINETS: Record<string, Cabinet> = {
+  bars: {
+    art: BARS,
+    names: {
+      W: 'wild, doubles the win', BON: 'bonus wheel, opens the feature', '7': 'lucky seven',
+      BBB: 'triple bar', BB: 'double bar', B: 'single bar', C: 'cherries', '-': 'blank',
+    },
+  },
+  bell: {
+    art: BELL,
+    names: {
+      W: 'wild', BL: 'bell scatter', '7': 'seven', D: 'diamond', BAR: 'bar',
+      ...RANK_NAMES, '-': 'blank',
+    },
+  },
+  rockslide: {
+    art: ROCK,
+    names: {
+      W: 'wild crystal', BON: 'dynamite, opens the feature', D: 'diamond', G: 'gold nugget',
+      R: 'ruby', E: 'emerald', Q: 'pebble', '-': 'blank',
+    },
+  },
+  lateshow: {
+    art: LATE,
+    names: {
+      spot: 'wild spotlight', mrq: 'marquee scatter', BON: 'stage door, opens the feature',
+      mic: 'microphone', mar: 'martini glass', sax: 'saxophone', crt: 'stage curtain',
+      ...RANK_NAMES, '-': 'blank',
+    },
+  },
+  highroller: {
+    art: HIGH,
+    names: {
+      W: 'wild, stands in for anything', '7': 'lucky seven', DIA: 'diamond',
+      CRN: 'crown', CHP: 'casino chip', PH: 'golden phone, calls the banker', '-': 'blank',
+    },
+  },
+  nova: {
+    art: NOVA,
+    names: {
+      W: 'wild, stands in for anything', SC: 'galaxy scatter, buys the free games',
+      NV: 'nova', CM: 'comet', ST: 'ringed planet', MN: 'crescent moon',
+      ...RANK_NAMES,
+    },
+  },
+}
+
+/** Gradient ids have to survive being concatenated into one document, and the
+ *  symbol ids include characters that aren't legal in a fragment id. */
+function slug(s: string): string {
+  const clean = s.replace(/[^A-Za-z0-9]+/g, '_')
+  return clean === '' || clean === '_' ? 'x' : clean
+}
+
+/** A symbol nobody has drawn yet: a plain tile with its id, so a new strip
+ *  entry shows up as obviously undrawn instead of taking the screen down. */
+function Unknown({ id }: { id: string }): JSX.Element {
+  return (
+    <g>
+      <rect x="14" y="14" width="72" height="72" rx="10" fill="#1b1e21" stroke="#4a5157" strokeWidth="1.6" />
+      <text x="50" y="59" textAnchor="middle" fontFamily="sans-serif" fontWeight="700" fontSize={id.length > 2 ? 22 : 32} fill="#9aa4ac">
+        {id.slice(0, 4)}
+      </text>
+    </g>
+  )
+}
+
+export function SlotArt({ machine, id }: { machine: string; id: string }): JSX.Element {
+  const cabinet = CABINETS[machine]
+  const draw = cabinet?.art[id]
+  const label = cabinet?.names[id] ?? `symbol ${id}`
+
+  return (
+    <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label={label}>
+      {draw ? draw(`${slug(machine)}-${slug(id)}`) : <Unknown id={id} />}
+    </svg>
+  )
+}

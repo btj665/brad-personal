@@ -1,0 +1,15 @@
+node_modules
+dist
+*.local
+.DS_Store
+packaging/build
+the-tables.zip
+.vite
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Local environment (Supabase keys, etc.) — never commit
+.env
+.env.local
+.env.*.local
