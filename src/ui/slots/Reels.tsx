@@ -171,6 +171,18 @@ export interface ReelsProps {
   payKey?: string
 }
 
+/** The viewport width, kept current across resizes and orientation changes. Reads
+ *  `globalThis` so it's safe in tests and doesn't collide with the `window` prop. */
+function useViewportWidth(): number {
+  const [w, setW] = useState(() => (typeof globalThis !== 'undefined' && globalThis.innerWidth) || 1200)
+  useEffect(() => {
+    const onResize = () => setW(globalThis.innerWidth)
+    globalThis.addEventListener('resize', onResize)
+    return () => globalThis.removeEventListener('resize', onResize)
+  }, [])
+  return w
+}
+
 export function Reels({
   machine,
   window,
@@ -277,9 +289,18 @@ export function Reels({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spinToken])
 
-  // Cell size is set here rather than in the stylesheet because the tape's
-  // translate is expressed in whole cells, so the two must agree exactly.
-  const cell = rows >= 4 ? 60 : reels >= 5 ? 76 : 88
+  // The reel window has to fit the screen. Its cell size is fixed per machine on a
+  // roomy viewport, but a five-reel cabinet at full size (5 × 76px) is wider than a
+  // phone, so shrink the cell to fit narrow screens. Everything derived from `cell`
+  // — the win-line overlay, the tape's whole-cell translate — scales with it, so
+  // the reels stay aligned at any size. (`globalThis`, not `window`: the prop named
+  // `window` shadows the global in this component.)
+  const vw = useViewportWidth()
+  const baseCell = rows >= 4 ? 60 : reels >= 5 ? 76 : 88
+  // Room the reels get after the cabinet, window and page gutters (~72px of chrome).
+  const budget = vw - 72
+  const fitCell = Math.floor((budget - (reels - 1) * GAP) / reels)
+  const cell = Math.max(40, Math.min(baseCell, fitCell))
 
   // The overlay is drawn in the reels' own pixel box, cell centres included.
   const overlayW = reels * cell + (reels - 1) * GAP
