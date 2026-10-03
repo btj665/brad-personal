@@ -56,6 +56,19 @@ export interface PokerOptions {
   humanName?: string
   seats?: number
   bots?: Array<{ name: string; profile: BotProfile }>
+  /** Explicit seat layout, used by the online table to (re)build a table with
+   *  known stacks and occupancy. When given it defines every seat — a seat with
+   *  `bot: null` is a human (local or remote), one with a profile is a bot filling
+   *  an empty spot — and `seats`/`bots` are ignored. `humanSeat` still names which
+   *  seat is "me" for `get human`. */
+  roster?: SeatSpec[]
+}
+
+/** One seat in an explicit roster. */
+export interface SeatSpec {
+  name: string
+  bot: BotProfile | null
+  stack: number
 }
 
 const DEFAULT_PROFILE: BotProfile = { looseness: 0.4, aggression: 0.3, bluff: 0.05, quips: [] }
@@ -89,7 +102,9 @@ export class PokerGame {
   private queue: Beat[] = []
   private phase: 'idle' | 'betting' | 'draw' | 'showdown' | 'over' = 'idle'
   private listeners = new Set<() => void>()
-  readonly humanSeat: number
+  /** Which seat is "me" for `get human` and for centring the felt. The solo table
+   *  fixes it at construction; the online host sets it to its own seat each hand. */
+  humanSeat: number
 
   constructor(opts: PokerOptions) {
     this.variant = opts.variant
@@ -102,6 +117,25 @@ export class PokerGame {
     this.smallBlind = Math.max(1, Math.floor(this.bigBlind / 2))
     this.humanSeat = opts.humanSeat ?? 0
 
+    const fresh = {
+      cards: [] as HeldCard[],
+      discarded: [] as Card[],
+      folded: false,
+      allIn: false,
+      sittingOut: false,
+      committed: 0,
+      streetCommitted: 0,
+      actedThisStreet: false,
+      canReopen: false,
+    }
+
+    if (opts.roster && opts.roster.length) {
+      opts.roster.forEach((r, i) => {
+        this.seats.push({ index: i, name: r.name, bot: r.bot, stack: r.stack, ...fresh, cards: [], discarded: [] })
+      })
+      return
+    }
+
     const n = opts.seats ?? Math.min(6, (opts.bots?.length ?? 4) + 1)
     const buyIn = opts.buyIn ?? this.bigBlind * 100
     const bots = opts.bots ?? []
@@ -113,15 +147,9 @@ export class PokerGame {
         name: human ? (opts.humanName ?? 'You') : (bots[bi]?.name ?? `Seat ${i}`),
         bot: human ? null : (bots[bi++]?.profile ?? DEFAULT_PROFILE),
         stack: buyIn,
+        ...fresh,
         cards: [],
         discarded: [],
-        folded: false,
-        allIn: false,
-        sittingOut: false,
-        committed: 0,
-        streetCommitted: 0,
-        actedThisStreet: false,
-        canReopen: false,
       })
     }
   }
@@ -355,12 +383,18 @@ export class PokerGame {
     return round < smallRounds ? this.bigBlind : this.bigBlind * 2
   }
 
-  act(action: Action): void {
+  /** Apply a human's action. `seat` defaults to the seat on the clock, which is
+   *  all the solo table needs; the online host passes the seat an action arrived
+   *  for so it can drive several humans. Bots never come through here — they act in
+   *  `step()` — so this only ever moves a human seat, and only when it's that
+   *  seat's turn. */
+  act(action: Action, seat: number = this.toAct): void {
     if (this.phase !== 'betting' || this.toAct < 0) return
-    if (this.toAct === this.humanSeat || this.seats[this.toAct].bot) {
-      this.applyAction(this.seats[this.toAct], action)
-      this.touch()
-    }
+    if (seat !== this.toAct) return
+    const s = this.seats[this.toAct]
+    if (!s || s.bot !== null) return
+    this.applyAction(s, action)
+    this.touch()
   }
 
   private applyAction(s: Seat, action: Action): void {
@@ -506,8 +540,12 @@ export class PokerGame {
     return -1
   }
 
-  /** Discard these indices from the seat on the clock and draw replacements. */
-  applyDraw(discardIdx: number[]): void {
+  /** Discard these indices from the seat on the clock and draw replacements.
+   *  `seat` guards against a stale request from a human who isn't the one on the
+   *  clock; it defaults to the clock, which is all a bot (via `step`) or the solo
+   *  table needs. */
+  applyDraw(discardIdx: number[], seat: number = this.drawSeat): void {
+    if (seat !== this.drawSeat) return
     const s = this.seats[this.drawSeat]
     if (!s) return
     const keep: HeldCard[] = []
@@ -597,11 +635,20 @@ export class PokerGame {
 
   pending(): Beat | null {
     if (this.queue.length > 0) return null
-    if (this.phase === 'betting' && this.toAct === this.humanSeat && this.canAct(this.human)) {
-      return { type: 'awaitAction', options: this.options(this.humanSeat) }
+    // A human seat on the clock is any seat with no bot brain. Solo has exactly one
+    // (the human); the online host has one per seated player, and the clock pausing
+    // on each in turn is what lets several humans share a table.
+    if (this.phase === 'betting' && this.toAct >= 0) {
+      const s = this.seats[this.toAct]
+      if (s && s.bot === null && this.canAct(s)) {
+        return { type: 'awaitAction', options: this.options(this.toAct) }
+      }
     }
-    if (this.phase === 'draw' && this.drawSeat === this.humanSeat && this.canAct(this.human)) {
-      return { type: 'awaitDraw', seat: this.humanSeat }
+    if (this.phase === 'draw' && this.drawSeat >= 0) {
+      const s = this.seats[this.drawSeat]
+      if (s && s.bot === null && this.canAct(s)) {
+        return { type: 'awaitDraw', seat: this.drawSeat }
+      }
     }
     return null
   }

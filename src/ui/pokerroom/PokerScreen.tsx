@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 
+import { useAuth } from '../../auth/AuthProvider'
+import { backendConfigured } from '../../supa/client'
 import { randomSeed } from '../../engine/rng'
 import { PokerGame } from '../../pokerroom/engine'
 import { ranker } from '../../pokerroom/ranker'
@@ -8,6 +10,7 @@ import { pokerBrain, pokerDraw } from '../../pokerroom/bot'
 import { ensureFunds, getBalance, recordDelta } from '../../wallet/wallet'
 import type { Beat, BotProfile } from '../../pokerroom/types'
 import { WinToast } from '../WinToast'
+import { OnlinePoker } from './OnlinePoker'
 import { PokerTable } from './PokerTable'
 import { BetControls } from './BetControls'
 
@@ -61,7 +64,20 @@ function sizeBuyIn(): number {
   return Math.min(BUY_IN, Math.max(0, getBalance()))
 }
 
+/** Poker has two rooms: the solo table against the house bots, and the online
+ *  tables where several signed-in people share a felt. Online needs a backend and a
+ *  signed-in user, so it's offered only then; guest mode plays solo. */
 export function PokerScreen() {
+  const { userId } = useAuth()
+  const [mode, setMode] = useState<'solo' | 'online'>('solo')
+  const canGoOnline = backendConfigured && !!userId
+  if (mode === 'online' && canGoOnline) {
+    return <OnlinePoker onExitOnline={() => setMode('solo')} />
+  }
+  return <SoloPoker canGoOnline={canGoOnline} onGoOnline={() => setMode('online')} />
+}
+
+function SoloPoker({ canGoOnline, onGoOnline }: { canGoOnline: boolean; onGoOnline: () => void }) {
   const [variantId, setVariantId] = useState(VARIANTS[0].id)
   const [game, setGame] = useState(() => make(VARIANTS[0].id, sizeBuyIn()))
   const [lastBeat, setLastBeat] = useState<Beat | null>(null)
@@ -180,6 +196,11 @@ export function PokerScreen() {
             ))}
           </select>
           <span className="sl-blurb pk-blurb">{game.variant.blurb}</span>
+          {canGoOnline && (
+            <button className="btn pk-online-btn" onClick={onGoOnline}>
+              Play online
+            </button>
+          )}
         </div>
         <div className="topbar-right">
           <span className="bankroll">

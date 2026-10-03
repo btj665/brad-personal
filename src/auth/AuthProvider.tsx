@@ -29,6 +29,8 @@ interface AuthState {
    *  "enter a code", not "enrol one". */
   hasFactor: boolean
   email: string | null
+  /** The signed-in user's id, or null. Identifies a player at an online table. */
+  userId: string | null
   profile: Profile | null
   /** Re-read session, assurance level and profile. Call after any auth step. */
   refresh: () => Promise<void>
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>(backendConfigured ? 'loading' : 'ready')
   const [hasFactor, setHasFactor] = useState(false)
   const [email, setEmail] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
 
   const refresh = useCallback(async () => {
@@ -58,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = sessionData.session
     if (!session) {
       setEmail(null)
+      setUserId(null)
       setProfile(null)
       setHasFactor(false)
       setStatus('signedOut')
@@ -65,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     setEmail(session.user.email ?? null)
+    setUserId(session.user.id)
 
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
     const { data: factors } = await supabase.auth.mfa.listFactors()
@@ -124,8 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   const value = useMemo<AuthState>(
-    () => ({ status, hasFactor, email, profile, refresh, signOut }),
-    [status, hasFactor, email, profile, refresh, signOut],
+    () => ({ status, hasFactor, email, userId, profile, refresh, signOut }),
+    [status, hasFactor, email, userId, profile, refresh, signOut],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

@@ -1,4 +1,4 @@
-import type { PokerGame } from '../../pokerroom/engine'
+import type { PokerView } from '../../pokerroom/view'
 import { PlayingCard } from '../Card'
 import { ChipStack } from '../Chips'
 import { PokerSeat } from './PokerSeat'
@@ -17,7 +17,7 @@ function seatPoint(index: number, humanSeat: number, n: number): { x: number; y:
 
 /** The next seat clockwise from `from` that's dealt into the hand — the same walk
  *  the engine uses to seat the button and the blinds. */
-function nextOccupied(game: PokerGame, from: number): number {
+function nextOccupied(game: PokerView, from: number): number {
   const seats = game.seats
   for (let k = 1; k <= seats.length; k++) {
     const i = (from + k) % seats.length
@@ -31,7 +31,7 @@ export function PokerTable({
   winners,
   awardNet,
 }: {
-  game: PokerGame
+  game: PokerView
   winners: Set<number>
   awardNet: number
 }) {

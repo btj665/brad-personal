@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import type { PokerGame } from '../../pokerroom/engine'
+import type { PokerView } from '../../pokerroom/view'
 import type { Beat, Options } from '../../pokerroom/types'
 import { PlayingCard } from '../Card'
 
@@ -11,7 +11,7 @@ function tidy(value: number, step: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(snapped, hi))
 }
 
-function RaiseControls({ game, opt }: { game: PokerGame; opt: Options }) {
+function RaiseControls({ game, opt }: { game: PokerView; opt: Options }) {
   const step = Math.max(1, game.smallBlind)
   const { minTo, maxTo, callAmount } = opt
   const [to, setTo] = useState(minTo)
@@ -78,7 +78,7 @@ function RaiseControls({ game, opt }: { game: PokerGame; opt: Options }) {
   )
 }
 
-function DrawControls({ game }: { game: PokerGame }) {
+function DrawControls({ game }: { game: PokerView }) {
   const seat = game.human
   const [picked, setPicked] = useState<Set<number>>(new Set())
 
@@ -120,10 +120,17 @@ function DrawControls({ game }: { game: PokerGame }) {
   )
 }
 
-export function BetControls({ game, pending }: { game: PokerGame; pending: Beat | null }) {
-  if (pending?.type === 'awaitDraw') return <DrawControls game={game} />
+export function BetControls({ game, pending }: { game: PokerView; pending: Beat | null }) {
+  // Only the local player's own turn draws the controls. At an online table the
+  // clock pauses on each human in turn, so a beat addressed to another seat must
+  // read as "waiting", not hand this client someone else's decision.
+  const mine =
+    (pending?.type === 'awaitAction' && pending.options.seat === game.humanSeat) ||
+    (pending?.type === 'awaitDraw' && pending.seat === game.humanSeat)
 
-  if (pending?.type !== 'awaitAction') {
+  if (pending?.type === 'awaitDraw' && mine) return <DrawControls game={game} />
+
+  if (pending?.type !== 'awaitAction' || !mine) {
     return (
       <div className="controls controls-idle pk-controls">
         <span className="dealing">Action on the table…</span>

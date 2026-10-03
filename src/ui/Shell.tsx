@@ -68,7 +68,7 @@ const FLOOR: Array<{ group: string; games: Entry[] }> = [
   },
   {
     group: 'Poker room',
-    games: [{ id: 'poker', label: 'Poker', blurb: 'Six-handed vs bots — Hold’em, Omaha, Stud, Draw' }],
+    games: [{ id: 'poker', label: 'Poker', blurb: 'Solo vs bots or live with friends — Hold’em, Omaha, Stud, Draw' }],
   },
   {
     group: 'Dice & wheels',

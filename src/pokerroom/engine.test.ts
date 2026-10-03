@@ -181,3 +181,59 @@ describe('the poker engine', () => {
     expect(raises).toBe(3)
   })
 })
+
+describe('multiple human seats (online tables)', () => {
+  // Two humans and a bot. The clock must pause on whichever human is on it, and an
+  // action is accepted only from the seat actually on the clock.
+  function table() {
+    return new PokerGame({
+      variant: HOLDEM,
+      ranker,
+      brain: rowdyBrain(5),
+      seed: 42,
+      bigBlind: 20,
+      humanSeat: 0,
+      roster: [
+        { name: 'Ada', bot: null, stack: 1000 },
+        { name: 'Ben', bot: null, stack: 1000 },
+        { name: 'Bot', bot: P, stack: 1000 },
+      ],
+    })
+  }
+
+  it('pauses the clock on each human seat, not just one', () => {
+    const g = table()
+    g.startHand()
+    // Drive the clock until it stops for a human to act.
+    let b = g.step()
+    for (let i = 0; i < 50 && b.type !== 'awaitAction' && !g.over; i++) b = g.step()
+    expect(b.type).toBe('awaitAction')
+    if (b.type === 'awaitAction') {
+      // The seat on the clock is one of the two humans (no bot brain).
+      expect(g.seats[b.options.seat].bot).toBeNull()
+      expect([0, 1]).toContain(b.options.seat)
+    }
+  })
+
+  it('accepts an action only for the seat on the clock', () => {
+    const g = table()
+    g.startHand()
+    let b = g.step()
+    for (let i = 0; i < 50 && b.type !== 'awaitAction' && !g.over; i++) b = g.step()
+    expect(b.type).toBe('awaitAction')
+    if (b.type !== 'awaitAction') return
+    const onClock = b.options.seat
+    const other = onClock === 0 ? 1 : 0
+    const before = g.version
+
+    // An action aimed at the wrong seat is ignored.
+    g.act({ kind: 'fold' }, other)
+    expect(g.version).toBe(before)
+    expect(g.onClock).toBe(onClock)
+
+    // The right seat's action lands.
+    g.act({ kind: 'fold' }, onClock)
+    expect(g.version).toBeGreaterThan(before)
+    expect(g.seats[onClock].folded).toBe(true)
+  })
+})
