@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="How to play every game at The Tables — rules, bets and payouts for the card tables, poker room, dice, wheels, machines and solitaires."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230e6b40'/%3E%3Cpath d='M16 6C11 11 8 13 8 17.5c0 2.6 2 4.2 4.3 4.2 1.2 0 2.3-.5 3-1.4-.3 2-.9 3.4-2 4.7h5.4c-1.1-1.3-1.7-2.7-2-4.7.7.9 1.8 1.4 3 1.4 2.3 0 4.3-1.6 4.3-4.2C24 13 21 11 16 6Z' fill='%23c8a04a'/%3E%3C/svg%3E"
+    />
+    <title>How to Play — The Tables</title>
+    <style>
+      :root {
+        --felt: #0e6b40;
+        --felt-dark: #063a22;
+        --rail: #3f2a1c;
+        --brass: #c8a04a;
+        --brass-bright: #e5c069;
+        --card-red: #c02a26;
+        --ink: #eae5da;
+        --ink-dim: #9a9287;
+        --bg: #0b0d0f;
+        --panel: #16181b;
+        --panel-2: #1e2126;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-bright: rgba(255, 255, 255, 0.16);
+        --win: #58c98a;
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: radial-gradient(120% 90% at 50% -10%, #12331f 0%, var(--bg) 55%) fixed;
+        color: var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.6;
+        font-size: 16px;
+      }
+
+      a {
+        color: var(--brass-bright);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+
+      /* Top bar */
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 20px;
+        background: rgba(11, 13, 15, 0.86);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .brand .spade {
+        width: 26px;
+        height: 26px;
+        flex: none;
+      }
+      .back-link {
+        font-size: 14px;
+        font-weight: 600;
+        padding: 7px 13px;
+        border: 1px solid var(--brass);
+        border-radius: 8px;
+        color: var(--brass);
+        background: rgba(200, 160, 74, 0.08);
+      }
+      .back-link:hover {
+        background: rgba(200, 160, 74, 0.16);
+        text-decoration: none;
+      }
+
+      /* Layout */
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        gap: 36px;
+        padding: 28px 20px 80px;
+        align-items: start;
+      }
+
+      /* Table of contents */
+      nav.toc {
+        position: sticky;
+        top: 72px;
+        max-height: calc(100vh - 92px);
+        overflow-y: auto;
+        font-size: 14px;
+        border-right: 1px solid var(--line);
+        padding-right: 14px;
+      }
+      nav.toc h2 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink-dim);
+        margin: 18px 0 6px;
+      }
+      nav.toc h2:first-child {
+        margin-top: 0;
+      }
+      nav.toc a {
+        display: block;
+        color: var(--ink-dim);
+        padding: 3px 0;
+      }
+      nav.toc a:hover {
+        color: var(--ink);
+        text-decoration: none;
+      }
+
+      main {
+        min-width: 0;
+      }
+
+      .hero {
+        margin-bottom: 8px;
+      }
+      .hero h1 {
+        font-size: 30px;
+        margin: 0 0 6px;
+        letter-spacing: 0.01em;
+      }
+      .hero p {
+        color: var(--ink-dim);
+        margin: 0;
+        max-width: 60ch;
+      }
+
+      section {
+        scroll-margin-top: 78px;
+        padding: 26px 0;
+        border-top: 1px solid var(--line);
+      }
+      section.group-head {
+        border-top: 2px solid var(--brass);
+      }
+
+      h2.group {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--brass);
+        margin: 0 0 2px;
+      }
+      h3 {
+        font-size: 22px;
+        margin: 0 0 4px;
+      }
+      h4 {
+        font-size: 15px;
+        margin: 18px 0 4px;
+        color: var(--brass-bright);
+      }
+      .tagline {
+        color: var(--ink-dim);
+        margin: 0 0 14px;
+        font-style: italic;
+      }
+      p {
+        margin: 0 0 12px;
+      }
+      ul,
+      ol {
+        margin: 0 0 12px;
+        padding-left: 22px;
+      }
+      li {
+        margin: 3px 0;
+      }
+      strong {
+        color: #fff;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px 22px;
+      }
+      .card + .card {
+        margin-top: 16px;
+      }
+
+      /* Payout / bet tables */
+      table.pay {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0 14px;
+        font-size: 14.5px;
+      }
+      table.pay caption {
+        text-align: left;
+        color: var(--ink-dim);
+        font-size: 13px;
+        padding-bottom: 6px;
+      }
+      table.pay th,
+      table.pay td {
+        text-align: left;
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      table.pay th {
+        color: var(--ink-dim);
+        font-weight: 600;
+        font-size: 12.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      table.pay td:last-child,
+      table.pay th:last-child {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      table.pay tr:last-child td {
+        border-bottom: none;
+      }
+
+      .tip {
+        border-left: 3px solid var(--brass);
+        background: rgba(200, 160, 74, 0.07);
+        padding: 10px 14px;
+        border-radius: 0 8px 8px 0;
+        margin: 12px 0;
+        font-size: 14.5px;
+      }
+      .tip b {
+        color: var(--brass-bright);
+      }
+
+      .pill {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--felt-dark);
+        background: var(--brass);
+        border-radius: 999px;
+        padding: 2px 9px;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+
+      .lede {
+        font-size: 17px;
+      }
+
+      footer {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 24px 20px 60px;
+        color: var(--ink-dim);
+        font-size: 13px;
+        border-top: 1px solid var(--line);
+      }
+
+      .totop {
+        display: inline-block;
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--ink-dim);
+      }
+
+      @media (max-width: 860px) {
+        .wrap {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        nav.toc {
+          position: static;
+          max-height: none;
+          border-right: none;
+          border-bottom: 1px solid var(--line);
+          padding: 0 0 12px;
+          margin-bottom: 8px;
+          columns: 2;
+          column-gap: 20px;
+        }
+        nav.toc h2 {
+          break-after: avoid;
+        }
+      }
+      @media (max-width: 520px) {
+        nav.toc {
+          columns: 1;
+        }
+        .hero h1 {
+          font-size: 25px;
+        }
+        .card {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar" id="top">
+      <span class="brand">
+        <svg class="spade" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="6" fill="#0e6b40" />
+          <path
+            d="M16 6C11 11 8 13 8 17.5c0 2.6 2 4.2 4.3 4.2 1.2 0 2.3-.5 3-1.4-.3 2-.9 3.4-2 4.7h5.4c-1.1-1.3-1.7-2.7-2-4.7.7.9 1.8 1.4 3 1.4 2.3 0 4.3-1.6 4.3-4.2C24 13 21 11 16 6Z"
+            fill="#c8a04a"
+          />
+        </svg>
+        The Tables — How to Play
+      </span>
+      <a class="back-link" href="./">← Back to the floor</a>
+    </header>
+
+    <div class="wrap">
+      <nav class="toc" aria-label="Contents">
+        <h2>Start here</h2>
+        <a href="#getting-started">Getting started</a>
+        <a href="#the-wallet">The shared wallet</a>
+        <a href="#basics">Table basics</a>
+
+        <h2>Card tables</h2>
+        <a href="#blackjack">Blackjack</a>
+        <a href="#baccarat">Baccarat</a>
+        <a href="#paigow">Pai Gow Poker</a>
+        <a href="#uth">Ultimate Texas Hold'em</a>
+        <a href="#threecard">Three Card Poker</a>
+        <a href="#caribbean">Caribbean Stud</a>
+        <a href="#mstud">Mississippi Stud</a>
+        <a href="#letitride">Let It Ride</a>
+        <a href="#war">Casino War</a>
+
+        <h2>Poker room</h2>
+        <a href="#poker">Poker &amp; variants</a>
+        <a href="#online">Playing online</a>
+
+        <h2>Dice &amp; wheels</h2>
+        <a href="#craps">Craps</a>
+        <a href="#roulette">Roulette</a>
+        <a href="#sicbo">Sic Bo</a>
+        <a href="#bigsix">Big Six</a>
+
+        <h2>Machines</h2>
+        <a href="#videopoker">Video Poker</a>
+        <a href="#slots">Slots</a>
+        <a href="#keno">Keno</a>
+
+        <h2>Patience</h2>
+        <a href="#solitaire">Solitaire</a>
+      </nav>
+
+      <main>
+        <div class="hero">
+          <h1>How to play</h1>
+          <p class="lede">
+            Sixteen casino games, six slot cabinets and thirty-five solitaires, all played against
+            honest, published odds with play money. Here's how each one works — pick a game from the
+            list, or read straight through.
+          </p>
+        </div>
+
+        <!-- ============================================ START HERE -->
+        <section id="getting-started" class="group-head">
+          <h2 class="group">Start here</h2>
+          <h3>Getting started</h3>
+          <p class="tagline">Make an account, set up your authenticator, and sit down.</p>
+          <div class="card">
+            <p>
+              The Tables is play money only — nothing here costs or pays real money. On the published
+              site you sign in so your balance follows you from game to game and device to device:
+            </p>
+            <ol>
+              <li><strong>Sign up</strong> with a username, an email and a password.</li>
+              <li>
+                <strong>Set up an authenticator.</strong> Scan the QR code with an authenticator app
+                (Google Authenticator, Authy, 1Password, etc.) and enter the 6-digit code. You'll
+                enter a fresh code each time you log in — it keeps your account yours.
+              </li>
+              <li>
+                <strong>Log in</strong> with either your username or your email, your password, and
+                the current code from the app.
+              </li>
+            </ol>
+            <p>
+              You start with a bankroll of play chips. Pick any game from the top navigation; your
+              balance is shared across all of them.
+            </p>
+            <div class="tip">
+              <b>On your phone?</b> Every table is built to work at phone width — the layouts reflow,
+              and the bet controls sit within thumb's reach.
+            </div>
+          </div>
+        </section>
+
+        <section id="the-wallet">
+          <h3>The shared wallet</h3>
+          <p class="tagline">One balance, every game, topped up when you're dry.</p>
+          <div class="card">
+            <ul>
+              <li>
+                <strong>Shared balance.</strong> Your chips are a single pool. Win at blackjack and
+                you've more to bring to the poker table — it's all one wallet, saved to your account.
+              </li>
+              <li>
+                <strong>Buying in.</strong> At the seated tables (poker, blackjack) you bring a
+                buy-in to the felt and rack whatever's left back onto your wallet when you leave.
+                Everywhere else your bets come straight off the balance.
+              </li>
+              <li>
+                <strong>Auto top-up.</strong> Go broke and the house stakes you again back to the
+                base amount after a short cooldown, so you're never stuck with nothing.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="basics">
+          <h3>Table basics</h3>
+          <p class="tagline">The handful of ideas every game here shares.</p>
+          <div class="card">
+            <ul>
+              <li><strong>Chips.</strong> Click a chip to set your bet size, then place it on the spot you want.</li>
+              <li>
+                <strong>Honest odds.</strong> Every shuffle and roll is random, and every payout is
+                the real mathematical one — the house edges are the genuine casino figures, not
+                tilted against you beyond them.
+              </li>
+              <li>
+                <strong>“To” vs “for”.</strong> A payout of <em>3 to 2</em> means you win 3 and keep
+                your 2 stake (you end up with 5). <em>3 for 2</em> would mean your stake is part of
+                the 3. The tables below use “to” throughout.
+              </li>
+              <li>
+                <strong>House edge</strong> is the average cut the house keeps over the long run. Lower
+                is better for you; it's listed where it helps you choose a bet.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- ============================================ CARD TABLES -->
+        <section id="blackjack" class="group-head">
+          <h2 class="group">Card tables</h2>
+          <h3>Blackjack</h3>
+          <p class="tagline">Beat the dealer to 21 without going over.</p>
+          <div class="card">
+            <h4>The goal</h4>
+            <p>
+              Get a hand total closer to 21 than the dealer without busting (going over 21). Number
+              cards count their value, face cards count 10, and an ace is 1 or 11 — whichever helps.
+              A two-card 21 (ace + ten-value) is a <strong>blackjack</strong>, paid 3 to 2.
+            </p>
+            <h4>Your turn</h4>
+            <ul>
+              <li><strong>Hit</strong> — take another card.</li>
+              <li><strong>Stand</strong> — keep your total and pass to the dealer.</li>
+              <li><strong>Double down</strong> — double your bet for exactly one more card.</li>
+              <li><strong>Split</strong> — a pair becomes two hands, each with its own bet.</li>
+              <li><strong>Surrender</strong> (when offered) — fold for half your bet back.</li>
+              <li><strong>Insurance</strong> — a side bet against a dealer ace showing; rarely worth it.</li>
+            </ul>
+            <p>
+              The dealer then plays a fixed way: hitting until reaching 17. Beat their total and you're
+              paid even money; tie and it's a push (bet back).
+            </p>
+            <div class="tip">
+              <b>Rules you can set.</b> This blackjack supports the full spread of real variants —
+              dealer hits or stands on soft 17, surrender, re-splits, Spanish 21 and Free Bet style
+              rules, and more. Each rule nudges the house edge; the game shows you where you stand.
+            </div>
+            <div class="tip">
+              <b>Basic strategy</b> (hit/stand/double per dealer up-card) cuts the edge to well under
+              1%. When in doubt: stand on hard 17+, always split aces and eights, never split tens.
+            </div>
+          </div>
+        </section>
+
+        <section id="baccarat">
+          <h3>Baccarat</h3>
+          <p class="tagline">Bet on Player or Banker — the cards play themselves.</p>
+          <div class="card">
+            <p>
+              You don't play a hand; you bet which of two hands — <strong>Player</strong> or
+              <strong>Banker</strong> — will total closest to 9. Tens and faces count zero, aces one,
+              and only the last digit of the total counts (so 7 + 8 = 15 → 5). A fixed rule decides
+              whether a third card is drawn; nothing is left to choice.
+            </p>
+            <table class="pay">
+              <caption>Bets and payouts</caption>
+              <tr><th>Bet</th><th>Pays</th><th>House edge</th></tr>
+              <tr><td>Banker (5% commission)</td><td>1 to 1</td><td>1.06%</td></tr>
+              <tr><td>Player</td><td>1 to 1</td><td>1.24%</td></tr>
+              <tr><td>Tie</td><td>8 to 1</td><td>14.4%</td></tr>
+            </table>
+            <div class="tip"><b>Simplest edge:</b> Banker is the best bet. Skip the Tie.</div>
+          </div>
+        </section>
+
+        <section id="paigow">
+          <h3>Pai Gow Poker</h3>
+          <p class="tagline">Make two hands from seven cards and beat the dealer on both.</p>
+          <div class="card">
+            <p>
+              You're dealt seven cards and split them into a <strong>five-card “high” hand</strong>
+              and a <strong>two-card “low” hand</strong>. The only rule: the high hand must outrank
+              the low. Both of your hands must beat both of the dealer's to win; win one and lose one
+              and it's a push. A joker fills a straight, a flush, or acts as an ace.
+            </p>
+            <ul>
+              <li>Win both → paid even money (minus 5% commission).</li>
+              <li>Split (win one, lose one) → push.</li>
+              <li>Lose both, or tie a hand that “goes to the dealer” → lose.</li>
+            </ul>
+            <div class="tip">
+              <b>The “house way”</b> is a sensible default split the game can set for you — keep the
+              highest five-card hand you can while still putting your best possible pair up front.
+            </div>
+          </div>
+        </section>
+
+        <section id="uth">
+          <h3>Ultimate Texas Hold'em</h3>
+          <p class="tagline">Heads-up Hold'em against the dealer — bet bigger, earlier.</p>
+          <div class="card">
+            <p>
+              Post equal <strong>Ante</strong> and <strong>Blind</strong> bets (and an optional
+              <strong>Trips</strong> bonus). You and the dealer each get two cards and share five
+              community cards. The earlier you commit your <strong>Play</strong> bet, the more you may
+              wager:
+            </p>
+            <ul>
+              <li><strong>Pre-flop:</strong> check, or bet Play at <strong>3× or 4×</strong> the ante.</li>
+              <li><strong>After the flop:</strong> check, or bet Play at <strong>2×</strong>.</li>
+              <li><strong>After the river:</strong> bet Play at <strong>1×</strong>, or fold.</li>
+            </ul>
+            <p>
+              The dealer needs a pair or better to “open”. If they don't, the Ante pushes. Otherwise
+              the best five-card hand wins; the Blind pays a bonus ladder on a straight or better, and
+              Trips pays on trips-or-better regardless of the dealer.
+            </p>
+            <div class="tip"><b>Rule of thumb:</b> raise 4× pre-flop with any pair, any ace, or two cards ten or higher. Only fold the river with truly nothing.</div>
+          </div>
+        </section>
+
+        <section id="threecard">
+          <h3>Three Card Poker</h3>
+          <p class="tagline">Three cards, one decision: play or fold.</p>
+          <div class="card">
+            <p>
+              Place an <strong>Ante</strong> (and optional <strong>Pair Plus</strong>). You get three
+              cards; decide to <strong>Play</strong> (match your ante) or <strong>fold</strong>. The
+              dealer needs <strong>Queen-high or better</strong> to qualify. Hand ranks run a little
+              differently with three cards: a straight beats a flush.
+            </p>
+            <table class="pay">
+              <caption>Pair Plus (pays regardless of the dealer)</caption>
+              <tr><th>Hand</th><th>Pays</th></tr>
+              <tr><td>Straight flush</td><td>40 to 1</td></tr>
+              <tr><td>Three of a kind</td><td>30 to 1</td></tr>
+              <tr><td>Straight</td><td>6 to 1</td></tr>
+              <tr><td>Flush</td><td>3 to 1</td></tr>
+              <tr><td>Pair</td><td>1 to 1</td></tr>
+            </table>
+            <div class="tip"><b>When to play:</b> raise with Queen-Six-Four or better; fold everything worse.</div>
+          </div>
+        </section>
+
+        <section id="caribbean">
+          <h3>Caribbean Stud</h3>
+          <p class="tagline">Five cards against a dealer showing one.</p>
+          <div class="card">
+            <p>
+              Ante up; you and the dealer get five cards, one of the dealer's face up. Decide to
+              <strong>raise</strong> (double your ante) or <strong>fold</strong>. The dealer qualifies
+              with <strong>Ace-King or better</strong>:
+            </p>
+            <ul>
+              <li>Dealer doesn't qualify → ante pays 1 to 1, raise pushes.</li>
+              <li>Dealer qualifies and you win → ante pays 1 to 1, raise pays a bonus by hand rank (up to 100 to 1 for a royal).</li>
+              <li>Dealer qualifies and wins → you lose both.</li>
+            </ul>
+            <div class="tip"><b>Simple rule:</b> raise with any pair or better (and a few ace-king hands); otherwise fold.</div>
+          </div>
+        </section>
+
+        <section id="mstud">
+          <h3>Mississippi Stud</h3>
+          <p class="tagline">Build a hand over three streets, raising 1×–3× each time.</p>
+          <div class="card">
+            <p>
+              Post an Ante. You get two cards, then three community cards are revealed one at a time.
+              Before each reveal you either <strong>fold</strong> or raise <strong>1×, 2× or 3×</strong>
+              your ante. At the end your five-card hand is paid on a ladder — but a pair of sixes or
+              better is needed just to get your money back:
+            </p>
+            <table class="pay">
+              <caption>Final hand</caption>
+              <tr><th>Hand</th><th>Pays</th></tr>
+              <tr><td>Royal flush</td><td>500 to 1</td></tr>
+              <tr><td>Straight flush</td><td>100 to 1</td></tr>
+              <tr><td>Four of a kind</td><td>40 to 1</td></tr>
+              <tr><td>Full house</td><td>10 to 1</td></tr>
+              <tr><td>Flush</td><td>6 to 1</td></tr>
+              <tr><td>Straight</td><td>4 to 1</td></tr>
+              <tr><td>Three of a kind</td><td>3 to 1</td></tr>
+              <tr><td>Two pair</td><td>2 to 1</td></tr>
+              <tr><td>Pair of Jacks+</td><td>1 to 1</td></tr>
+              <tr><td>Pair of 6s–10s</td><td>push</td></tr>
+            </table>
+            <div class="tip"><b>Discipline wins:</b> fold weak two-card starts early; the 3× raise is for strong made hands and big draws only.</div>
+          </div>
+        </section>
+
+        <section id="letitride">
+          <h3>Let It Ride</h3>
+          <p class="tagline">Three equal bets — pull two back if you don't like your cards.</p>
+          <div class="card">
+            <p>
+              Place three equal bets. You get three cards and share two community cards. Twice you get
+              to decide: <strong>let it ride</strong> (keep that bet in) or <strong>pull it back</strong>.
+              You're paid on your final five-card hand — a pair of tens or better:
+            </p>
+            <table class="pay">
+              <caption>Paytable</caption>
+              <tr><th>Hand</th><th>Pays</th></tr>
+              <tr><td>Royal flush</td><td>1000 to 1</td></tr>
+              <tr><td>Straight flush</td><td>200 to 1</td></tr>
+              <tr><td>Four of a kind</td><td>50 to 1</td></tr>
+              <tr><td>Full house</td><td>11 to 1</td></tr>
+              <tr><td>Flush</td><td>8 to 1</td></tr>
+              <tr><td>Straight</td><td>5 to 1</td></tr>
+              <tr><td>Three of a kind</td><td>3 to 1</td></tr>
+              <tr><td>Two pair</td><td>2 to 1</td></tr>
+              <tr><td>Pair of 10s+</td><td>1 to 1</td></tr>
+            </table>
+            <div class="tip"><b>Let the first bet ride</b> only with a paying hand or a strong draw (e.g. three to a royal). Pull back otherwise.</div>
+          </div>
+        </section>
+
+        <section id="war">
+          <h3>Casino War</h3>
+          <p class="tagline">Highest card wins. The simplest game on the floor.</p>
+          <div class="card">
+            <p>
+              You and the dealer each get one card; higher card wins even money. On a <strong>tie</strong>
+              you choose: <strong>surrender</strong> (lose half) or <strong>go to war</strong> — match
+              your bet, burn three cards, and get one more each. Win the war and you're paid on the
+              raised portion; a second tie is a bonus.
+            </p>
+            <div class="tip"><b>Going to war</b> is the lower-edge choice over surrendering, but it's a coin-flip game either way — pure, fast fun.</div>
+          </div>
+        </section>
+
+        <!-- ============================================ POKER ROOM -->
+        <section id="poker" class="group-head">
+          <h2 class="group">Poker room</h2>
+          <h3>Poker &amp; variants</h3>
+          <p class="tagline">A real poker room — blinds, side pots, showdowns — solo or live.</p>
+          <div class="card">
+            <p>
+              Sit at a full table and play hands to a showdown: post the blinds (or antes), act in turn
+              to <strong>fold / check / call / bet / raise</strong>, and the best five-card hand takes
+              the pot. All-ins split the pot into side pots correctly. One engine deals every variant:
+            </p>
+            <table class="pay">
+              <caption>Available games</caption>
+              <tr><th>Variant</th><th>How it plays</th></tr>
+              <tr><td>No-Limit Hold'em</td><td>Two hole cards, five shared; bet any amount up to your stack.</td></tr>
+              <tr><td>Limit Hold'em</td><td>Hold'em with fixed bet sizes and a raise cap.</td></tr>
+              <tr><td>Pot-Limit Omaha</td><td>Four hole cards, use exactly two; bets capped at the pot.</td></tr>
+              <tr><td>Limit Omaha Hi</td><td>Omaha with fixed-limit betting.</td></tr>
+              <tr><td>Seven-Card Stud</td><td>No shared board — up and down cards, bring-in and antes.</td></tr>
+              <tr><td>Five-Card Draw</td><td>Five private cards, one draw to replace what you discard.</td></tr>
+            </table>
+            <h4>Hand rankings (high to low)</h4>
+            <p>
+              Royal flush, straight flush, four of a kind, full house, flush, straight, three of a
+              kind, two pair, one pair, high card.
+            </p>
+            <div class="tip">
+              <b>Solo play</b> seats you against five house regulars, each with a distinct style.
+              Use the bet slider or the quick buttons (½ pot, pot, all-in) to size your raises.
+            </div>
+          </div>
+        </section>
+
+        <section id="online">
+          <h3>Playing online <span class="pill">multiplayer</span></h3>
+          <p class="tagline">Share a table with other people; bots fill the empty seats.</p>
+          <div class="card">
+            <p>
+              From the poker room, tap <strong>Play online</strong> (you need to be signed in). You can
+              start a table or join one:
+            </p>
+            <ul>
+              <li>
+                <strong>Create a table.</strong> Choose the game, and set it up the way you want:
+                <ul>
+                  <li><strong>Table size</strong> — 2 to 9 seats.</li>
+                  <li><strong>Robot players</strong> — how many seats start as bots. The rest stay open for people.</li>
+                  <li><strong>Buy-in</strong> — the chips each player brings, drawn from the shared wallet.</li>
+                  <li><strong>Drop timer</strong> — how long a disconnected player's seat is held before a bot takes over.</li>
+                  <li><strong>Public or private</strong> — list it in the lobby, or keep it to a shared code.</li>
+                </ul>
+              </li>
+              <li><strong>Join by code.</strong> Enter a friend's four-character table code to sit down at a private game.</li>
+              <li><strong>Public lobby.</strong> Browse open tables and join one in a tap.</li>
+            </ul>
+            <h4>At the table</h4>
+            <ul>
+              <li><strong>Take a seat</strong> to play, or just watch. Bots play any seat no human holds.</li>
+              <li><strong>If someone drops</strong>, the remaining players choose: hold their seat (auto-folded until they're back) or let a bot take over. A bot takes it automatically once the drop timer runs out.</li>
+              <li><strong>Leaving</strong> racks your chips back to your wallet and frees the seat for the next person.</li>
+            </ul>
+            <div class="tip">
+              <b>Share the code</b> from the top of the table (tap it to copy) so friends can join your
+              private game.
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================ DICE & WHEELS -->
+        <section id="craps" class="group-head">
+          <h2 class="group">Dice &amp; wheels</h2>
+          <h3>Craps</h3>
+          <p class="tagline">Bet on two dice — the loudest, deepest table in the house.</p>
+          <div class="card">
+            <p>
+              A round starts with a <strong>come-out roll</strong>. The core bet is the
+              <strong>Pass Line</strong>:
+            </p>
+            <ul>
+              <li>Come-out <strong>7 or 11</strong> → Pass wins. <strong>2, 3 or 12</strong> → Pass loses.</li>
+              <li>Any other number becomes the <strong>point</strong>. Now Pass wins if that point rolls again before a 7, and loses on the 7.</li>
+            </ul>
+            <p>Once a point is set you can back your Pass bet with <strong>Odds</strong> — a bet paid at true odds with <em>zero</em> house edge. Other common bets:</p>
+            <table class="pay">
+              <tr><th>Bet</th><th>What it does</th></tr>
+              <tr><td>Don't Pass</td><td>The opposite side of Pass — bets with the house against the shooter.</td></tr>
+              <tr><td>Come / Don't Come</td><td>Like Pass, but started on any roll after the point.</td></tr>
+              <tr><td>Place bets</td><td>Bet a specific number (4,5,6,8,9,10) to roll before a 7.</td></tr>
+              <tr><td>Field</td><td>A one-roll bet on 2,3,4,9,10,11,12.</td></tr>
+            </table>
+            <div class="tip"><b>Best value:</b> Pass (or Don't Pass) backed with maximum Odds is the lowest-edge bet in the casino. Skip the flashy one-roll center bets.</div>
+          </div>
+        </section>
+
+        <section id="roulette">
+          <h3>Roulette</h3>
+          <p class="tagline">Spin the wheel; bet a number, a color, or a whole region.</p>
+          <div class="card">
+            <p>Place chips on the layout before the spin. Bets pay by how unlikely they are:</p>
+            <table class="pay">
+              <caption>Payouts</caption>
+              <tr><th>Bet</th><th>Pays</th></tr>
+              <tr><td>Single number (straight up)</td><td>35 to 1</td></tr>
+              <tr><td>Split (two numbers)</td><td>17 to 1</td></tr>
+              <tr><td>Corner (four)</td><td>8 to 1</td></tr>
+              <tr><td>Line (six)</td><td>5 to 1</td></tr>
+              <tr><td>Column / Dozen</td><td>2 to 1</td></tr>
+              <tr><td>Red/Black, Odd/Even, High/Low</td><td>1 to 1</td></tr>
+            </table>
+            <div class="tip">
+              <b>Pick your wheel.</b> European (single zero) halves the house edge versus American
+              (double zero). French rules give half an even-money bet back on zero — kinder still.
+            </div>
+          </div>
+        </section>
+
+        <section id="sicbo">
+          <h3>Sic Bo</h3>
+          <p class="tagline">Three dice, a whole grid of ways to bet the total.</p>
+          <div class="card">
+            <p>
+              Three dice are rolled; bet on what they'll show. <strong>Small</strong> (total 4–10) and
+              <strong>Big</strong> (11–17) pay even money and lose on any triple. You can also bet a
+              specific total, a specific triple (huge payout, long odds), a pair, or a single number.
+            </p>
+            <table class="pay">
+              <tr><th>Bet</th><th>Pays</th></tr>
+              <tr><td>Small / Big</td><td>1 to 1</td></tr>
+              <tr><td>Single number</td><td>1 to 1 per die showing it</td></tr>
+              <tr><td>Specific total</td><td>6 to 1 up to 60 to 1</td></tr>
+              <tr><td>Any triple</td><td>30 to 1</td></tr>
+              <tr><td>Specific triple</td><td>180 to 1</td></tr>
+            </table>
+            <div class="tip"><b>Lowest edge:</b> Small and Big. The exotic totals and triples are where the house makes its money.</div>
+          </div>
+        </section>
+
+        <section id="bigsix">
+          <h3>Big Six (Money Wheel)</h3>
+          <p class="tagline">Bet which segment the wheel stops on.</p>
+          <div class="card">
+            <p>
+              The wheel is divided into segments marked by multiplier (1, 2, 5, 10, 20) and a couple of
+              jackpot symbols. Bet a symbol; it pays its number to one if the wheel stops there. The
+              commoner the symbol, the smaller the payout.
+            </p>
+            <div class="tip"><b>Best of the segments</b> is the 1-to-1; the big multipliers carry the biggest house edge. It's a simple, streaky wheel — bet small.</div>
+          </div>
+        </section>
+
+        <!-- ============================================ MACHINES -->
+        <section id="videopoker" class="group-head">
+          <h2 class="group">Machines</h2>
+          <h3>Video Poker</h3>
+          <p class="tagline">Draw poker against a paytable — skill genuinely matters.</p>
+          <div class="card">
+            <p>
+              You're dealt five cards. <strong>Hold</strong> the ones you want to keep and draw new
+              cards for the rest; your final hand is paid on the machine's table. Unlike slots, your
+              choices move the odds a lot — with correct play these are among the best games in the
+              house.
+            </p>
+            <h4>Variants here</h4>
+            <ul>
+              <li><strong>Jacks or Better 9/6</strong> — the classic; a pair of jacks pays. “9/6” is the full-house/flush pay (the good one).</li>
+              <li><strong>Jacks or Better 8/5</strong> — a tighter paytable; same strategy, lower return.</li>
+              <li><strong>Bonus Poker</strong> — extra for four-of-a-kinds.</li>
+              <li><strong>Double Bonus 9/7/5</strong> — bigger quad bonuses, slightly different strategy.</li>
+              <li><strong>Deuces Wild (full pay)</strong> — all four 2s are wild; the whole paytable and strategy shift.</li>
+            </ul>
+            <h4>Playing well</h4>
+            <ul>
+              <li>Play up to <strong>ten hands</strong> at once — your held cards carry into every hand, each drawing independently.</li>
+              <li>Use <strong>auto-hold</strong>: the machine can highlight the mathematically best cards to keep. A great way to learn correct play.</li>
+            </ul>
+            <div class="tip"><b>First rule of Jacks or Better:</b> never break a paying pair to chase a flush or straight unless you're one card from a royal.</div>
+          </div>
+        </section>
+
+        <section id="slots">
+          <h3>Slots</h3>
+          <p class="tagline">Six cabinets, six different mechanics.</p>
+          <div class="card">
+            <p>
+              Set your bet and spin; matching symbols on a payline (or across the reels) pay out. Each
+              cabinet plays differently:
+            </p>
+            <table class="pay">
+              <caption>The cabinets</caption>
+              <tr><th>Machine</th><th>What makes it tick</th></tr>
+              <tr><td>Bars &amp; Sevens</td><td>A classic three-reel feel with multiplying wilds.</td></tr>
+              <tr><td>Bell Ringer</td><td>Wilds and a scatter bell that triggers free spins.</td></tr>
+              <tr><td>The Late Show</td><td>A themed cabinet with a bonus feature round.</td></tr>
+              <tr><td>Rockslide</td><td>Cascading symbols — wins clear and new symbols drop in.</td></tr>
+              <tr><td>High Roller</td><td>Bigger bets, bigger top-end volatility.</td></tr>
+              <tr><td>Nova Ways</td><td>“Ways” paying — any matching symbols on adjacent reels pay, no fixed lines.</td></tr>
+            </table>
+            <h4>The symbols</h4>
+            <ul>
+              <li><strong>Wild</strong> — substitutes for other symbols to complete a win (sometimes with a multiplier).</li>
+              <li><strong>Scatter</strong> — pays or triggers a bonus wherever it lands, not just on a line.</li>
+              <li><strong>Bonus</strong> — collects toward a feature round.</li>
+            </ul>
+            <div class="tip"><b>Honest machines:</b> each cabinet's return-to-player is a fixed, published figure — no streak is “due”, and the odds never change based on how you've been doing.</div>
+          </div>
+        </section>
+
+        <section id="keno">
+          <h3>Keno</h3>
+          <p class="tagline">Pick up to ten of eighty; match the draw.</p>
+          <div class="card">
+            <p>
+              Choose up to ten numbers from 1–80. Twenty numbers are then drawn, and you're paid by how
+              many of yours came up — the more you pick and the more you hit, the bigger the pay. Hit
+              all ten and it's a jackpot.
+            </p>
+            <div class="tip"><b>It's a long-odds game by nature</b> — the fun is in the near-misses and the occasional big hit. The payouts shown are the exact odds for each pick size.</div>
+          </div>
+        </section>
+
+        <!-- ============================================ PATIENCE -->
+        <section id="solitaire" class="group-head">
+          <h2 class="group">Patience</h2>
+          <h3>Solitaire</h3>
+          <p class="tagline">Thirty-five patience games across the classic families.</p>
+          <div class="card">
+            <p>
+              A quieter corner of the floor: single-player patience, no betting. The aim is almost
+              always to build the four <strong>foundations</strong> up in suit from ace to king. The
+              families differ in how the tableau builds and how the stock is dealt:
+            </p>
+            <table class="pay">
+              <caption>Families</caption>
+              <tr><th>Family</th><th>The idea</th></tr>
+              <tr><td>Klondike</td><td>The classic — build down in alternating colour, turn one or three from the stock. Includes Vegas and relaxed variants.</td></tr>
+              <tr><td>FreeCell</td><td>Everything dealt face up with a few free cells — almost every deal is winnable with care.</td></tr>
+              <tr><td>Spider</td><td>Build down in suit to clear whole suits; play one, two or four suits for rising difficulty.</td></tr>
+              <tr><td>Canfield</td><td>Foundations start on a dealt rank and climb; a tight, deliberate game.</td></tr>
+              <tr><td>Forty Thieves</td><td>Two packs, suit builds, single-card moves — a stern test, with looser variants.</td></tr>
+              <tr><td>Golf</td><td>Clear the tableau onto a single pile running up or down by rank.</td></tr>
+              <tr><td>Scorpion / Yukon</td><td>Move long runs regardless of order; build down in suit (Scorpion) or colour (Yukon).</td></tr>
+            </table>
+            <div class="tip"><b>New to patience?</b> Start with FreeCell (the most winnable) or Klondike draw-1, then branch out.</div>
+          </div>
+        </section>
+
+        <p class="totop"><a href="#top">↑ Back to top</a></p>
+      </main>
+    </div>
+
+    <footer>
+      <p>
+        The Tables — play money, honest odds. Every payout and house edge above is the real
+        mathematical figure. <a href="./">Back to the floor →</a>
+      </p>
+    </footer>
+  </body>
+</html>

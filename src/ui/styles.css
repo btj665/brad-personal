@@ -10641,6 +10641,19 @@ main.main {
   background: rgba(200, 160, 74, 0.2);
 }
 
+.gamenav-help {
+  font-size: 0.82rem;
+  color: var(--ink-dim);
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 5px 4px;
+  border-bottom: 1px solid transparent;
+}
+.gamenav-help:hover {
+  color: #e8d4a4;
+  border-bottom-color: rgba(200, 160, 74, 0.5);
+}
+
 /* --- the gate --- */
 .auth {
   min-height: 100vh;

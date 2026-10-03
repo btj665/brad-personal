@@ -162,6 +162,15 @@ function Casino() {
         </div>
 
         <div className="gamenav-account">
+          <a
+            className="gamenav-help"
+            href="how-to-play.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Rules and payouts for every game"
+          >
+            How to play
+          </a>
           <span className="gamenav-balance" title="Your balance, shared across every game">
             ${balance.toLocaleString('en-US')}
           </span>
