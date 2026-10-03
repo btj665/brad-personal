@@ -19,13 +19,20 @@ import { PokerTable } from './PokerTable'
 import { BetControls } from './BetControls'
 
 const BIG_BLIND = 20
-const BUY_IN = 2000
-const SEATS = 6
+const DEFAULT_BUY_IN = 2000
+const DEFAULT_SEATS = 6
+const DEFAULT_BOTS = 4
+const DEFAULT_TIMER_S = 30
+
+const BUY_IN_CHOICES = [500, 1000, 2000, 5000, 10000]
+const TIMER_CHOICES = [10, 20, 30, 45, 60, 120]
 
 interface Session {
   code: string
   meta: TableMeta
   creator: boolean
+  /** The creator's actual (wallet-capped) buy-in. */
+  stake?: number
 }
 
 function randomCode(): string {
@@ -37,10 +44,10 @@ function randomCode(): string {
 }
 
 /** What to buy in for, capped at the wallet, topping up if broke. */
-async function sizeBuyIn(): Promise<number> {
+async function sizeBuyIn(target: number): Promise<number> {
   let bal = getBalance()
   if (bal <= 0) bal = await ensureFunds()
-  return Math.min(BUY_IN, Math.max(0, bal))
+  return Math.min(target, Math.max(0, bal))
 }
 
 export function OnlinePoker({ onExitOnline }: { onExitOnline: () => void }) {
@@ -56,10 +63,19 @@ function Lobby({ onStart, onBack }: { onStart: (s: Session) => void; onBack: () 
   const [name, setName] = useState('')
   const [variantId, setVariantId] = useState(VARIANTS[0].id)
   const [isPublic, setIsPublic] = useState(true)
+  const [seats, setSeats] = useState(DEFAULT_SEATS)
+  const [bots, setBots] = useState(DEFAULT_BOTS)
+  const [buyIn, setBuyIn] = useState(DEFAULT_BUY_IN)
+  const [timerS, setTimerS] = useState(DEFAULT_TIMER_S)
   const [joinCode, setJoinCode] = useState('')
   const [tables, setTables] = useState<TableAd[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Bots can't outnumber the seats left after the creator; clamp when size drops.
+  const maxBots = Math.max(0, seats - 1)
+  const botCount = Math.min(bots, maxBots)
+  const openForHumans = seats - 1 - botCount
 
   useEffect(() => {
     if (!userId) return
@@ -77,9 +93,9 @@ function Lobby({ onStart, onBack }: { onStart: (s: Session) => void; onBack: () 
     setBusy(true)
     setError(null)
     try {
-      const buyIn = await sizeBuyIn()
-      if (buyIn <= 0) throw new Error('Your wallet is empty — nothing to buy in with.')
-      recordDelta('poker', -buyIn)
+      const stake = await sizeBuyIn(buyIn)
+      if (stake <= 0) throw new Error('Your wallet is empty — nothing to buy in with.')
+      recordDelta('poker', -stake)
       const code = randomCode()
       const meta: TableMeta = {
         code,
@@ -89,9 +105,11 @@ function Lobby({ onStart, onBack }: { onStart: (s: Session) => void; onBack: () 
         hostId: userId,
         bigBlind: BIG_BLIND,
         buyIn,
-        seats: SEATS,
+        seats,
+        bots: botCount,
+        disconnectMs: timerS * 1000,
       }
-      onStart({ code, meta, creator: true })
+      onStart({ code, meta, creator: true, stake })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create the table.')
       setBusy(false)
@@ -110,8 +128,10 @@ function Lobby({ onStart, onBack }: { onStart: (s: Session) => void; onBack: () 
       variantId: VARIANTS[0].id,
       hostId: '',
       bigBlind: BIG_BLIND,
-      buyIn: BUY_IN,
-      seats: SEATS,
+      buyIn: DEFAULT_BUY_IN,
+      seats: DEFAULT_SEATS,
+      bots: 0,
+      disconnectMs: DEFAULT_TIMER_S * 1000,
     }
     onStart({ code: clean, meta, creator: false })
   }
@@ -144,6 +164,63 @@ function Lobby({ onStart, onBack }: { onStart: (s: Session) => void; onBack: () 
               ))}
             </select>
           </label>
+
+          <div className="pk-lobby-grid">
+            <label className="auth-field">
+              <span>Table size</span>
+              <select
+                className="sl-picker"
+                value={seats}
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  setSeats(n)
+                  if (bots > n - 1) setBots(n - 1)
+                }}
+              >
+                {[2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                  <option key={n} value={n}>
+                    {n} seats
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="auth-field">
+              <span>Robot players</span>
+              <select className="sl-picker" value={botCount} onChange={(e) => setBots(Number(e.target.value))}>
+                {Array.from({ length: maxBots + 1 }, (_, n) => (
+                  <option key={n} value={n}>
+                    {n} {n === 1 ? 'bot' : 'bots'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="auth-field">
+              <span>Buy-in</span>
+              <select className="sl-picker" value={buyIn} onChange={(e) => setBuyIn(Number(e.target.value))}>
+                {BUY_IN_CHOICES.map((n) => (
+                  <option key={n} value={n}>
+                    {n.toLocaleString()} chips
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="auth-field">
+              <span>Hold a dropped seat for</span>
+              <select className="sl-picker" value={timerS} onChange={(e) => setTimerS(Number(e.target.value))}>
+                {TIMER_CHOICES.map((n) => (
+                  <option key={n} value={n}>
+                    {n < 60 ? `${n} seconds` : `${n / 60} min`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="pk-lobby-note">
+            {openForHumans > 0
+              ? `Room for you + ${openForHumans} ${openForHumans === 1 ? 'person' : 'people'} and ${botCount} ${botCount === 1 ? 'bot' : 'bots'}.`
+              : `Just you and ${botCount} ${botCount === 1 ? 'bot' : 'bots'} — no open seats for others.`}
+          </p>
+
           <label className="pk-lobby-check">
             <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
             <span>List publicly (anyone can join). Off = private, join by code only.</span>
@@ -247,17 +324,18 @@ function TableView({ session, onLeave }: { session: Session; onLeave: () => void
   }
 
   const sit = async (seat: number) => {
-    const buyIn = await sizeBuyIn()
-    if (buyIn <= 0) return
-    recordDelta('poker', -buyIn)
-    table.sit(seat, buyIn)
+    const stake = await sizeBuyIn(info.meta.buyIn)
+    if (stake <= 0) return
+    recordDelta('poker', -stake)
+    table.sit(seat, stake)
   }
 
   const seated = info.mySeat >= 0
   const myStack = seated ? (info.stacks[info.mySeat] ?? 0) : 0
+  // You can take an open seat, or bump a bot — humans are always welcome.
   const openSeats = info.kinds
     .map((k, i) => ({ k, i }))
-    .filter((s) => s.k === 'bot')
+    .filter((s) => s.k === 'bot' || s.k === 'empty')
     .map((s) => s.i)
   const busted = seated && myStack <= 0 && (view?.over ?? false)
   // A vacancy prompt goes to seated players other than the one who dropped.

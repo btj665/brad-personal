@@ -11137,3 +11137,19 @@ main.main {
     padding: 14px;
   }
 }
+
+.pk-lobby-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.pk-lobby-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+@media (max-width: 480px) {
+  .pk-lobby-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -32,7 +32,14 @@ export interface TableMeta {
   hostId: string
   bigBlind: number
   buyIn: number
+  /** Total seats at the table. */
   seats: number
+  /** How many seats start as bots; the rest (beyond the creator) stay open for
+   *  other people. Humans may also take a bot's seat, so this is the starting
+   *  count, not a cap. */
+  bots: number
+  /** How long a dropped player's seat is held before a bot takes it, in ms. */
+  disconnectMs: number
 }
 
 /** The authoritative table state, redacted for broadcast. */

@@ -35,8 +35,6 @@ import {
 } from './protocol'
 
 const BOT_STACK = 2000
-/** How long a vacated seat is held before a bot takes it, if nobody chooses. */
-const VACANCY_MS = 30000
 
 /** The regulars who fill empty seats, same tempers as the solo table. */
 const BOT_POOL: Array<{ name: string; profile: BotProfile }> = [
@@ -76,6 +74,9 @@ export interface OnlineOptions {
   name: string
   /** True when this client created the table (it starts as host). */
   creator: boolean
+  /** The creator's actual buy-in (capped to their wallet), which can be below the
+   *  table's standard. Defaults to the table buy-in. */
+  stake?: number
 }
 
 /** What the screen reads to draw its chrome around the felt. */
@@ -105,6 +106,7 @@ export class OnlineTable {
   meta: TableMeta
   private user: string
   private name: string
+  private creatorStake: number
 
   private channel: TableChannel
   private lobby: LobbyChannel | null = null
@@ -121,9 +123,10 @@ export class OnlineTable {
   private lastButton = -1
   private timer: ReturnType<typeof setTimeout> | null = null
   private vacancyTimer: ReturnType<typeof setTimeout> | null = null
-  /** Claims and leaves to apply at the next hand. */
+  /** Claims and conversions to apply at the next hand. A seat becomes a bot when a
+   *  dropped player is replaced, or open when someone leaves voluntarily. */
   private pendingSits = new Map<number, { user: string; name: string; buyIn: number }>()
-  private pendingBots = new Set<number>()
+  private pendingConvert = new Map<number, 'bot' | 'empty'>()
 
   // Guest state.
   private snapshot: TableSnapshot | null = null
@@ -141,6 +144,7 @@ export class OnlineTable {
     this.meta = opts.meta
     this.user = opts.user
     this.name = opts.name
+    this.creatorStake = opts.stake ?? opts.meta.buyIn
     this.role = opts.creator ? 'host' : 'guest'
     this.channel = new TableChannel(opts.supabase, opts.meta.code, opts.user, opts.name)
   }
@@ -258,11 +262,12 @@ export class OnlineTable {
         const kind = this.snapshot!.kinds[i]
         const owner = this.snapshot!.owners[i]
         return {
-          kind: kind === 'human' ? 'human' : 'bot',
+          kind,
           owner: kind === 'human' ? owner : null,
-          name: kind === 'human' ? s.name : this.botName(i),
-          stack: Math.max(0, s.stack + s.committed),
-          profile: kind === 'human' ? null : this.botProfile(i),
+          name: kind === 'human' ? s.name : kind === 'bot' ? this.botName(i) : 'Open',
+          // Refund chips committed to the voided hand; open seats carry nothing.
+          stack: kind === 'empty' ? 0 : Math.max(0, s.stack + s.committed),
+          profile: kind === 'bot' ? this.botProfile(i) : null,
           away: this.snapshot!.away[i] ?? false,
         }
       })
@@ -293,14 +298,16 @@ export class OnlineTable {
   }
 
   private initHostRoster(): void {
+    // Seat 0 is the creator. The next `bots` seats are bots; any seats beyond that
+    // stay open for other people to sit down in.
     this.roster = []
     for (let i = 0; i < this.meta.seats; i++) {
       if (i === 0) {
-        // The creator takes seat 0; their stack is set when they confirm sit, but
-        // start them seated so there's a human from the first hand.
-        this.roster.push({ kind: 'human', owner: this.user, name: this.name, stack: this.meta.buyIn, away: false, profile: null })
-      } else {
+        this.roster.push({ kind: 'human', owner: this.user, name: this.name, stack: this.creatorStake, away: false, profile: null })
+      } else if (i <= this.meta.bots) {
         this.roster.push({ kind: 'bot', owner: null, name: this.botName(i), stack: BOT_STACK, away: false, profile: this.botProfile(i) })
+      } else {
+        this.roster.push({ kind: 'empty', owner: null, name: 'Open', stack: 0, away: false, profile: null })
       }
     }
   }
@@ -329,28 +336,39 @@ export class OnlineTable {
     }
     this.pendingSits.clear()
 
-    // Apply pending bot conversions (a human who left / timed out).
-    for (const seat of this.pendingBots) {
+    // Apply pending conversions: a dropped player's seat becomes a bot, a seat
+    // left voluntarily becomes open again (pendingSits above already won this seat
+    // if someone re-claimed it, so only convert seats nobody took).
+    for (const [seat, to] of this.pendingConvert) {
+      if (this.pendingSits.has(seat)) continue
       const r = this.roster[seat]
-      if (r) {
+      if (!r) continue
+      if (to === 'bot') {
         r.kind = 'bot'
         r.owner = null
         r.name = this.botName(seat)
         r.profile = this.botProfile(seat)
         r.stack = BOT_STACK
-        r.away = false
+      } else {
+        r.kind = 'empty'
+        r.owner = null
+        r.name = 'Open'
+        r.profile = null
+        r.stack = 0
       }
+      r.away = false
     }
-    this.pendingBots.clear()
+    this.pendingConvert.clear()
     this.clearVacancy()
 
     // Rebuy busted bots so the table stays full.
     for (const r of this.roster) if (r.kind === 'bot' && r.stack <= 0) r.stack = BOT_STACK
 
+    // An open seat sits out (stack 0, no bot brain so the engine never waits on it).
     const specs: SeatSpec[] = this.roster.map((r) => ({
       name: r.name,
       bot: r.kind === 'bot' ? r.profile : null,
-      stack: r.stack,
+      stack: r.kind === 'empty' ? 0 : r.stack,
     }))
 
     const game = new PokerGame({
@@ -486,7 +504,9 @@ export class OnlineTable {
     const r = this.roster[seat]
     if (!r) return
     this.pendingSits.delete(seat)
-    this.pendingBots.add(seat)
+    // Leaving voluntarily opens the seat for the next person — it doesn't spawn a
+    // bot (that only happens on a disconnect, by the players' choice).
+    this.pendingConvert.set(seat, 'empty')
     if (r.kind === 'human' && this.game && !this.game.over) {
       // Fold them out of the current hand immediately.
       r.away = true
@@ -505,9 +525,10 @@ export class OnlineTable {
     if (!r || r.kind !== 'human') return
     r.away = true
     // Offer the remaining players the choice; a bot takes over at the deadline.
-    this.vacancy = { seat, name: r.name, deadline: Date.now() + VACANCY_MS }
+    const ms = this.meta.disconnectMs
+    this.vacancy = { seat, name: r.name, deadline: Date.now() + ms }
     if (this.vacancyTimer) clearTimeout(this.vacancyTimer)
-    this.vacancyTimer = setTimeout(() => this.applyVacancyChoice(seat, 'bot'), VACANCY_MS)
+    this.vacancyTimer = setTimeout(() => this.applyVacancyChoice(seat, 'bot'), ms)
     this.broadcast()
     // If the clock was parked waiting on this now-absent player, nudge it so the
     // seat gets auto-folded and the hand moves on.
@@ -516,7 +537,7 @@ export class OnlineTable {
 
   private applyVacancyChoice(seat: number, choice: 'bot' | 'hold'): void {
     if (this.vacancy?.seat !== seat) return
-    if (choice === 'bot') this.pendingBots.add(seat)
+    if (choice === 'bot') this.pendingConvert.set(seat, 'bot')
     // 'hold' keeps the seat human+away until they return or a later vacancy.
     this.clearVacancy()
     this.touch()

@@ -24,6 +24,8 @@ const META: TableMeta = {
   bigBlind: 20,
   buyIn: 1000,
   seats: 3,
+  bots: 2,
+  disconnectMs: 30000,
 }
 
 /** A 3-seat Hold'em table: seat 0 a human (owner u0), seats 1–2 bots. */
