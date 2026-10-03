@@ -11155,12 +11155,38 @@ main.main {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  min-width: 0;
 }
 .pk-lobby-note {
   margin: 0;
   font-size: 12px;
   color: var(--ink-dim);
 }
+
+/* Keep the lobby inside the viewport on a phone. iOS Safari sizes <select> and
+   <input> to their own content and won't shrink them inside a flex/grid cell
+   unless they're told to — so a select's intrinsic width can shove the whole card
+   off the right edge (where .app's overflow-x: clip then hides it). Pinning the
+   controls to the cell width and letting every wrapper shrink past its content
+   min-width stops that at the source. */
+.pk-lobby,
+.pk-lobby-make,
+.pk-lobby-join,
+.pk-lobby-grid > *,
+.pk-lobby .auth-field,
+.pk-join-row,
+.pk-code-input {
+  min-width: 0;
+}
+.pk-lobby select,
+.pk-lobby input,
+.pk-lobby .sl-picker {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 @media (max-width: 480px) {
   .pk-lobby-grid {
     grid-template-columns: 1fr;
