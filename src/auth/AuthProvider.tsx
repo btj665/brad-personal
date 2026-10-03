@@ -71,10 +71,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const verified = (factors?.totp ?? []).some((f) => f.status === 'verified')
     setHasFactor(verified)
 
-    // nextLevel is aal2 exactly when a verified factor exists; until the challenge
-    // is done currentLevel lags at aal1. Equal levels means nothing is owed.
-    const satisfied = aal?.currentLevel === aal?.nextLevel
-    if (!satisfied) {
+    // An authenticator is required for everyone. Two ways to still owe one:
+    //   * No verified factor yet — a brand-new account. Force enrolment (the QR),
+    //     otherwise Supabase sees nextLevel == aal1 and would wave them in with no
+    //     second factor at all.
+    //   * A verified factor exists but this session is still at aal1 (just signed
+    //     in with a password) — ask for the current code. Here nextLevel is aal2
+    //     while currentLevel lags, so the two levels differ.
+    const challengePending = aal?.currentLevel !== aal?.nextLevel
+    if (!verified || challengePending) {
       setStatus('needsMfa')
       return
     }
