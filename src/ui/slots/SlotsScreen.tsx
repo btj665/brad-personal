@@ -81,7 +81,7 @@ function useRollup(target: number): number {
 
 export function SlotsScreen() {
   const [machine, setMachine] = useState<Machine>(MACHINES[0])
-  const { game, replace } = useSharedBankroll(
+  const { game, refill } = useSharedBankroll(
     'slots',
     (bankroll) => new SlotGame({ machine, seed: randomSeed(), bankroll }),
   )
@@ -283,7 +283,7 @@ export function SlotsScreen() {
   )
 
   const rebuy = useCallback(() => {
-    replace((bankroll) => {
+    refill((bankroll) => {
       const g = new SlotGame({ machine, seed: randomSeed(), bankroll })
       g.setCoinsPerLine(game.coinsPerLine)
       return g
@@ -292,7 +292,7 @@ export function SlotsScreen() {
     setRunning(0)
     setBonusSettled(true)
     setPhase('idle')
-  }, [machine, game.coinsPerLine, replace])
+  }, [machine, game.coinsPerLine, refill])
 
   // --- what to light -------------------------------------------------------
 

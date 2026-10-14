@@ -86,14 +86,14 @@ function Spot({
 }
 
 export function ThreeCardScreen() {
-  const { game, replace } = useSharedBankroll('threecard', (bankroll) => new ThreeCardGame({ seed: randomSeed(), bankroll }))
+  const { game, refill } = useSharedBankroll('threecard', (bankroll) => new ThreeCardGame({ seed: randomSeed(), bankroll }))
   const [coach, setCoach] = useState(false)
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   const rebuy = useCallback(
     () =>
-      replace((bankroll) => new ThreeCardGame({ seed: randomSeed(), bankroll, pairPlusTableId: game.table.id })),
-    [replace, game],
+      refill((bankroll) => new ThreeCardGame({ seed: randomSeed(), bankroll, pairPlusTableId: game.table.id })),
+    [refill, game],
   )
 
   const deciding = game.phase === 'decide'

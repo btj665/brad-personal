@@ -18,13 +18,13 @@ const CHIPS = [5, 25, 100, 500]
 const CIRCLES = ['1', '2', '$']
 
 export function LetItRideScreen() {
-  const { game, replace } = useSharedBankroll('letitride', (bankroll) => new LetItRideGame({ seed: randomSeed(), bankroll }))
+  const { game, refill } = useSharedBankroll('letitride', (bankroll) => new LetItRideGame({ seed: randomSeed(), bankroll }))
   const [coach, setCoach] = useState(false)
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   const rebuy = useCallback(
-    () => replace((bankroll) => new LetItRideGame({ seed: randomSeed(), bankroll, unit: game.unit })),
-    [replace, game],
+    () => refill((bankroll) => new LetItRideGame({ seed: randomSeed(), bankroll, unit: game.unit })),
+    [refill, game],
   )
 
   const round = game.round ?? game.last

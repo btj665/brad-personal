@@ -165,9 +165,12 @@ begin
 end;
 $$;
 
--- Replenish a broke wallet. Refills to the base stake only when the balance is at
--- or below zero and a short cooldown has passed, so it can't be spammed. Returns
--- the balance (unchanged if a top-up wasn't due).
+-- Replenish a short wallet. Refills to the base stake whenever the balance has
+-- fallen below it and a short cooldown has passed, so it can't be spammed. Topping
+-- up below the full stake (not only at zero) is what frees a player stranded under
+-- the table minimum — a few chips left, too few to bet. It never pays above the
+-- base, so there's no free money beyond the standard refill. Returns the balance
+-- (unchanged if a top-up wasn't due).
 create or replace function public.top_up()
 returns numeric
 language plpgsql
@@ -188,7 +191,7 @@ begin
     raise exception 'no wallet';
   end if;
 
-  if w.balance <= 0 and (w.last_topup is null or now() - w.last_topup > cooldown) then
+  if w.balance < base and (w.last_topup is null or now() - w.last_topup > cooldown) then
     update public.wallets
       set balance = base, topups = topups + 1, last_topup = now(), updated_at = now()
       where user_id = auth.uid()

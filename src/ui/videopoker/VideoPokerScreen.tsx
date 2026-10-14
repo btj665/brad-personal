@@ -144,7 +144,7 @@ function HandRow({ row }: { row: RowSpec }) {
 }
 
 export function VideoPokerScreen() {
-  const { game, replace } = useSharedBankroll(
+  const { game, refill } = useSharedBankroll(
     'videopoker',
     (bankroll) => new VideoPokerGame({ seed: randomSeed(), bankroll }),
   )
@@ -195,7 +195,7 @@ export function VideoPokerScreen() {
 
   const changeVariant = useCallback((id: string) => game.setVariant(id), [game])
   const rebuy = useCallback(() => {
-    replace(
+    refill(
       (bankroll) =>
         new VideoPokerGame({
           seed: randomSeed(),
@@ -205,7 +205,7 @@ export function VideoPokerScreen() {
           hands: game.hands,
         }),
     )
-  }, [game, replace])
+  }, [game, refill])
 
   const broke = game.bankroll < game.totalBet() && game.phase !== 'dealt'
   const won = done?.won ?? 0

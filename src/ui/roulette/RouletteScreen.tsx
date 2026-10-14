@@ -202,7 +202,7 @@ function Board({
 }
 
 export function RouletteScreen() {
-  const { game, replace } = useSharedBankroll('roulette', (bankroll) => new RouletteGame({ seed: randomSeed(), bankroll }))
+  const { game, refill } = useSharedBankroll('roulette', (bankroll) => new RouletteGame({ seed: randomSeed(), bankroll }))
   useSyncExternalStore(game.subscribe, game.getVersion)
 
   // The spin animation is driven here: spin the engine to learn the pocket, then
@@ -221,10 +221,10 @@ export function RouletteScreen() {
     [game, busy],
   )
   const rebuy = useCallback(() => {
-    replace((bankroll) => new RouletteGame({ seed: randomSeed(), variant: game.variant, bankroll }))
+    refill((bankroll) => new RouletteGame({ seed: randomSeed(), variant: game.variant, bankroll }))
     setAnim(null)
     setRevealed(true)
-  }, [replace, game])
+  }, [refill, game])
 
   const spin = useCallback(() => {
     if (!game.canSpin() || busy) return

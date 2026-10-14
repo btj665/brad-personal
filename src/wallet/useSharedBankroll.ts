@@ -17,15 +17,21 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { ensureFunds, getBalance, recordDelta } from './wallet'
+import { ensureFunds, getBalance, recordDelta, refill as walletRefill } from './wallet'
 
 export interface SharedGame<T> {
   game: T
-  /** Rebuild the engine funded from the current balance (e.g. a new shoe). */
+  /** Rebuild the engine, topping the wallet back up to the base stake first if it's
+   *  short. This is the "add chips" / rebuy path: it's only ever used from a broke
+   *  table, and it works even with a few chips left — under the minimum bet but not
+   *  yet zero — which is exactly the state nothing else replenished. */
   newGame: () => void
-  /** Rebuild with a new factory, funded from the current balance (e.g. a variant
-   *  switch), when the constructor arguments change. */
+  /** Rebuild with a new factory, funded from the current balance, WITHOUT topping
+   *  up — for a new shoe or a variant switch, where you keep whatever you have. */
   replace: (make: (bankroll: number) => T) => void
+  /** Like `newGame` (tops up if short) but with a custom factory, for a rebuy that
+   *  must preserve the game's settings (variant, stake, coins per line). */
+  refill: (make: (bankroll: number) => T) => void
 }
 
 /** Where the engine keeps its working balance. Most games put it on `.bankroll`;
@@ -73,16 +79,23 @@ export function useSharedBankroll<T>(
     }
   }, [game, bankroll])
 
-  const newGame = () => {
-    const g = makeRef.current(getBalance())
-    last.current = readRef.current(g)
-    setGame(g)
+  // The rebuy path: top the wallet up to the base stake if it's short, then rebuild
+  // the engine funded from the new balance. Topping up below the full stake (not
+  // only at zero) is the fix for being stranded under the table minimum.
+  const refill = (make2: (bankroll: number) => T = makeRef.current) => {
+    void walletRefill().then((bal) => {
+      const g = make2(bal)
+      last.current = readRef.current(g)
+      setGame(g)
+    })
   }
+
+  const newGame = () => refill()
   const replace = (make2: (bankroll: number) => T) => {
     const g = make2(getBalance())
     last.current = readRef.current(g)
     setGame(g)
   }
 
-  return { game, newGame, replace }
+  return { game, newGame, replace, refill }
 }

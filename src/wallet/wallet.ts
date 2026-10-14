@@ -155,6 +155,23 @@ export function recordDelta(game: string, delta: number): void {
  *  cooldown); guest mode refills locally with a short cooldown of its own. */
 export async function ensureFunds(): Promise<number> {
   if (balance > 0) return balance
+  return topUp()
+}
+
+/** Top the wallet back up to the base stake when it has fallen below it — the
+ *  manual "add chips" action. Unlike ensureFunds it fires with a few chips still
+ *  left, which is what rescues a player stranded under the table minimum (too few
+ *  chips to make a bet, but not yet zero, so nothing auto-replenished). Never pays
+ *  above the base stake. Returns the balance afterwards. */
+export async function refill(): Promise<number> {
+  if (balance >= BASE_STAKE) return balance
+  return topUp()
+}
+
+/** The shared top-up path for ensureFunds and refill: the server RPC in cloud mode
+ *  (which refills to base when short and enforces the cooldown), or a local refill
+ *  with the same cooldown in guest mode. */
+async function topUp(): Promise<number> {
   if (mode === 'guest' || !supabase || !userId) {
     const now = Date.now()
     if (now - guestTopupAt > 15000) {
