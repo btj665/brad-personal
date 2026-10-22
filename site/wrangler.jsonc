@@ -1,0 +1,10 @@
+// Deploys baldyshilltop.com as a static-assets Worker.
+// In the Cloudflare dashboard, set Advanced settings → Path to `site`.
+{
+  "name": "baldyshilltop",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": ".",
+    "not_found_handling": "404-page"
+  }
+}

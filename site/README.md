@@ -17,22 +17,23 @@ root.
 cd site && python3 -m http.server 8000   # then open http://localhost:8000
 ```
 
-## Deploy (Cloudflare Pages)
+## Deploy (Cloudflare Workers)
 
-1. **dash.cloudflare.com** → **Workers & Pages** → **Create** → **Pages** →
-   **Connect to Git** → pick `btj665/brad-personal`.
-2. Name the project something like `baldyshilltop` (keep it separate from the
-   games app project).
-3. Build settings:
-   - **Framework preset:** None
+`site/wrangler.jsonc` makes this folder a static-assets Worker named
+`baldyshilltop`. `.assetsignore` keeps the README and config from being served.
+
+1. **dash.cloudflare.com** → **Workers & Pages** → **Create** → **Import a
+   repository** → pick `btj665/brad-personal`.
+2. On **Set up your application**:
+   - **Project name:** `baldyshilltop`
    - **Build command:** *(leave empty)*
-   - **Build output directory:** `site`
-4. **Save and Deploy.**
-5. Project → **Custom domains** → add `baldyshilltop.com` and
-   `www.baldyshilltop.com`. If the domain's DNS is on Cloudflare, this is one
-   click, and HTTPS is provisioned automatically.
+   - **Deploy command:** `npx wrangler deploy` (the default)
+   - **Advanced settings → Path:** `site`
+3. **Deploy.** You get a `https://baldyshilltop.<you>.workers.dev` URL.
+4. Worker → **Settings** → **Domains & Routes** → **Add** → **Custom domain**
+   → `baldyshilltop.com`, then again for `www.baldyshilltop.com`.
 
-`404.html` is served automatically for unknown paths.
+Every push to `main` that touches `site/` redeploys it.
 
 ## Email addresses used on the site
 
