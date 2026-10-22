@@ -35,12 +35,11 @@ cd site && python3 -m http.server 8000   # then open http://localhost:8000
 
 Every push to `main` that touches `site/` redeploys it.
 
-## Email addresses used on the site
+## Email address used on the site
 
-The site lists `hello@`, `support@` and `privacy@baldyshilltop.com`. Make sure
-all three are delivered somewhere. The easiest way is **Cloudflare Email
-Routing** (domain → Email → Email Routing) with a catch-all rule that forwards
-to your real inbox. Or replace them with a single address you already have.
+Every contact link (home, support, privacy and terms) points to
+`bjohnson@baldyshilltop.com`. To change it, find and replace it in the `.html`
+files.
 
 ## Apple Developer Program checklist
 
@@ -48,6 +47,6 @@ to your real inbox. Or replace them with a single address you already have.
 - [ ] Your Apple Account / enrollment email uses the `@baldyshilltop.com` domain
 - [ ] The legal entity name on the site ("Baldy's Hilltop, LLC") exactly matches
       your D-U-N-S record and state filing
-- [ ] Contact email addresses on the site actually receive mail
+- [ ] `bjohnson@baldyshilltop.com` receives mail
 - [ ] Review the Privacy Policy and Terms before shipping each app, and update
       them if an app collects data beyond what they describe
