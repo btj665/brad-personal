@@ -4,17 +4,30 @@ The public website for **Baldy's Hilltop, LLC**: plain static HTML and CSS, with
 no build step and no dependencies. It's separate from the games app at the repo
 root.
 
-| Page | Path | Used for |
-|---|---|---|
-| Home | `/` | Company identity (Apple developer enrollment) |
-| Support | `/support.html` | App Store Connect **Support URL** |
-| Privacy Policy | `/privacy.html` | App Store Connect **Privacy Policy URL** |
-| Terms of Use | `/terms.html` | Optional EULA / terms link |
+| Page | Address | File | Used for |
+|---|---|---|---|
+| Home | `/` | `index.html` | Company identity (Apple developer enrollment) |
+| Support | `/support` | `support.html` | App Store Connect **Support URL** |
+| Privacy Policy | `/privacy` | `privacy.html` | App Store Connect **Privacy Policy URL** |
+| Terms of Use | `/terms` | `terms.html` | Optional EULA / terms link |
+| Rustfall support | `/rustfall` | `rustfall.html` | Rustfall's support page, linked from the game |
+
+Pages link to each other without `.html`. Cloudflare serves `/rustfall` from
+`rustfall.html` and redirects the old `/rustfall.html` address to it, so links
+already in App Store Connect and inside Rustfall keep working. **Don't rename or
+move these files**, and keep the `#rustfall` heading id in `privacy.html`.
+
+The home page and Support also link out to The Tables at
+`https://tables.baldyshilltop.com/` (the games app at the repo root).
+
+`og-image.png` is the picture shown when a link is shared, and
+`apple-touch-icon.png` is the icon used when the site is added to a home screen.
 
 ## Preview locally
 
 ```bash
 cd site && python3 -m http.server 8000   # then open http://localhost:8000
+# (this simple server needs the .html on page addresses, e.g. /support.html)
 ```
 
 ## Deploy (Cloudflare Workers)
