@@ -48,6 +48,26 @@ cd site && python3 -m http.server 8000   # then open http://localhost:8000
 
 Every push to `main` that touches `site/` redeploys it.
 
+## Fonts
+
+Fraunces and Inter are served from `fonts/`, not from Google Fonts, so pages
+make no requests to other companies' servers. The `@font-face` rules are at the
+top of `styles.css`, and each page preloads the two upright fonts.
+
+The files are the Latin variable fonts from the Fontsource packages (version
+5.3.0), copied in by hand so the site still has no build step:
+
+| File | Package |
+|---|---|
+| `fraunces-latin-opsz-normal.woff2`, `fraunces-latin-opsz-italic.woff2` | `@fontsource-variable/fraunces` |
+| `inter-latin-wght-normal.woff2` | `@fontsource-variable/inter` |
+
+To update them, run `npm pack @fontsource-variable/fraunces
+@fontsource-variable/inter` in a scratch folder, unpack the archives and copy
+the same three files from each `package/files/` into `fonts/`. Both fonts are
+under the SIL Open Font License; the `LICENSE-*.txt` files must stay next to
+them.
+
 ## Email address used on the site
 
 Every contact link (home, support, privacy and terms) points to
