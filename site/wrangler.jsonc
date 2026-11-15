@@ -5,6 +5,13 @@
   "compatibility_date": "2026-01-01",
   "assets": {
     "directory": ".",
+    // Cloudflare's default, written out so it isn't changed by accident:
+    // /rustfall serves rustfall.html, and the old /rustfall.html address
+    // (used by App Store Connect and inside Rustfall) redirects to it.
+    "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
-  }
+  },
+  // Lets Cloudflare build a preview for pull-request branches
+  // (`wrangler preview` refuses to run without this block; empty is fine).
+  "previews": {}
 }
