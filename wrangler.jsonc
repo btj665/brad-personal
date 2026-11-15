@@ -4,5 +4,8 @@
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  // Lets Cloudflare build a preview for pull-request branches
+  // (`wrangler preview` refuses to run without this block; empty is fine).
+  "previews": {}
 }
