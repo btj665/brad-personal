@@ -18,7 +18,7 @@ already in App Store Connect and inside Rustfall keep working. **Don't rename or
 move these files**, and keep the `#rustfall` heading id in `privacy.html`.
 
 The home page and Support also link out to The Tables at
-`https://tables.baldyshilltop.com/` (the games app at the repo root).
+`https://thetables.baldyshilltop.com/` (the games app at the repo root).
 
 `og-image.png` is the picture shown when a link is shared, and
 `apple-touch-icon.png` is the icon used when the site is added to a home screen.
