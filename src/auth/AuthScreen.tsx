@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { requireSupabase } from '../supa/client'
+import { SiteFooter } from '../ui/SiteFooter'
 import { useAuth } from './AuthProvider'
 
 type Panel = 'login' | 'signup'
@@ -24,6 +25,7 @@ export function AuthScreen() {
           Authenticator, Authy, 1Password…) are all you need.
         </p>
       </div>
+      <SiteFooter />
     </div>
   )
 }

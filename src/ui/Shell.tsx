@@ -16,6 +16,7 @@ import { PaiGowScreen } from './paigow/PaiGowScreen'
 import { PokerScreen } from './pokerroom/PokerScreen'
 import { RouletteScreen } from './roulette/RouletteScreen'
 import { SicBoScreen } from './sicbo/SicBoScreen'
+import { SiteFooter } from './SiteFooter'
 import { SlotsScreen } from './slots/SlotsScreen'
 import { ThreeCardScreen } from './threecard/ThreeCardScreen'
 import { UthScreen } from './uth/UthScreen'
@@ -192,6 +193,7 @@ function Casino() {
       </nav>
 
       <Screen />
+      <SiteFooter />
     </div>
   )
 }

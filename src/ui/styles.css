@@ -10689,6 +10689,8 @@ main.main {
 .auth {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
+  gap: 18px;
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
@@ -10851,6 +10853,32 @@ main.main {
   color: #6f7880;
   text-align: center;
   line-height: 1.5;
+}
+
+/* --- the link back to baldyshilltop.com --- */
+/* Under the sign-in card, and pushed to the bottom of the floor. */
+.sitefoot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+  font-size: 0.78rem;
+}
+.app > .sitefoot {
+  margin-top: auto;
+  padding: 16px 20px 18px;
+  border-top: 1px solid var(--line);
+}
+.sitefoot a {
+  color: var(--ink-dim);
+  text-decoration: none;
+  padding: 4px 2px;
+  border-bottom: 1px solid transparent;
+}
+.sitefoot a:hover,
+.sitefoot a:focus-visible {
+  color: #e8d4a4;
+  border-bottom-color: rgba(200, 160, 74, 0.5);
 }
 
 /* --- the back office --- */
